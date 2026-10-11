@@ -1,0 +1,7 @@
+*
+!services/
+!services/**
+!contracts/
+!contracts/**
+!tests/
+!tests/**
