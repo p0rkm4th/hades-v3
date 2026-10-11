@@ -23,3 +23,9 @@ The v2 development lane remains independent and active. Recheck its latest sourc
 - The pinned tree still contains the owner-workflow scoreboard, campaign state, daily-driver failure log, blocker log, and Decision Plane alpha evidence listed above. The historical risk review's October 11 owner-dogfood notes remain historical evidence; they do not establish that those failures persist at this exact checkpoint.
 - No authorized current v2 runtime observation or matched runtime/model/configuration evidence was collected. Consequently this is a source-only living-control check, not a new acceptance result or a controlled comparison.
 - Latest eligible v2 source SHA for this project checkpoint remains `fe222446c83a4034bfa37ac5a493d6a30b9abe74`.
+
+### Workspace and upstream verification — 2026-10-11
+
+- A read-only check of the local HADES workspace found `main` at `6a46e18657b17c261a5725de3b0d09b24e7d3f60` (commit time `2026-09-30T03:42:37-05:00`). That checkout is 1,229 commits ahead and 235 behind its recorded `origin/main`, with local modifications to multiple documentation files. It is therefore not treated as the latest eligible v2 source or a clean controlled instance.
+- A direct `git ls-remote origin refs/heads/main` check still returned `fe222446c83a4034bfa37ac5a493d6a30b9abe74`, matching the anonymous GitHub observation above. No files or state in the v2 workspace were changed.
+- No v2 runtime, model, configuration, or matched task was exercised. This remains source-only evidence; neither the local diverged checkout nor the upstream source observation establishes current owner-facing behavior.

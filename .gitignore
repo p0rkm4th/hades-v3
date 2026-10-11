@@ -36,3 +36,6 @@ venv/
 node_modules/
 dist/
 build/
+
+# Local inference weights (downloaded by the owner; never publish)
+experiment/models/*.gguf
