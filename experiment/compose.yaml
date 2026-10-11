@@ -1,0 +1,78 @@
+name: hades-v3-lab
+
+services:
+  postgres:
+    image: postgres:17.11-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+    environment:
+      POSTGRES_DB: hades_lab
+      POSTGRES_USER: fixture_writer
+      POSTGRES_PASSWORD: disposable-only-not-a-secret
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./fixtures/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fixture_writer -d hades_lab"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    networks: [fixture-backend]
+    restart: "no"
+
+  grocy:
+    image: ghcr.io/linuxserver/grocy:v4.7.1-ls342@sha256:3c1ce96cb2d0f0c7ea0c2e0b89f5769be7f2f102204fbeef87aeef56afd6036e
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: UTC
+      APP_URL: http://127.0.0.1
+    volumes:
+      - grocy-data:/config
+      - grocy-api-key:/run/fixture-secrets
+      - ./scripts:/opt/hades-v3-scripts:ro
+    networks: [fixture-backend]
+    restart: "no"
+
+  tool-gateway:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
+      GROCY_URL: http://grocy
+      GROCY_API_KEY_FILE: /run/fixture-secrets/grocy-api-key
+      TOOLS_PATH: /app/tools.json
+    volumes:
+      - grocy-api-key:/run/fixture-secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      grocy:
+        condition: service_started
+    networks: [fixture-backend, operator]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+    restart: "no"
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: services/Test.Dockerfile
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    networks: [operator]
+    restart: "no"
+
+volumes:
+  postgres-data:
+  grocy-data:
+  grocy-api-key:
+
+networks:
+  fixture-backend:
+    internal: true
+  operator:
+    internal: true

@@ -14,4 +14,4 @@ See [`docs/EXPERIMENT_PLAN.md`](docs/EXPERIMENT_PLAN.md). The frozen local produ
 
 ## Reproducibility
 
-Setup commands will be documented alongside the disposable comparison environment once its dependencies and versions are pinned. Any reported result must include the candidate revision, model/runtime identity, fixture reset, trial provenance, and independent outcome verification. Unrun tests and uncollected measurements must remain labeled as such.
+The initial pinned PostgreSQL/Grocy fixture is described in [`experiment/README.md`](experiment/README.md). Any reported result must include the candidate revision, model/runtime identity, fixture reset, trial provenance, and independent outcome verification. Unrun tests and uncollected measurements must remain labeled as such.
