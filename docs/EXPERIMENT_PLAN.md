@@ -39,4 +39,4 @@ Eliminate candidates with fundamental authority conflicts, competing task state,
 
 ## Current evidence status
 
-No candidate adapter, shared fixture environment, trial, or owner evaluation has yet been completed. These are pending work, not passing results. The v2 source baseline observation is recorded separately with its limitations.
+The PostgreSQL/Grocy synthetic fixture and scoped gateway are running and have passed their documented fixture and gateway checks. Local CPU inference profiles now load both the standard and stronger model and return visible text over the operator-only Compose network. This verifies only model endpoint availability; no candidate adapter, controlled scenario trial, interruption-recovery run, protected commitment flow, disposable shell/Git workspace, Playwright-compatible app, or owner evaluation has been completed. These remain pending. The v2 source baseline and living-source recheck are recorded separately with their limitations.

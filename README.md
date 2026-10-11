@@ -6,7 +6,7 @@ The experiment compares a thin Pydantic AI harness, a reduced Hermes runtime, an
 
 ## Current status
 
-The experiment is at repository setup. No comparative prototype trials have been run, and no harness is recommended. The exact v2 source revision recorded so far and its evidence limits are in [`docs/V2_CONTROL_BASELINE.md`](docs/V2_CONTROL_BASELINE.md). Current blockers and next steps are in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
+The shared PostgreSQL/Grocy fixture, scoped tool gateway, and CPU-served Qwen3-8B and Qwen3-14B model profiles are available. Model endpoint smoke calls passed; no candidate adapters or comparative trials have run, and no harness is recommended. The exact v2 source revisions and evidence limits are in [`docs/V2_CONTROL_BASELINE.md`](docs/V2_CONTROL_BASELINE.md). Current blockers and next steps are in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
 
 ## Scope and safety
 
@@ -14,4 +14,4 @@ See [`docs/EXPERIMENT_PLAN.md`](docs/EXPERIMENT_PLAN.md). The frozen local produ
 
 ## Reproducibility
 
-The initial pinned PostgreSQL/Grocy fixture is described in [`experiment/README.md`](experiment/README.md). Any reported result must include the candidate revision, model/runtime identity, fixture reset, trial provenance, and independent outcome verification. Unrun tests and uncollected measurements must remain labeled as such.
+The fixture and optional model profiles are described in [`experiment/README.md`](experiment/README.md). Exact local model/runtime identities are pinned in [`docs/MODEL_PROFILE.md`](docs/MODEL_PROFILE.md). Any reported result must include the candidate revision, model/runtime identity, fixture reset, trial provenance, and independent outcome verification. Unrun tests and uncollected measurements must remain labeled as such.
