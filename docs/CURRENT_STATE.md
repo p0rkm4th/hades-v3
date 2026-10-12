@@ -28,9 +28,9 @@
 ## Public checkpoint
 
 - Repository: [`https://github.com/p0rkm4th/hades-v3`](https://github.com/p0rkm4th/hades-v3), branch `main`.
-- Latest published checkpoint: `4d769454900cbcf9fc8f60715df9e260100569a2` on public `main`; initial repository commit remains `2d0488caddde45210a704a332329783176f45476`.
+- Checkpoint 19's evidence commit is `4d769454900cbcf9fc8f60715df9e260100569a2` on public `main`; the initial repository commit remains `2d0488caddde45210a704a332329783176f45476`.
 - Candidate adapter includes the family 4 memory-search integration and shared correction guidance. The repeated evidence and per-turn task IDs are in Checkpoint 19.
-- Post-push verification returned `4d769454900cbcf9fc8f60715df9e260100569a2` from both the origin and anonymous HTTPS `git ls-remote`. Full-history Gitleaks found no leaks across 37 commits. No GitHub Actions workflows are configured, so no CI run exists; local checks include compilation/JSON validation, the passing gateway scope integration test, the 18-attempt screen, task/effect SQL readback, and fixture cleanup verification.
+- Post-push verification returned the published `main` tip from both the origin and anonymous HTTPS `git ls-remote`; GitHub's anonymous API reported `private=false`, visibility `public`, default branch `main`. Full-history Gitleaks found no leaks. No GitHub Actions workflows are configured, so no CI run exists; local checks include compilation/JSON validation, the passing gateway scope integration test, the 18-attempt screen, task/effect SQL readback, and fixture cleanup verification.
 - Changes include candidate A/C adapters, an early B Hermes runtime integration, the synthetic chat UI and one Playwright UI smoke test. Candidate B remains blocked on the configured CPU profiles' verified 40,960-versus-64,000 mismatch; the 65,536 GPU profile is not reachable from candidate containers yet. ADR-010 remains NOT READY.
 - The repository is public and SSH authentication is available. Reverify visibility, anonymous access, and exact remote SHA after each later checkpoint.
 - Frozen authority documents and local instruction files remain excluded from the public repository by `.gitignore`; they were not changed. No memorial content is in the public worktree.
