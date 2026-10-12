@@ -1,0 +1,124 @@
+{
+  "checkpoint": 64,
+  "scenario": "family 3 read-only question with a temporary unavailable observation",
+  "prompt": "Can you report whether synthetic-monitor is healthy right now? If its source is unavailable, say so without inferring a health value.",
+  "temporary_fixture": {
+    "domain": "synthetic Amber",
+    "subject": "synthetic-monitor",
+    "state": "ERROR",
+    "value": null,
+    "observed_at": null,
+    "cleanup": "exact inserted observation deleted; pre/post database snapshot and gateway read matched"
+  },
+  "model": "Qwen3-8B Q4_K_M",
+  "model_weight_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "endpoint": "same existing lab CPU endpoint as CP63; internal route omitted",
+  "effective_context": 40960,
+  "training_context": 40960,
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "threads": 16,
+  "request_timeout_seconds": 50,
+  "candidate_source_revision": "3ab4644fc065f5021e036bc8debf7f77229a2f74",
+  "candidate_api_runtime_image_id": "sha256:f4380ca1ed6ac325a62160299381e1cfe6c7082d965b0796ddf3a576046d7139",
+  "order": [
+    "pydantic",
+    "lean",
+    "lean",
+    "pydantic",
+    "pydantic",
+    "lean"
+  ],
+  "gpu_inference_used": false,
+  "results": {
+    "pydantic": {
+      "read_tool_scope": "3/3 infrastructure_read only",
+      "reports_unavailable": "3/3",
+      "candidate_api_http_status": [
+        200,
+        200,
+        200
+      ],
+      "task_state_at_api_return": [
+        "RUNNING",
+        "RUNNING",
+        "RUNNING"
+      ],
+      "operator_final_task_state": [
+        "FAILED",
+        "FAILED",
+        "FAILED"
+      ],
+      "effects_created": [
+        0,
+        0,
+        0
+      ],
+      "duration_ms": [
+        11257,
+        11304,
+        11270
+      ],
+      "duration_range_ms": [
+        11257,
+        11304
+      ],
+      "median_duration_ms": 11270,
+      "prompt_tokens": [
+        5420,
+        5420,
+        5420
+      ],
+      "completion_tokens": [
+        45,
+        45,
+        45
+      ]
+    },
+    "lean": {
+      "read_tool_scope": "3/3 infrastructure_read only",
+      "reports_unavailable": "3/3",
+      "candidate_api_http_status": [
+        200,
+        200,
+        200
+      ],
+      "task_state_at_api_return": [
+        "RUNNING",
+        "RUNNING",
+        "RUNNING"
+      ],
+      "operator_final_task_state": [
+        "FAILED",
+        "FAILED",
+        "FAILED"
+      ],
+      "effects_created": [
+        0,
+        0,
+        0
+      ],
+      "duration_ms": [
+        12845,
+        11429,
+        12035
+      ],
+      "duration_range_ms": [
+        11429,
+        12845
+      ],
+      "median_duration_ms": 12035,
+      "prompt_tokens": [
+        5448,
+        5448,
+        5448
+      ],
+      "completion_tokens": [
+        42,
+        42,
+        42
+      ]
+    }
+  },
+  "fixture_restored_and_independently_verified": true,
+  "interpretation": "read routing and unavailable-value reporting passed 3/3 for each candidate; every task stayed RUNNING after the HTTP 200 response, had zero effects, and was closed FAILED for operator review. This is not a completed-task pass or a family qualification."
+}

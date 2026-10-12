@@ -716,3 +716,16 @@ This verifies one deterministic shared shell/Git fixture, not model-driven perfo
 - **Evidence:** [six trial records](../experiment/results/family2_eggs_milk_cp63_8b.jsonl) and [profile summary](../experiment/results/family2_eggs_milk_cp63_profile.json).
 
 **Next evidence step:** preserve this case beside the CP46/59 omissions and CP61/62 positive cases, then continue an unfinished family under the same common endpoint settings. ADR-010 remains NOT READY.
+
+## Checkpoint 64 — family 3 unavailable observation and task lifecycle
+
+**Status:** the read-only answer behavior matched across six trials on the common Qwen3-8B CPU endpoint, but no candidate task reached `COMPLETED`; all six were closed `FAILED` for operator review. Treat this as a bounded read-routing signal with a shared task-lifecycle failure, not a completed-task success or family qualification.
+
+- **Case:** a temporary synthetic `ERROR` observation was added for `synthetic-monitor`, with no value or observation timestamp. The request asked whether it was currently healthy and directed the candidate to report unavailable data without inferring health.
+- **Read behavior:** Pydantic AI and lean each called only `infrastructure_read` in 3/3 trials and reported the source unavailable. Every response was HTTP 200 and each task contained the expected read tool. All six created zero effects.
+- **Task lifecycle:** every API response left its task `RUNNING`; each was then explicitly closed `FAILED` for operator review after verifying zero effects. This matches the task-completion gap seen in earlier read-only work and prevents these responses from counting as fully completed tasks.
+- **Configuration:** the same Qwen3-8B Q4_K_M endpoint, model weights, 40,960 effective/training context, pinned llama.cpp image, 16 threads, and 50-second model request bound as CP63. The internal endpoint route is omitted from public evidence. No GPU inference was used.
+- **Fixture cleanup:** the exact inserted observation was deleted in `finally`; the pre/post database snapshot and gateway observation read matched, and an independent SQL check found zero `synthetic-monitor` rows and zero effects. No v2 or production service/data was accessed.
+- **Evidence:** [six attempt records](../experiment/results/family3_unavailable_cp64_8b.jsonl), [profile and interpretation](../experiment/results/family3_unavailable_cp64_profile.json), and [repeatable runner](../experiment/tests/run_family3_cp64_unavailable.py).
+
+**Next evidence step:** preserve the task-lifecycle failures alongside the correct unavailable-read behavior and inspect the shared completion contract before treating family 3 as qualified. Keep request limits and candidate configurations unchanged. ADR-010 remains NOT READY.
