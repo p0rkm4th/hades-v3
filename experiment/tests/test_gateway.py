@@ -85,12 +85,24 @@ class GatewayIntegration(unittest.TestCase):
         status, _ = call("GET", f"/v1/tasks/{task_id}", COBALT)
         self.assertEqual(status, 404)
 
+        status, _ = call("POST", "/v1/shopping-list/changes", COBALT, {
+            "task_id": task_id,
+            "remove": ["Milk"],
+            "add": [{"name": "Rice", "amount": 1}],
+        })
+        self.assertEqual(status, 404)
+        status, unchanged = call("GET", "/v1/shopping-list", AMBER)
+        self.assertEqual(status, 200)
+        self.assertEqual({item["name"] for item in unchanged["items"]}, {"Milk", "Oats"})
+
         status, changed = call("POST", "/v1/shopping-list/changes", AMBER, {
+            "task_id": task_id,
             "remove": ["Milk"],
             "add": [{"name": "Rice", "amount": 1}, {"name": "Eggs", "amount": 2}],
         })
         self.assertEqual(status, 200, changed)
         self.assertEqual(changed["state"], "CONFIRMED")
+        self.assertEqual(changed["task_id"], task_id)
         expected = {"Oats": 1, "Rice": 1, "Eggs": 2}
         actual = {item["name"]: item["amount"] for item in changed["verified_after"]}
         self.assertEqual(actual, expected)

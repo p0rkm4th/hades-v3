@@ -54,10 +54,10 @@ def tool_contracts():
                 "type": "object", "properties": schema["properties"],
                 "required": ["state", "checkpoint"], "additionalProperties": False,
             }
-        elif name in {"workspace_exec", "commitment_submit"}:
+        elif name in {"workspace_exec", "commitment_submit", "shopping_list_change"}:
             schema = dict(schema)
             schema["properties"] = {k: v for k, v in schema["properties"].items() if k != "task_id"}
-            schema["required"] = [k for k in schema["required"] if k != "task_id"]
+            schema["required"] = [k for k in schema.get("required", []) if k != "task_id"]
         visible.append({"name": name, "description": tool["description"], "parameters": schema})
     return visible
 
@@ -80,7 +80,7 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str):
             effect_id = urllib.parse.quote(str(arguments.get("effect_id", "")), safe="")
             path = path.replace("{effect_id}", effect_id)
     payload = dict(arguments)
-    if name in {"workspace_exec", "commitment_submit"}:
+    if name in {"workspace_exec", "commitment_submit", "shopping_list_change"}:
         payload["task_id"] = task_id
     if name in {"task_checkpoint", "commitment_reconcile"}:
         payload = {} if name == "commitment_reconcile" else payload
