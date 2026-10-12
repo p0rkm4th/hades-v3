@@ -42,7 +42,13 @@ only when its result says CONFIRMED. Before a shopping-list change, call invento
 this turn unless canonical product names were already returned in this turn. Use those names
 exactly. If a name is rejected, make no success claim; read inventory and retry only with a
 matching canonical name. Never invent approval IDs or repeat an uncertain operation. Keep
-user-facing language natural; never ask for fixture-internal IDs. For code work, inspect the
+user-facing language natural; never ask for fixture-internal IDs. Treat personal-continuity
+questions as memory questions even when the user does not explicitly mention memory: when
+asked what the user prefers, previously requested, decided, or uses as a standing choice,
+retrieve relevant memory with memory_search when the exact key is unknown, or memory_read
+when it is known, before answering. Do not infer a saved preference from the current
+conversation alone. Use only returned memories; if no relevant memory is found, say so after
+searching. Memory is not a source of live operational truth. For code work, inspect the
 repository, run its tests, inspect the result and commit only when asked.
 """
 
@@ -76,7 +82,7 @@ def tool_contracts():
 VISIBLE_TOOLS = tool_contracts()
 
 
-def gateway_call(name: str, arguments: dict, token: str, task_id: str):
+def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence: list | None = None):
     contract = next((item for item in TOOLS if item["name"] == name), None)
     if contract is None:
         raise ValueError("unknown shared tool")
@@ -104,17 +110,31 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str):
     )
     try:
         with urllib.request.urlopen(req, timeout=35) as response:
-            return json.loads(response.read())
+            observation = json.loads(response.read())
     except urllib.error.HTTPError as exc:
         try:
-            return {"http_status": exc.code, **json.loads(exc.read())}
+            observation = {"http_status": exc.code, **json.loads(exc.read())}
         except json.JSONDecodeError:
-            return {"http_status": exc.code, "error": "tool request failed"}
+            observation = {"http_status": exc.code, "error": "tool request failed"}
+    if evidence is not None and name in {"memory_search", "memory_read", "memory_correct"}:
+        item = {
+            "tool": name,
+            "status": "error" if observation.get("http_status") else "ok",
+        }
+        if name == "memory_search":
+            memories = observation.get("memories", [])
+            item["result_count"] = len(memories)
+            item["memory_keys"] = [row.get("memory_key") for row in memories]
+        else:
+            item["memory_key"] = observation.get("memory_key")
+        evidence.append(item)
+    return observation
 
 
 def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: str, tools_used: list[str]):
     history = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
     tool_trace = tools_used
+    tool_evidence = []
     usage_totals = {"prompt_tokens": 0, "completion_tokens": 0}
     started = time.monotonic()
     for _ in range(MAX_MODEL_REQUESTS):
@@ -140,6 +160,7 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
         if not calls:
             return {
                 "text": choice.get("content") or "", "tool_calls": tool_trace,
+                "tool_evidence": tool_evidence,
                 "usage": usage_totals, "duration_ms": round((time.monotonic() - started) * 1000),
             }
         if len(tool_trace) + len(calls) > MAX_TOOL_CALLS:
@@ -148,7 +169,7 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
             function = call["function"]
             args = json.loads(function.get("arguments") or "{}")
             tool_trace.append(function["name"])
-            observation = gateway_call(function["name"], args, token, task_id)
+            observation = gateway_call(function["name"], args, token, task_id, tool_evidence)
             history.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(observation)})
     raise RuntimeError("model request limit reached before a final response")
 
@@ -160,12 +181,13 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
 
     started = time.monotonic()
     trace = tools_used
+    tool_evidence = []
     toolset = FunctionToolset()
     for spec in VISIBLE_TOOLS:
         name = spec["name"]
         def invoke(_name=name, **kwargs):
             trace.append(_name)
-            return gateway_call(_name, kwargs, token, task_id)
+            return gateway_call(_name, kwargs, token, task_id, tool_evidence)
         toolset.add_tool(Tool.from_schema(
             function=invoke, name=name, description=spec["description"],
             json_schema=spec["parameters"],
@@ -189,6 +211,7 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
     usage = result.usage
     return {
         "text": str(result.output), "tool_calls": trace,
+        "tool_evidence": tool_evidence,
         "usage": {"prompt_tokens": usage.input_tokens, "completion_tokens": usage.output_tokens},
         "duration_ms": round((time.monotonic() - started) * 1000),
     }
