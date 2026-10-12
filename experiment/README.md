@@ -45,6 +45,18 @@ docker compose -f experiment/compose.yaml --profile fixture-admin run --rm fixtu
 
 The test runner command expects the task to target the seeded ack-loss target and the exact details in `test_commitment_flow.py`. `inspect` independently reads the target's accepted effect and receive count from the fixture database. Run the fixture-admin commands from the operator host during a controlled trial. Never run them inside a candidate container. The simulator and admin service are synthetic test components and do not authorize real external actions. Reset fixture volumes before repeating one-shot target trials.
 
+The family 8 candidate screen uses a fresh, one-shot synthetic target and a task-bound fixture-admin grant per candidate. It records candidate tool behavior before any operator cleanup; if the candidate leaves a quarantined effect, the runner reconciles it through the protected gateway without replay and closes a still-running task for review. The runner withholds approval UUIDs from its evidence output. Use a new label and output file for each run because targets are intentionally never reused:
+
+```sh
+docker compose -f experiment/compose.yaml build candidate-api test-runner
+docker compose -f experiment/compose.yaml up -d candidate-api
+python experiment/tests/run_family8_ack_loss_pilot.py \
+  --order pydantic,lean --run-label trial-2 \
+  --output experiment/results/family8_ack_loss_trial_2.jsonl
+```
+
+This is synthetic candidate behavior evidence only. It does not authorize a real commitment or prove that the system can complete owner work without operator review.
+
 Start a shared local model endpoint when running candidate adapters (only one profile at a time):
 
 ```sh

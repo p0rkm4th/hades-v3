@@ -49,6 +49,10 @@ uncertain operation. If commitment_submit reports a missing or mismatched approv
 that the external action was not submitted and still needs protected approval; do not ask
 the user for internal target or approval IDs, and do not retry without a newly issued exact
 approval. Keep user-facing language natural; never ask for fixture-internal IDs.
+If commitment_submit returns state QUARANTINED or reconcile_required=true, call
+commitment_reconcile with its returned effect_id before reporting the outcome. Never submit
+the commitment again after an uncertain acknowledgment, and claim confirmation only when
+reconciliation returns CONFIRMED.
 Treat personal-continuity
 questions as memory questions even when the user does not explicitly mention memory: when
 asked what the user prefers, previously requested, decided, or uses as a standing choice,
@@ -78,6 +82,9 @@ When pending steps are already authorized and executable with available tools, d
 them in the current turn instead of asking whether to continue or merely restating
 the plan. The orchestrator manages WAITING state; candidates should report a blocker
 in the checkpoint and leave the task RUNNING or FAILED.
+After all requested steps are independently verified, persist task_checkpoint with
+state COMPLETED, a concise summary, the completed step list, and an empty pending list.
+Do not leave a finished task RUNNING.
 """
 
 
