@@ -102,3 +102,7 @@ The owner-approved history remediation was published at `190d85398d39d67d08dc082
 ## Checkpoint 64 — family 3 result
 
 Both candidates used only `infrastructure_read` and reported the temporary unavailable synthetic observation correctly in three trials each. Every API response nevertheless left its task `RUNNING`; all six zero-effect tasks were closed `FAILED` for review. The exact temporary row was removed and the fixture's before/after snapshots matched. See the [CP64 profile](../experiment/results/family3_unavailable_cp64_profile.json) and [trial records](../experiment/results/family3_unavailable_cp64_8b.jsonl). This does not qualify family 3 or resolve the shared task-completion gap.
+
+## CP64 publication status
+
+CP64 is published at `504089d994ea70ff1f2c17e0be2393f8dd01cedc`; the remote `main` SHA matched at verification. Anonymous repository API and page requests returned HTTP 200, with API visibility `public`. Exact-SHA Prototype CI run [38295537180](https://github.com/p0rkm4th/hades-v3/actions/runs/38295537180) passed and uploaded zero artifacts.
