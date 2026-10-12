@@ -76,6 +76,17 @@ docker compose -f experiment/compose.yaml --profile harness up -d --build --forc
 
 The probe intentionally leaves two synthetic `FAILED` tasks and creates no effects. Confirm the restored default with `docker compose -f experiment/compose.yaml exec -T candidate-api python -c 'import os; print(os.environ["MODEL_REQUEST_TIMEOUT_SECONDS"])'` before resuming comparisons.
 
+To reproduce the limited family 3 source-unavailable screen, ensure the disposable Amber fixture has no row for `synthetic-monitor`, then insert the temporary `ERROR` row, run three matched calls per candidate, and remove that exact row. This database mutation is only for the disposable lab and must never target a household or production database:
+
+```sh
+docker compose -f experiment/compose.yaml exec -T postgres psql -U fixture_writer -d hades_lab -v ON_ERROR_STOP=1 -c "INSERT INTO infra_observations (domain_id, subject, observation_state, value, observed_at, source) VALUES ('domain-home-amber', 'synthetic-monitor', 'ERROR', NULL, NULL, 'fixture-unavailable-v1') ON CONFLICT (domain_id, subject) DO NOTHING;"
+docker compose -f experiment/compose.yaml build test-runner
+docker compose -f experiment/compose.yaml run --rm test-runner python /app/tests/run_family3_unavailable_screen.py
+docker compose -f experiment/compose.yaml exec -T postgres psql -U fixture_writer -d hades_lab -v ON_ERROR_STOP=1 -c "DELETE FROM infra_observations WHERE domain_id='domain-home-amber' AND subject='synthetic-monitor' AND observation_state='ERROR' AND source='fixture-unavailable-v1';"
+```
+
+Before insertion, inspect the subject and stop if it already exists; do not overwrite or delete a preexisting row. After the screen, verify the original three Amber observations through the gateway. The recorded run used the same Qwen3-8B CPU endpoint and configuration as the preceding family 3 screen. The injected row was deleted after the run and the original seed was verified.
+
 `smoke_fixtures.sh` checks domain separation, fresh/stale/unknown observations, commitment fixture count, Grocy inventory and shopping-list state, and idempotent reseeding. `test-runner` checks scoped gateway reads and writes, memory isolation, durable task checkpoints, compound shopping-list changes, and independent Grocy read-back. The gateway integration test mutates the Amber shopping list; reset and reseed before running it again.
 
 Destroy only this project's disposable data with:
