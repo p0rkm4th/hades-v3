@@ -243,6 +243,26 @@ class Handler(BaseHTTPRequestHandler):
                     rows = cur.fetchall()
                 return self.send_json(200, {"observations": rows})
 
+            if self.command == "GET" and route.path == "/v1/memory/search":
+                query = parse_qs(route.query).get("q", [""])[0].strip()
+                if not 2 <= len(query) <= 200:
+                    raise ClientError(400, "query must contain 2 to 200 characters")
+                terms = re.findall(r"[a-zA-Z0-9]+", query.lower())
+                if not terms:
+                    raise ClientError(400, "query must include searchable words")
+                tsquery = " | ".join(terms)
+                document = "to_tsvector('simple', memory_key || ' ' || value::text)"
+                with database() as conn, conn.cursor() as cur:
+                    cur.execute(
+                        f"SELECT memory_key, value, updated_at, ts_rank_cd({document}, to_tsquery('simple', %s)) AS score "
+                        f"FROM scoped_memory WHERE user_id = %s AND domain_id = %s "
+                        f"AND {document} @@ to_tsquery('simple', %s) "
+                        "ORDER BY score DESC, updated_at DESC, memory_key LIMIT 5",
+                        (tsquery, user_id, domain_id, tsquery),
+                    )
+                    rows = cur.fetchall()
+                return self.send_json(200, {"memories": rows})
+
             memory_match = re.fullmatch(r"/v1/memory/([^/]+)", route.path)
             if self.command == "GET" and memory_match:
                 key = unquote(memory_match.group(1))
