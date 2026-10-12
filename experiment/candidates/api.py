@@ -135,6 +135,14 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
             observation = {"http_status": exc.code, **json.loads(exc.read())}
         except json.JSONDecodeError:
             observation = {"http_status": exc.code, "error": "tool request failed"}
+    if (name == "task_resume" and not observation.get("http_status")
+            and observation.get("state") in {"RUNNING", "WAITING"}
+            and (observation.get("checkpoint") or {}).get("pending")):
+        observation["continuation_directive"] = (
+            "This task is active and has authorized pending steps. Verify the workspace, "
+            "then perform the next pending step now. Do not pause just to restate the plan; "
+            "use WAITING only for a genuine missing input, approval, or external dependency."
+        )
     if evidence is not None and name in {"memory_search", "memory_read", "memory_correct"}:
         item = {
             "tool": name,
