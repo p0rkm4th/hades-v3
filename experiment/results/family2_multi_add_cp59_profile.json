@@ -1,0 +1,40 @@
+{
+  "checkpoint": 59,
+  "date": "2026-10-12",
+  "scenario_family": 2,
+  "status": "complete six-trial CPU screen; no candidate passed exact after-state",
+  "prompt": "Please add two Eggs and one Pasta to my shopping list, and remove Oats. Tell me what remains.",
+  "seed": {"Milk": 1.0, "Oats": 1.0},
+  "expected_after_state": {"Milk": 1.0, "Eggs": 2.0, "Pasta": 1.0},
+  "candidate_source_revision": "0419786a1c4e4c971a0819cb7d0a16e3a3dd3612",
+  "model": "Qwen3-8B Q4_K_M",
+  "model_id": "/models/Qwen3-8B-Q4_K_M.gguf",
+  "model_weight_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "endpoint": "http://model-server-8b:8080/v1",
+  "effective_context_tokens": 40960,
+  "training_context_tokens_reported": 40960,
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "runtime_threads": 16,
+  "inference_device": "CPU; disposable Compose model service has no GPU passthrough",
+  "model_request_timeout_seconds": 50,
+  "trial_order": ["pydantic", "lean", "lean", "pydantic", "pydantic", "lean"],
+  "candidate_results": {
+    "pydantic": {"attempts": 3, "exact_postcondition_passes": 0},
+    "lean": {"attempts": 3, "exact_postcondition_passes": 0}
+  },
+  "common_observed_after_state": {"Milk": 1.0, "Eggs": 2.0},
+  "common_partial_effect": {"add": [{"name": "Eggs", "amount": 2.0}], "remove": ["Oats"]},
+  "task_and_effect_verification": "All six tasks were COMPLETED with one CONFIRMED effect each. The effect omitted Pasta in all six attempts, and independent list readback showed the same partial after-state. No timeouts occurred.",
+  "cleanup": {
+    "amber_seed_restored": true,
+    "amber_final_state": {"Milk": 1.0, "Oats": 1.0},
+    "recent_nonterminal_tasks": 0,
+    "recent_unresolved_effects": 0,
+    "cobalt_modified": false
+  },
+  "living_v2_control": {
+    "main_sha": "8be6ccba0c1d5009581e0e4ad5b1fc180fd2ebf1",
+    "latest_source_recheck": "Checkpoint 58; main did not advance before CP59",
+    "owner_routing_acceptance": "still open/unverified in current public acceptance records"
+  }
+}
