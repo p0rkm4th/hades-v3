@@ -56,7 +56,7 @@ docker compose -f experiment/compose.yaml --profile model-14b up -d model-server
 
 The selected server is reachable from operator-network candidate containers at `http://model-server-8b:8080/v1` or `http://model-server-14b:8080/v1`. It has no published host port. CPU inference is slower than the intended GPU path; measurements must record that hardware condition. The local model files are large and are not committed.
 
-The A/C adapter defaults to a 50-second model-request timeout, six model requests, four tool calls, and 1,024 completion tokens per response. The candidate API client records failed turns as `FAILED`, returns the task ID, and flags operator review and possible effect uncertainty; inspect the task/effect ledger before retrying. Candidate B's outer request timeout does not prove that the Hermes backend cancels work after a disconnect, so B's failure lifecycle is not qualified.
+The current A/C adapter uses a 50-second model-request timeout, up to 16 model requests, 18 tool calls, and 1,024 completion tokens per response. These higher shared limits and a common stop-after-commit instruction were used for the final family 5 screen; earlier screens used lower recorded limits. The candidate API returns the task ID and flags operator review and possible effect uncertainty after a failed turn; inspect the task/effect ledger and workspace snapshot before retrying. Candidate B's outer request timeout does not prove that the Hermes backend cancels work after a disconnect, so B's failure lifecycle is not qualified.
 
 Reproduce the matched family 2 A/C screen, including per-call seed reset, task-trace verification, and final seed restoration:
 
