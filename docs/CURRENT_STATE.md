@@ -20,9 +20,9 @@
 ## Public checkpoint
 
 - Repository: [`https://github.com/p0rkm4th/hades-v3`](https://github.com/p0rkm4th/hades-v3), branch `main`.
-- Last remotely verified SHA before the present worktree checkpoint: `c87cb0a5b571864614ea591ff47ed354b0918175`.
-- SSH authentication succeeds as `p0rkm4th`; a push before the current changes returned `Everything up-to-date`. The current candidate/UI/doc changes are not yet committed or published.
-- The prior published history passed Gitleaks. Before publication, rescan the working tree and full proposed history, review every staged path, push without force, then verify `git ls-remote` and anonymous GitHub API/raw access. Update this section with the resulting published SHA.
+- Last remotely verified SHA before this candidate checkpoint: `c87cb0a5b571864614ea591ff47ed354b0918175`.
+- Candidate adapters/UI/runtime changes are committed locally as `d2bb5b0` but not pushed yet. The findings document has a follow-up edit with exact post-commit A/C probe IDs and measurements; that documentation edit is not committed.
+- SSH authentication succeeds as `p0rkm4th`; no owner action is needed. After the final documentation update, rescan the working tree and full history, review the staged paths, push without force, then verify `git ls-remote` and anonymous GitHub API/raw access. Record the resulting published code SHA here.
 - Frozen authority documents and local instruction files remain excluded from the public repository by `.gitignore`; they were not changed. No memorial content is in the public worktree.
 
 ## Next engineering actions
@@ -30,6 +30,6 @@
 1. Preserve the honest Hermes/Qwen compatibility result. Do not bypass the 64K check or misreport the endpoint's actual context. Decide within the existing campaign scope whether an eligible, locally runnable model with a measured context of at least 64K can be added as a common profile; otherwise record Hermes as ineligible for the selected model configuration and continue the eight-family screen with A/C.
 2. Complete independently verified A/C trials for all eight scenario families with consistent resets, held-out wording, exact model/runtime identity, and latency/tool/token capture. Fix or investigate task lifecycle state before interpreting completion outcomes.
 3. Recheck the living v2 source and available acceptance evidence at the next comparison checkpoint; collect no production runtime data or owner data.
-4. Run Gitleaks on the proposed checkout and full history, perform manual publication review, commit the sanitized candidate checkpoint, push it, and verify anonymous access and the exact remote SHA.
+4. Run Gitleaks on the proposed checkout and full history, perform manual publication review, commit the evidence update, push both sanitized commits, and verify anonymous access and the exact remote SHA.
 
 No owner action is currently required for GitHub access or repository visibility. Full production implementation remains out of scope.
