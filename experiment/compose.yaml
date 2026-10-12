@@ -231,6 +231,7 @@ services:
       GATEWAY_URL: http://tool-gateway:8080
       MODEL_URL: ${MODEL_URL:-http://model-server-8b:8080/v1}
       MODEL_NAME: ${MODEL_NAME:-Qwen3-8B}
+      MODEL_REQUEST_TIMEOUT_SECONDS: ${MODEL_REQUEST_TIMEOUT_SECONDS:-50}
     volumes:
       - hermes-amber-task:/hermes/amber-task
       - hermes-amber-trace:/hermes/amber-trace
