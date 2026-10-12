@@ -704,3 +704,15 @@ This verifies one deterministic shared shell/Git fixture, not model-driven perfo
 - **Evidence:** [six matched trial records](../experiment/results/family2_rice_remove_milk_cp62_8b.jsonl), [profile and cleanup sidecar](../experiment/results/family2_rice_remove_milk_cp62_profile.json), and [excluded setup diagnostic](../experiment/results/family2_rice_remove_milk_cp62_diagnostics.jsonl).
 
 **Next evidence step:** preserve this bounded positive case beside the CP46/59 omissions and CP61 positive case; continue another held-out family on the identical endpoint/configuration. Reuse the remote GPU endpoint only after a resolvable identity, trusted host key, and narrow route are available. Keep Hermes unqualified until a reachable endpoint reports effective context of at least 64,000 and candidate behavior is measured on that common endpoint.
+
+## Checkpoint 63 — family 2 held-out Eggs/Milk operation
+
+**Status:** six matched trials on the identical local Qwen3-8B CPU endpoint passed the exact after-state, three per candidate. This is one bounded operation, not a family qualification or candidate ranking.
+
+- **Case:** reset to `Milk 1, Oats 1`; the request added three Eggs and removed Milk. The expected list was `Oats 1, Eggs 3`.
+- **Configuration:** Qwen3-8B Q4_K_M, verified weight SHA-256 `d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785`, effective and training context 40,960, pinned llama.cpp image, 16 threads, and a 50-second model request limit. Both candidates shared the same model endpoint and prompt. No GPU inference was used.
+- **Results:** Pydantic AI passed 3/3 (20,974–22,211 ms; 10,898–10,903 prompt tokens; 106 completion tokens each). Lean passed 3/3 (22,384–24,016 ms; 10,961–10,969 prompt tokens; 106–107 completion tokens). All six tasks completed, each had one confirmed effect, and independent after-state reads matched the expected list. Trial order was lean, Pydantic, Pydantic, lean, lean, Pydantic. The final `Milk 1, Oats 1` seed was restored and verified.
+- **Living v2 control:** public `main` was rechecked read-only at `89f274113296d827c948538921032c3059f71244`; exact-SHA CI runs 38293419260 and 38293268101 passed. Its campaign record still identifies the owner-reported domain-routing failure as the current mission; no matched v2 trial or owner resolution was observed.
+- **Evidence:** [six trial records](../experiment/results/family2_eggs_milk_cp63_8b.jsonl) and [profile summary](../experiment/results/family2_eggs_milk_cp63_profile.json).
+
+**Next evidence step:** preserve this case beside the CP46/59 omissions and CP61/62 positive cases, then continue an unfinished family under the same common endpoint settings. ADR-010 remains NOT READY.

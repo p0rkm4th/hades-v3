@@ -90,3 +90,11 @@ Owner action is needed to choose an authorized remediation path for the private 
 The owner-approved history rewrite and its external caching limitations are documented in [PUBLICATION_HISTORY_REMEDIATION.md](PUBLICATION_HISTORY_REMEDIATION.md). The recovery bundle and commit mapping are retained outside the public repository.
 
 - Public-history rewrite verification: the local Compose experiment suite passed (5 tests run, 3 passed, 2 skipped because they require an operator-issued commitment grant); the fresh disposable fixture smoke check passed. These checks ran under a separate Compose project with its own containers and volumes.
+
+## Checkpoint 63 — current campaign result
+
+The held-out family 2 Eggs/Milk operation passed its exact after-state in all six matched CPU Qwen3-8B trials (three per candidate). Task/effect records and independent reads agree; the seed was restored. The exact context, model digest, timing, source revision, and trial order are in the [CP63 profile](../experiment/results/family2_eggs_milk_cp63_profile.json). The living v2 source was rechecked read-only at `89f274113296d827c948538921032c3059f71244`; its owner-reported domain-routing issue remains the open current mission. ADR-010 remains NOT READY.
+
+## Last verified public checkpoint
+
+The owner-approved history remediation was published at `190d85398d39d67d08dc082a7a2acb6508f8c186`. Anonymous GitHub API and repository-page requests returned HTTP 200, API visibility was `public`, and remote `main` matched the published SHA. Exact-SHA Prototype CI run [38293278697](https://github.com/p0rkm4th/hades-v3/actions/runs/38293278697) passed with zero uploaded artifacts. CP63 evidence follows this public checkpoint and is being synchronized separately.

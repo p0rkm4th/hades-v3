@@ -1,0 +1,149 @@
+{
+  "checkpoint": 63,
+  "scenario": "family 2, held-out one-add/one-remove case with a new item combination",
+  "seed": {
+    "Milk": 1,
+    "Oats": 1
+  },
+  "prompt": "Please add three Eggs to my shopping list and take Milk off. What will remain?",
+  "expected_after": {
+    "Oats": 1,
+    "Eggs": 3
+  },
+  "model": "Qwen3-8B Q4_K_M",
+  "model_weight_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "endpoint": "same existing lab CPU endpoint; internal route omitted",
+  "effective_context": 40960,
+  "training_context": 40960,
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "threads": 16,
+  "request_timeout_seconds": 50,
+  "candidate_source_revision": "3ab4644fc065f5021e036bc8debf7f77229a2f74",
+  "candidate_api_runtime_image_id": "sha256:f4380ca1ed6ac325a62160299381e1cfe6c7082d965b0796ddf3a576046d7139",
+  "order": [
+    "lean",
+    "pydantic",
+    "pydantic",
+    "lean",
+    "lean",
+    "pydantic"
+  ],
+  "gpu_inference_used": false,
+  "results": {
+    "pydantic": {
+      "exact_after_state": "3/3",
+      "task_states": [
+        "COMPLETED",
+        "COMPLETED",
+        "COMPLETED"
+      ],
+      "effect_states": [
+        [
+          "CONFIRMED"
+        ],
+        [
+          "CONFIRMED"
+        ],
+        [
+          "CONFIRMED"
+        ]
+      ],
+      "tool_traces": [
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ],
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ],
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ]
+      ],
+      "duration_ms": [
+        22142,
+        20974,
+        22211
+      ],
+      "duration_range_ms": [
+        20974,
+        22211
+      ],
+      "median_duration_ms": 22142,
+      "prompt_tokens": [
+        10898,
+        10899,
+        10903
+      ],
+      "completion_tokens": [
+        106,
+        106,
+        106
+      ]
+    },
+    "lean": {
+      "exact_after_state": "3/3",
+      "task_states": [
+        "COMPLETED",
+        "COMPLETED",
+        "COMPLETED"
+      ],
+      "effect_states": [
+        [
+          "CONFIRMED"
+        ],
+        [
+          "CONFIRMED"
+        ],
+        [
+          "CONFIRMED"
+        ]
+      ],
+      "tool_traces": [
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ],
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ],
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ]
+      ],
+      "duration_ms": [
+        24016,
+        22384,
+        22997
+      ],
+      "duration_range_ms": [
+        22384,
+        24016
+      ],
+      "median_duration_ms": 22997,
+      "prompt_tokens": [
+        10961,
+        10966,
+        10969
+      ],
+      "completion_tokens": [
+        107,
+        106,
+        106
+      ]
+    }
+  },
+  "seed_restored_and_verified": true,
+  "independent_after_state_verified_each_trial": true,
+  "interpretation": "six exact outcomes for this one operation; no candidate ranking or family qualification"
+}
