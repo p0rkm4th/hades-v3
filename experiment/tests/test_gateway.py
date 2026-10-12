@@ -132,14 +132,25 @@ class GatewayIntegration(unittest.TestCase):
         status, task = call("POST", "/v1/tasks", AMBER, {"goal": "fixture restart task"})
         self.assertEqual(status, 201)
         task_id = task["task_id"]
+        status, rejected = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "WAITING", "checkpoint": {}
+        })
+        self.assertEqual(status, 400)
+        self.assertIn("completed/pending", rejected["error"])
         status, saved = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
-            "state": "WAITING", "checkpoint": {"step": "after-source-read", "done": ["inventory"]}
+            "state": "WAITING", "checkpoint": {
+                "summary": "Inventory read completed",
+                "completed": ["inventory_read"],
+                "pending": ["continue task"],
+                "step": "after-source-read",
+            }
         })
         self.assertEqual(status, 200)
         self.assertEqual(saved["revision"], 1)
         status, resumed = call("GET", f"/v1/tasks/{task_id}", AMBER)
         self.assertEqual(status, 200)
         self.assertEqual(resumed["checkpoint"]["step"], "after-source-read")
+        self.assertEqual(resumed["checkpoint"]["completed"], ["inventory_read"])
         status, _ = call("GET", f"/v1/tasks/{task_id}", COBALT)
         self.assertEqual(status, 404)
 

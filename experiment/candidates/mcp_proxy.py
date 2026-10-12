@@ -9,7 +9,7 @@ from typing import Literal
 sys.path.insert(0, "/app/candidates")
 from api import gateway_call
 from mcp.server import MCPServer
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 server = MCPServer("HADES shared fixture tools")
@@ -21,6 +21,14 @@ TRACE_FILE = Path(os.environ["HADES_TRACE_FILE"])
 class ShoppingItem(BaseModel):
     name: str
     amount: float = Field(gt=0)
+
+
+class DurableCheckpoint(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    summary: str = Field(min_length=1)
+    completed: list[str]
+    pending: list[str]
 
 
 def invoke(name: str, **arguments):
@@ -76,9 +84,9 @@ def task_resume() -> dict:
 
 
 @server.tool()
-def task_checkpoint(state: Literal["RUNNING", "WAITING", "COMPLETED", "FAILED"], checkpoint: dict) -> dict:
-    """Persist progress in the current task's canonical checkpoint."""
-    return invoke("task_checkpoint", state=state, checkpoint=checkpoint)
+def task_checkpoint(state: Literal["RUNNING", "WAITING", "COMPLETED", "FAILED"], checkpoint: DurableCheckpoint) -> dict:
+    """Persist progress with summary, completed and pending steps in the canonical task."""
+    return invoke("task_checkpoint", state=state, checkpoint=checkpoint.model_dump())
 
 
 @server.tool()

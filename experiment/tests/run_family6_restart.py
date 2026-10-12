@@ -73,7 +73,7 @@ token='fixture-token-amber'; base='http://tool-gateway:8080'; task=sys.argv[1]
 headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'}
 req=urllib.request.Request(base+'/v1/tasks/'+task,headers=headers)
 with urllib.request.urlopen(req,timeout=10) as r: value=json.loads(r.read())
-checkpoint=value.get('checkpoint') or {}; checkpoint['operator_review_required']=True; checkpoint['operator_closed_after_pilot']=True
+checkpoint=value.get('checkpoint') or {}; checkpoint.setdefault('summary','Operator closed disposable pilot after inspection'); checkpoint.setdefault('completed',[]); checkpoint.setdefault('pending',[]); checkpoint['operator_review_required']=True; checkpoint['operator_closed_after_pilot']=True
 req=urllib.request.Request(base+'/v1/tasks/'+task+'/checkpoint',data=json.dumps({'state':'FAILED','checkpoint':checkpoint}).encode(),headers=headers,method='POST')
 with urllib.request.urlopen(req,timeout=10) as r: print(json.dumps(json.loads(r.read())))'''
     return compose("run", "-T", "--rm", "--no-deps", "test-runner", "python", "-c",

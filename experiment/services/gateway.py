@@ -359,6 +359,12 @@ class Handler(BaseHTTPRequestHandler):
                 checkpoint = body.get("checkpoint")
                 if state not in {"RUNNING", "WAITING", "COMPLETED", "FAILED"} or not isinstance(checkpoint, dict):
                     raise ClientError(400, "valid state and checkpoint object are required")
+                if (not isinstance(checkpoint.get("summary"), str) or not checkpoint["summary"].strip()
+                        or not isinstance(checkpoint.get("completed"), list)
+                        or not all(isinstance(item, str) for item in checkpoint["completed"])
+                        or not isinstance(checkpoint.get("pending"), list)
+                        or not all(isinstance(item, str) for item in checkpoint["pending"])):
+                    raise ClientError(400, "checkpoint requires a nonempty summary and completed/pending string lists")
                 with database() as conn, conn.cursor() as cur:
                     cur.execute(
                         "UPDATE tasks SET state=%s, checkpoint=%s, revision=revision+1, updated_at=now() "
