@@ -32,6 +32,38 @@ services:
     networks: [fixture-backend]
     restart: "no"
 
+  commitment-simulator:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+    command: ["python", "/app/commitment_simulator.py"]
+    environment:
+      DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
+      COMMITMENT_API_TOKEN: ${COMMITMENT_API_TOKEN:-fixture-only-token-not-a-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [fixture-backend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+    restart: "no"
+
+  fixture-admin:
+    build:
+      context: .
+      dockerfile: services/Admin.Dockerfile
+    profiles: [fixture-admin]
+    environment:
+      DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [fixture-backend]
+    restart: "no"
+
   tool-gateway:
     build:
       context: .
@@ -40,6 +72,8 @@ services:
       DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
       GROCY_URL: http://grocy
       GROCY_API_KEY_FILE: /run/fixture-secrets/grocy-api-key
+      COMMITMENT_URL: http://commitment-simulator:8090
+      COMMITMENT_API_TOKEN: ${COMMITMENT_API_TOKEN:-fixture-only-token-not-a-secret}
       TOOLS_PATH: /app/tools.json
     volumes:
       - grocy-api-key:/run/fixture-secrets:ro
@@ -48,6 +82,8 @@ services:
         condition: service_healthy
       grocy:
         condition: service_started
+      commitment-simulator:
+        condition: service_healthy
     networks: [fixture-backend, operator]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
