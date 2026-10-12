@@ -1,0 +1,89 @@
+{
+  "all_trials_exact_postcondition": true,
+  "attempts_per_candidate": 3,
+  "candidate_api_source_revision": "93d58682e3919ffc306f0be571444cf2292abb54",
+  "candidate_order": [
+    "pydantic",
+    "lean",
+    "lean",
+    "pydantic",
+    "pydantic",
+    "lean"
+  ],
+  "candidate_results": {
+    "lean": {
+      "completion_tokens": [
+        108,
+        108,
+        108
+      ],
+      "duration_ms": [
+        22758,
+        22099,
+        22161
+      ],
+      "effect_states": [
+        "CONFIRMED",
+        "CONFIRMED",
+        "CONFIRMED"
+      ],
+      "passed": "3/3",
+      "task_states_after_candidate": [
+        "COMPLETED",
+        "COMPLETED",
+        "COMPLETED"
+      ]
+    },
+    "pydantic": {
+      "completion_tokens": [
+        108,
+        108,
+        108
+      ],
+      "duration_ms": [
+        21001,
+        21948,
+        20832
+      ],
+      "effect_states": [
+        "CONFIRMED",
+        "CONFIRMED",
+        "CONFIRMED"
+      ],
+      "passed": "3/3",
+      "task_states_after_candidate": [
+        "COMPLETED",
+        "COMPLETED",
+        "COMPLETED"
+      ]
+    }
+  },
+  "checkpoint": 61,
+  "cobalt_fixture_untouched": true,
+  "effective_context": 40960,
+  "endpoint": "http://model-server-8b:8080/v1",
+  "expected_after": {
+    "Milk": 1,
+    "Rice": 2
+  },
+  "final_amber_seed_restored": true,
+  "gpu_inference_used": false,
+  "interpretation": "one bounded positive task; not family qualification or candidate ranking",
+  "llama_cpp_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "model": "Qwen3-8B Q4_K_M",
+  "model_request_timeout_seconds": 50,
+  "model_weight_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "prompt": "Please add two units of Rice to my shopping list and take Oats off. Tell me the final list.",
+  "scenario": "family2 one-add/one-remove shopping-list operation",
+  "seed": {
+    "Milk": 1,
+    "Oats": 1
+  },
+  "threads": 16,
+  "tool_trace_per_trial": [
+    "inventory_read",
+    "shopping_list_read",
+    "shopping_list_change"
+  ],
+  "training_context": 40960
+}
