@@ -20,7 +20,7 @@
 ## Public checkpoint
 
 - Repository: [`https://github.com/p0rkm4th/hades-v3`](https://github.com/p0rkm4th/hades-v3), branch `main`.
-- Published experiment/evidence checkpoint before the task/effect linkage repair: `0bf9dbfad992ae2db45414e494e4229a82e21645` (includes adapter revision `d2bb5b0`). The linkage repair and new evidence are being prepared for the next sanitized checkpoint.
+- Published baseline before the task/effect linkage repair: `0bf9dbfad992ae2db45414e494e4229a82e21645` (includes adapter revision `d2bb5b0`). The sanitized repair and new evidence are published in commit `9d413b3d18760628ad846513abc58ff3ef345a59`; repository `main` is synchronized to that commit, and unauthenticated API verification confirmed the repository remains public. The final docs-sync commit records this checkpoint.
 - Anonymous GitHub API verification returned `private=false`, default branch `main`; anonymous raw access to `experiment/candidates/api.py` returned source containing `chat_hermes`. The full 12-commit Git history and new public source/docs passed Gitleaks with no findings.
 - Changes include candidate A/C adapters, an early B Hermes runtime integration, the synthetic chat UI and one Playwright UI smoke test. Candidate B remains blocked by the verified 40,960-versus-64,000 context mismatch; ADR-010 remains NOT READY.
 - No owner action is required for authentication or visibility. Continue synchronizing meaningful sanitized checkpoints and reverify the remote SHA and anonymous access after later pushes.
