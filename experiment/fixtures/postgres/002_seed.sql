@@ -6,6 +6,9 @@ INSERT INTO lab_users (user_id, domain_id, display_name, token_sha256) VALUES
   ('user-amber', 'domain-home-amber', 'Amber (synthetic)', encode(digest('fixture-token-amber', 'sha256'), 'hex')),
   ('user-cobalt', 'domain-home-cobalt', 'Cobalt (synthetic)', encode(digest('fixture-token-cobalt', 'sha256'), 'hex'));
 
+INSERT INTO scoped_memory (user_id, domain_id, memory_key, value) VALUES
+  ('user-amber', 'domain-home-amber', 'answer_style', '{"scope":"synthetic lab status updates","style":"brief prose"}'::jsonb);
+
 INSERT INTO infra_observations (domain_id, subject, observation_state, value, observed_at, source) VALUES
   ('domain-home-amber', 'synthetic-router', 'FRESH', '{"health":"ok","services":2}'::jsonb, now(), 'fixture-inventory-v1'),
   ('domain-home-amber', 'synthetic-backup', 'STALE', '{"health":"unknown","services":1}'::jsonb, now() - interval '2 days', 'fixture-inventory-v1'),

@@ -22,7 +22,15 @@ jobs:
           python -m py_compile experiment/services/gateway.py experiment/candidates/api.py
           python -m json.tool experiment/contracts/tools.json >/dev/null
 
-      - name: Run gateway integration test on disposable fixtures
+      - name: Start disposable fixtures
+        run: docker compose -f experiment/compose.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway
+
+      - name: Initialize synthetic Grocy data
+        run: |
+          docker compose -f experiment/compose.yaml exec -T grocy sh /opt/hades-v3-scripts/initialize_grocy.sh
+          docker compose -f experiment/compose.yaml exec -T grocy sh /opt/hades-v3-scripts/seed_grocy_data.sh
+
+      - name: Run gateway integration test
         run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_gateway.py
 
       - name: Remove disposable services and volumes
