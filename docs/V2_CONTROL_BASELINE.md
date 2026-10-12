@@ -94,6 +94,12 @@ Pinned current source snapshots: [Hermes coding-worker integration](https://gith
 
 Pinned current source records: [campaign state](https://github.com/p0rkm4th/hades/blob/3df7bfb886bfcb891aab7d770be09139329b6ccd/CAMPAIGN_STATE.md), [current blockers](https://github.com/p0rkm4th/hades/blob/3df7bfb886bfcb891aab7d770be09139329b6ccd/docs/current-blockers.md), and [owner-workflow scoreboard](https://github.com/p0rkm4th/hades/blob/3df7bfb886bfcb891aab7d770be09139329b6ccd/acceptance/owner-workflows.md).
 
+## Living-control source recheck — 2026-10-12, HADES v3 checkpoints 48–49
+
+- Anonymous GitHub `git ls-remote` still returns public v2 `main` at `3df7bfb886bfcb891aab7d770be09139329b6ccd`. The exact-SHA Public CI runs 38214947338 and 38214081660 both report success.
+- Read the campaign state, current blockers, and owner-workflow scoreboard pinned to that source tip. The Open WebUI P0 acceptance remains closed; the separate owner-reported read-routing/memory-mutation mission remains open and unreproduced in the public record. No new owner acceptance for this routing case is recorded.
+- No v2 runtime, production service, workload, branch, user data, credential, or deployment was accessed or changed. This is source/acceptance-record observation only and is not a matched v2 task comparison.
+
 ## Living-control source recheck — 2026-10-12, HADES v3 checkpoint 46
 
 - Anonymous `git ls-remote` returned public v2 `main` at `3df7bfb886bfcb891aab7d770be09139329b6ccd`; the pinned campaign state, current-blocker record, and owner-workflow scoreboard were read at that exact revision.

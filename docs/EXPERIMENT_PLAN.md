@@ -14,6 +14,7 @@ Determine whether one of three agent harness foundations is ready to advance for
 
 - **Checkpoint 46:** added the matched two-add/one-remove family 2 trial on Qwen3-8B and Qwen3-14B CPU profiles. Keep the repeated 8B omission and the 14B timeout attrition as counterevidence; do not tune a phrase-specific fix from this one wording. See the exact profiles and independent state checks in `docs/COMPARISON_REPORT.md` and `experiment/results/family2_multi_add_screen_cp46_*.jsonl`.
 - **Checkpoint 47:** retried remote GPU discovery read-only with the attached SSH identity. Unknown host keys blocked all three SSH targets before authentication, so no remote driver/service check or generation ran. The prior observed Qwen3.6 35B serving context of 65,536 remains a legitimate Hermes-floor observation, not current remote health. Keep candidates on identical CPU endpoint/configuration until the host identity and narrow disposable-network route are verified.
+- **Checkpoints 48–49:** both candidates passed 3/3 on two family 2 formulations that added Eggs 2 and removed Milk and Oats, using the same 8B CPU endpoint and independently verified effects/postconditions. CP49 used counterbalanced order. Treat these as bounded positive cases alongside earlier shared 8B omissions; do not change prompts or tools solely to make a held-out result pass.
 
 Evaluate the current HADES v2 product separately. Do not rebuild v2 as a fourth candidate.
 
