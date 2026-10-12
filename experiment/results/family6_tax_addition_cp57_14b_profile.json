@@ -1,0 +1,46 @@
+{
+  "screen": "cp57-family6-heldout-tax-addition-14b",
+  "date": "2026-10-12",
+  "case": "tax_addition",
+  "candidate_source_revision": "0419786a1c4e4c971a0819cb7d0a16e3a3dd3612",
+  "experiment_runner_revision": "0bde04a2e6be65c4b0468f0c15091c70d33054b2",
+  "task": "Repair synthetic tax addition formula, run all tests, review diff, and commit if verified.",
+  "seed": "Fresh synthetic repository per attempt; wrong formula subtracts the rate; tests cover 10%, 0%, and 100%; two expected seed failures.",
+  "model": "Qwen3-14B Q4_K_M",
+  "model_id": "/models/Qwen3-14B-Q4_K_M.gguf",
+  "model_weight_sha256": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
+  "endpoint": "http://model-server-14b:8080/v1",
+  "effective_context_tokens": 40960,
+  "training_context_tokens_reported": 40960,
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "runtime_threads": 16,
+  "inference_device": "CPU; disposable Compose model service has no GPU passthrough",
+  "per_model_request_timeout_seconds": 50,
+  "resume_turn_limit": 3,
+  "candidate_tool_limit_per_turn": 18,
+  "trial_order": [
+    "pydantic tax-a14-01 (pre-checkpoint timeout)",
+    "pydantic tax-a14-02",
+    "pydantic tax-a14-03",
+    "lean tax-c14-01 (pre-checkpoint timeout)",
+    "lean tax-c14-02 (pre-checkpoint timeout)",
+    "lean tax-c14-03",
+    "pydantic tax-a14-04",
+    "lean tax-c14-04",
+    "lean tax-c14-05"
+  ],
+  "candidate_results": {
+    "pydantic": {
+      "valid_interrupted": 3,
+      "recovered": 0,
+      "pre_checkpoint_timeouts": 1
+    },
+    "lean": {
+      "valid_interrupted": 3,
+      "recovered": 0,
+      "pre_checkpoint_timeouts": 2
+    }
+  },
+  "raw_trial_records": "family6_tax_addition_cp57_14b_valid.jsonl",
+  "result": "All six valid tasks ended FAILED. Resume requests included model errors, timeouts, usage-limit closure, and repeated invalid sed commands. Independent snapshots showed no repaired source; two expected tests still failed. All effects were terminal."
+}

@@ -1,0 +1,27 @@
+{
+  "screen": "cp57-family6-tax-addition-8b-orchestration-anomaly",
+  "excluded_from_candidate_scoring": true,
+  "reason": "Two host orchestrators ran concurrently with the same trial label and overlapped candidate work; the rows are not independent comparisons.",
+  "trial_label": "tax-a01",
+  "task_ids": [
+    {
+      "task_id": "41cb45d1-8f91-48b3-9191-b140db019cd7",
+      "final_state": "FAILED",
+      "checkpoint_saved": false,
+      "effects": 1,
+      "unresolved_effects": 0,
+      "closure": "Operator closed after confirming its only effect was a completed fixture read."
+    },
+    {
+      "task_id": "94c5adfc-76b1-48b3-be6d-388eca9d587d",
+      "final_state": "FAILED",
+      "checkpoint_saved": true,
+      "effects": 7,
+      "unresolved_effects": 0,
+      "closure": "Both runner rows excluded; task closed after candidate turn finalization settled."
+    }
+  ],
+  "workspace_after": "Clean synthetic tax seed; no source change; two expected tests failed.",
+  "remediation": "Added a nonblocking host lock to run_family6_restart.py. The next attempt used a single runner and a unique trial label.",
+  "raw_trial_records": "family6_tax_addition_cp57_8b.jsonl"
+}
