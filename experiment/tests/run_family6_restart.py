@@ -33,7 +33,7 @@ def checkpoint(trial):
     tasks = sql_json(query) or []
     for task in tasks:
         saved = task.get("checkpoint") or {}
-        if saved.get("family") == "family6" and saved.get("phase") == "source_inspected":
+        if task.get("state") == "RUNNING" and saved.get("family") == "family6" and saved.get("phase") == "source_inspected":
             return task
     return None
 
@@ -67,7 +67,7 @@ def effects(task_id):
     return sql_json(query) or []
 
 
-def close_waiting_task(task_id):
+def close_task_for_review(task_id):
     script = r'''import json,sys,urllib.request
 token='fixture-token-amber'; base='http://tool-gateway:8080'; task=sys.argv[1]
 headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'}
@@ -148,10 +148,10 @@ def main():
         task = wait_terminal(trial)
         task_effects = effects(task["task_id"]) if task else []
         operator_closed = False
-        if task and task["state"] == "WAITING":
+        if task and task["state"] in {"WAITING", "RUNNING"}:
             if any(effect["state"] not in {"CONFIRMED", "CANCELLED"} for effect in task_effects):
                 raise RuntimeError(f"Unresolved effects on waiting task; inspect before closure: {task_effects}")
-            close_waiting_task(task["task_id"])
+            close_task_for_review(task["task_id"])
             operator_closed = True
             task = trial_task(trial)
         after = snapshot()
@@ -190,11 +190,11 @@ def main():
             if task_state and task_state["state"] in {"COMPLETED", "FAILED"}:
                 break
         operator_closed = False
-        if task_state and task_state["state"] == "WAITING":
+        if task_state and task_state["state"] in {"WAITING", "RUNNING"}:
             current_effects = effects(task_id)
             if any(effect["state"] not in {"CONFIRMED", "CANCELLED"} for effect in current_effects):
                 raise RuntimeError(f"Unresolved effects on waiting task; inspect before closure: {current_effects}")
-            close_waiting_task(task_id)
+            close_task_for_review(task_id)
             operator_closed = True
         after = snapshot()
         final_task = sql_json(

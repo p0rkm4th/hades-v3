@@ -41,7 +41,7 @@ def main():
         messages = [{"role": "user", "content":
             f"{goal} For this turn, do only two things: (1) use workspace_exec once to run "
             "`cat discount.py && cat test_discount.py`; (2) call task_checkpoint with state "
-            f"WAITING and checkpoint exactly {checkpoint}. Do not edit files or call any other "
+            f"RUNNING and checkpoint exactly {checkpoint}. Do not edit files or call any other "
             "tool. Stop after the checkpoint call."}]
         task_id = None
     else:
