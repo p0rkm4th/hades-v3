@@ -209,6 +209,20 @@ def start_task(token: str, goal: str):
         return json.loads(response.read())
 
 
+def transition_task(token: str, task_id: str, state: str, tools_used: list[str]):
+    current = gateway_call("task_resume", {}, token, task_id)
+    if current.get("http_status") or current.get("task_id") != task_id:
+        raise RuntimeError("task state could not be read")
+    checkpoint = dict(current.get("checkpoint") or {})
+    checkpoint["candidate_turn"] = {"state": state, "tools": tools_used}
+    updated = gateway_call(
+        "task_checkpoint", {"state": state, "checkpoint": checkpoint}, token, task_id
+    )
+    if updated.get("http_status") or updated.get("state") != state:
+        raise RuntimeError("task state could not be saved")
+    return updated
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print(f"{self.command} {self.path.split('?')[0]}")
@@ -253,15 +267,22 @@ class Handler(BaseHTTPRequestHandler):
             task_id = body.get("task_id")
             if not task_id:
                 task_id = start_task(token, str(user_messages[0]["content"]))["task_id"]
+            else:
+                transition_task(token, task_id, "RUNNING", [])
             if candidate == "pydantic":
                 result = chat_pydantic(messages, token, task_id)
             elif candidate == "hermes":
                 result = chat_hermes(messages, token, task_id)
             else:
                 result = chat_openai(messages, True, token, task_id)
+            current = gateway_call("task_resume", {}, token, task_id)
+            if current.get("http_status") or current.get("task_id") != task_id:
+                raise RuntimeError("task state could not be read")
+            if current.get("state") == "RUNNING":
+                transition_task(token, task_id, "COMPLETED", result.get("tool_calls", []))
             result["task_id"] = task_id
             return self.send_json(200, result)
-        except (KeyError, TypeError, ValueError, urllib.error.URLError) as exc:
+        except Exception as exc:
             print(f"Candidate request rejected: {type(exc).__name__}: {exc}")
             return self.send_json(502, {"error": f"candidate request failed: {type(exc).__name__}"})
 
