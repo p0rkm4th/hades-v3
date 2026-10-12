@@ -63,6 +63,12 @@ nonempty checkpoint that records verified completed steps and the remaining step
 Do not claim a checkpoint was saved unless the tool returns successfully. On a later
 turn, read the saved checkpoint again, verify the current workspace state, and
 continue the same task; never claim completion from a prior task summary alone.
+Every checkpoint must include `summary` (nonempty string), `completed` (string list),
+and `pending` (string list); retain any additional task-specific fields.
+When pending steps are already authorized and executable with available tools, do
+them in the current turn instead of asking whether to continue or merely restating
+the plan. Remain WAITING only for a genuine missing input, external dependency, or
+required approval that has not been provided.
 """
 
 
@@ -278,6 +284,9 @@ def transition_task(
     if current.get("http_status") or current.get("task_id") != task_id:
         raise RuntimeError("task state could not be read")
     checkpoint = dict(current.get("checkpoint") or {})
+    checkpoint.setdefault("summary", "Candidate turn state update")
+    checkpoint.setdefault("completed", [])
+    checkpoint.setdefault("pending", [])
     candidate_turn = {"state": state, "tools": tools_used}
     if error_type is not None:
         candidate_turn["error_type"] = error_type

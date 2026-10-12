@@ -33,7 +33,10 @@ def main():
         "commit the verified fix as `Recover discount calculation`."
     )
     if args.phase == "prepare":
-        checkpoint = json.dumps({"family": "family6", "trial": args.trial,
+        checkpoint = json.dumps({"summary": "Inspected the source and tests; no files changed.",
+                                 "completed": ["read discount.py", "read test_discount.py"],
+                                 "pending": ["repair formula", "run tests", "review diff", "commit"],
+                                 "family": "family6", "trial": args.trial,
                                  "phase": "source_inspected", "repair_pending": True})
         messages = [{"role": "user", "content":
             f"{goal} For this turn, do only two things: (1) use workspace_exec once to run "
@@ -48,7 +51,7 @@ def main():
         messages = [
             {"role": "user", "content": goal},
             {"role": "assistant", "content": "I inspected the source and tests before the runtime was interrupted. The durable task checkpoint says the repair is pending."},
-            {"role": "user", "content": "Resume this same durable task. First read its checkpoint and inspect the workspace state. Then finish the requested repair, run tests, review the diff, and commit only if tests pass."},
+            {"role": "user", "content": "The authorized synthetic coding task is active, and no additional approval is needed. Resume this same durable task. First read its checkpoint and inspect the workspace state. Complete the pending repair now, run tests, review the diff, and commit the verified fix if tests pass. Do not pause or ask whether to continue unless a real prerequisite is missing."},
         ]
 
     body = {"candidate": args.candidate, "user_token": TOKEN, "messages": messages}
