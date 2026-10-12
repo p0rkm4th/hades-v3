@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HADES Harness Comparison</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; background: #f4f6f8; color: #17212b; }
+    body { margin: 0; }
+    main { max-width: 880px; margin: 3rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.65rem; margin-bottom: .3rem; }
+    .note { color: #546170; margin-top: 0; }
+    section, form { background: white; border: 1px solid #d7dee5; border-radius: 12px; padding: 1rem; margin: 1rem 0; }
+    .controls { display: flex; gap: 1rem; flex-wrap: wrap; }
+    label { display: grid; gap: .3rem; font-weight: 600; }
+    select, textarea, button { font: inherit; }
+    select { min-width: 12rem; padding: .55rem; border: 1px solid #aab5bf; border-radius: 6px; background: white; }
+    #conversation { min-height: 14rem; max-height: 50vh; overflow: auto; }
+    .message { padding: .75rem; margin: .6rem 0; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .user { background: #edf4fb; }
+    .assistant { background: #f0f5f0; }
+    .meta { color: #596775; font-size: .85rem; margin-top: .5rem; }
+    textarea { width: 100%; min-height: 5rem; box-sizing: border-box; padding: .7rem; border: 1px solid #aab5bf; border-radius: 6px; resize: vertical; }
+    button { border: 0; border-radius: 6px; background: #155a8a; color: white; padding: .65rem 1rem; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .submit { display: flex; justify-content: flex-end; margin-top: .6rem; }
+    #status { min-height: 1.5rem; color: #53616e; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>HADES Harness Comparison</h1>
+  <p class="note">Synthetic fixture only. Candidate calls share the same local model and tool gateway.</p>
+  <section class="controls" aria-label="Trial controls">
+    <label>Fixture user
+      <select id="user"><option value="amber">Amber</option><option value="cobalt">Cobalt</option></select>
+    </label>
+    <label>Harness
+      <select id="candidate"><option value="lean">C — Lean loop</option><option value="pydantic">A — Pydantic AI</option><option value="hermes">B — Reduced Hermes</option></select>
+    </label>
+  </section>
+  <section id="conversation" aria-live="polite" aria-label="Conversation"></section>
+  <form id="chat-form">
+    <label for="message">Message</label>
+    <textarea id="message" required maxlength="4000" placeholder="Ask about the synthetic fixture or request a test task."></textarea>
+    <div class="submit"><button id="send" type="submit">Send</button></div>
+  </form>
+  <p id="status" role="status"></p>
+</main>
+<script>
+const conversation = document.querySelector('#conversation');
+const form = document.querySelector('#chat-form');
+const input = document.querySelector('#message');
+const status = document.querySelector('#status');
+const send = document.querySelector('#send');
+let messages = [];
+let taskId = null;
+document.querySelector('#user').addEventListener('change', () => {
+  messages = [];
+  taskId = null;
+  render();
+  status.textContent = 'Conversation reset for the selected synthetic user.';
+});
+function render() {
+  conversation.replaceChildren();
+  for (const m of messages) {
+    const item = document.createElement('div');
+    item.className = `message ${m.role}`;
+    item.textContent = m.content;
+    conversation.append(item);
+  }
+  conversation.scrollTop = conversation.scrollHeight;
+}
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const content = input.value.trim();
+  if (!content) return;
+  messages.push({role: 'user', content});
+  render(); input.value = ''; send.disabled = true; status.textContent = 'Running synthetic trial…';
+  try {
+    const response = await fetch('/api/turn', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        candidate: document.querySelector('#candidate').value,
+        user_token: `fixture-token-${document.querySelector('#user').value}`,
+        task_id: taskId, messages
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    taskId = result.task_id;
+    messages.push({role: 'assistant', content: result.text});
+    status.textContent = `${result.duration_ms} ms · ${result.tool_calls.length} tool calls · ${result.usage.prompt_tokens + result.usage.completion_tokens} model tokens`;
+    render();
+  } catch (error) {
+    messages.pop();
+    status.textContent = `Trial error: ${error.message}`;
+    render();
+  } finally { send.disabled = false; input.focus(); }
+});
+</script>
+</body>
+</html>

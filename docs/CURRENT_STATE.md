@@ -1,16 +1,35 @@
 # Current state
 
-- Experiment: shared PostgreSQL/Grocy fixture, scoped tool gateway, protected simulated commitment, separate synthetic shell/Git workspaces, and local 8B/14B CPU model profiles are available. No harness candidate trial has run.
-- Candidate decision: ADR-010 NOT READY; no comparative evidence.
-- HADES v2 source snapshot: `fe222446c83a4034bfa37ac5a493d6a30b9abe74` on public `main`, rechecked during this checkpoint; source-only, with no runtime observation. See [baseline evidence and limits](V2_CONTROL_BASELINE.md).
-- Public repository: [`https://github.com/p0rkm4th/hades-v3`](https://github.com/p0rkm4th/hades-v3), public, branch `main`.
-- Publication verification before this checkpoint: anonymous GitHub API returned HTTP 200 with `private=false`; anonymous raw source fetch succeeded. Public `main` SHA was `121795106804ced49414f88be366edbcd5e76bd1`, matching `git ls-remote`; reverify after publishing this checkpoint.
-- Local initial project commit: `2d0488caddde45210a704a332329783176f45476`. The remote's preexisting one-line initializer commit `11abec1f63d3cd65aa8df3c99a8d227340138457` was preserved by merging unrelated histories; no force-push was used.
-- Local repository: `main`; the last published history passed Gitleaks with no findings. New model files are excluded by `/experiment/models/*.gguf`; re-audit the proposed commit history before pushing.
-- Local tooling: Docker Engine `29.8.2` responds to `docker info`; Python `3.14.7`, Node.js `v26.11.1`, and npm `12.2.0` are available.
-- Public content review: local frozen specifications, project instructions, and owner-specific addenda remain excluded pending their own detailed content review. The published files were manually checked for private workspace paths, memorial references, personal identifiers, and private network addresses; Gitleaks reported no findings across the full merged history.
-- Test status: a clean reset re-passed the fixture smoke and gateway integration test. Four operator-only commitment test executions covered exact-approval denial, changed-details denial, harmless-read access, lost-ack quarantine, cross-user reconciliation denial, non-replay reconciliation, acceptance, and target rejection. Independent DB verification confirmed two separately seeded ack-loss acceptances, one ordinary acceptance, and zero accepted effects for the rejected target. The workspace scenario passed: Amber's initial tests failed, the shell changed the implementation, all tests passed, the change was committed, independent host-side verification confirmed clean Git state, and Cobalt remained unchanged. Both model profiles returned visible output in operator-network smoke calls (8B: 4 tokens/0.7 s; 14B: 6 tokens/1.6 s). These are fixture/runtime checks, not candidate trials or comparative results.
-- Model status: both local model files are checksum-verified and ignored by Git. Docker GPU passthrough failed with `no known GPU vendor found`; CPU profiles are used. See [pinned model and server details](MODEL_PROFILE.md).
-- Disposable services: PostgreSQL `17.11-bookworm`, Grocy `4.7.1-ls342`, the Python tool gateway, protected commitment simulator, and two isolated workspace runners are running on internal-only Compose networks. Candidate/test-runner containers cannot directly resolve fixture-backend or workspace services and have no database or Grocy API-key access. See [`experiment/README.md`](../experiment/README.md).
-- Current lab state: the gateway integration test changed Amber's list to Oats 1, Rice 1, Eggs 2 and created synthetic memory/task/effect rows. `target-ack-loss` and `target-ack-loss-repeat` each have one confirmed accepted effect; `target-accept` has one confirmed accepted effect; `target-reject` has one receive and no accepted effect. Amber's workspace has the committed discount fix; Cobalt remains at the failing seed. Reset before comparable runs.
-- Next actions: build the Playwright-compatible app and three minimal candidate adapters; then run the eight scenario families with independent verification and continue versioned v2 observations. Owner evaluation, revocation and duplicate-safe replay coverage, process-kill recovery, aggregate workspace-volume quotas, and the full historical 20-family comparison remain outstanding.
+**Campaign status:** in progress; ADR-010 remains NOT READY. The project is a prototype comparison, not a production HADES v3 implementation.
+
+## Current checkpoint
+
+- Shared lab: PostgreSQL/Grocy, scoped gateway, synthetic commitment simulator, isolated Amber/Cobalt shell/Git workspaces, local Qwen inference, and a Playwright-compatible chat UI are present in the Compose experiment.
+- Candidate C (lean) and A (Pydantic AI) each completed one live read-only kitchen integration smoke probe under the same CPU Qwen3-8B endpoint. Both returned the seeded values and called only `inventory_read`. Their task IDs, token counts, timings, and verification limits are recorded in [COMPARISON_REPORT.md](COMPARISON_REPORT.md). These are not controlled trials.
+- Candidate B (reduced Hermes) starts its pinned Hermes gateway, and authenticated `/health` and `/v1/models` requests return HTTP 200. Its kitchen request fails before tool execution because the verified shared model context is 40,960 tokens and Hermes enforces a 64,000-token floor. Qwen3-8B reports both `n_ctx` and `n_ctx_train` as 40,960; do not advertise or configure it as a 64K model. The selected local model and runtime profile are documented in [MODEL_PROFILE.md](MODEL_PROFILE.md).
+- The Playwright UI smoke test passed after confirming the three candidate options, visible metrics, and hidden task identity. This uses a mocked `/api/turn`; it is not owner acceptance or an end-to-end candidate UI evaluation.
+- SQL read-back confirmed the A/C task owners, goals, `RUNNING` states, and zero effect rows. Their states were not advanced to `COMPLETED`. A pre-probe memory count was not recorded, so memory non-mutation is not claimed as independently verified.
+- No three-trial scenario, full eight-family screen, restart-kill test, stronger-model comparison, maintenance exercise, independent owner judgment, or 20-family historical qualification has been completed.
+
+## Living v2 control
+
+- Latest eligible public HADES v2 `main` source remains `fe222446c83a4034bfa37ac5a493d6a30b9abe74`; a direct upstream `git ls-remote` check on 2026-10-11 returned the same SHA as the recorded baseline.
+- The local HADES workspace remains at `6a46e18657b17c261a5725de3b0d09b24e7d3f60`, 1,229 commits ahead and 235 behind upstream, with local changes. It was inspected read-only and is not treated as an eligible current control.
+- No current v2 runtime was exercised. This remains a source-only observation, not a controlled comparison or owner acceptance result. See [V2_CONTROL_BASELINE.md](V2_CONTROL_BASELINE.md).
+
+## Public checkpoint
+
+- Repository: [`https://github.com/p0rkm4th/hades-v3`](https://github.com/p0rkm4th/hades-v3), branch `main`.
+- Last remotely verified SHA before the present worktree checkpoint: `c87cb0a5b571864614ea591ff47ed354b0918175`.
+- SSH authentication succeeds as `p0rkm4th`; a push before the current changes returned `Everything up-to-date`. The current candidate/UI/doc changes are not yet committed or published.
+- The prior published history passed Gitleaks. Before publication, rescan the working tree and full proposed history, review every staged path, push without force, then verify `git ls-remote` and anonymous GitHub API/raw access. Update this section with the resulting published SHA.
+- Frozen authority documents and local instruction files remain excluded from the public repository by `.gitignore`; they were not changed. No memorial content is in the public worktree.
+
+## Next engineering actions
+
+1. Preserve the honest Hermes/Qwen compatibility result. Do not bypass the 64K check or misreport the endpoint's actual context. Decide within the existing campaign scope whether an eligible, locally runnable model with a measured context of at least 64K can be added as a common profile; otherwise record Hermes as ineligible for the selected model configuration and continue the eight-family screen with A/C.
+2. Complete independently verified A/C trials for all eight scenario families with consistent resets, held-out wording, exact model/runtime identity, and latency/tool/token capture. Fix or investigate task lifecycle state before interpreting completion outcomes.
+3. Recheck the living v2 source and available acceptance evidence at the next comparison checkpoint; collect no production runtime data or owner data.
+4. Run Gitleaks on the proposed checkout and full history, perform manual publication review, commit the sanitized candidate checkpoint, push it, and verify anonymous access and the exact remote SHA.
+
+No owner action is currently required for GitHub access or repository visibility. Full production implementation remains out of scope.
