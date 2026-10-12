@@ -1,6 +1,7 @@
 """Host orchestrator for one matched family 6 restart-recovery pilot."""
 
 import argparse
+import fcntl
 import json
 import subprocess
 import time
@@ -110,6 +111,11 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--checkpoint-timeout", type=int, default=240)
     args = parser.parse_args()
+    lock_handle = (Path("/tmp") / "hades-v3-family6-restart.lock").open("w")
+    try:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise SystemExit("another family 6 restart runner is active") from None
     trial = args.trial
     output_path = (ROOT / args.output).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
