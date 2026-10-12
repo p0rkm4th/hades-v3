@@ -84,7 +84,7 @@ def task_resume() -> dict:
 
 
 @server.tool()
-def task_checkpoint(state: Literal["RUNNING", "WAITING", "COMPLETED", "FAILED"], checkpoint: DurableCheckpoint) -> dict:
+def task_checkpoint(state: Literal["RUNNING", "COMPLETED", "FAILED"], checkpoint: DurableCheckpoint) -> dict:
     """Persist progress with summary, completed and pending steps in the canonical task."""
     return invoke("task_checkpoint", state=state, checkpoint=checkpoint.model_dump())
 
