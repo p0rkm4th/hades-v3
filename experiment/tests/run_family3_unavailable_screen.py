@@ -1,13 +1,14 @@
 """Run a matched read-only family 3 screen with an injected ERROR fixture row."""
 
 import json
+import sys
 import urllib.request
 
 
 TOKEN = "fixture-token-amber"
 GATEWAY = "http://tool-gateway:8080"
 CANDIDATE_API = "http://candidate-api:8080"
-PROMPT = (
+PROMPT = sys.argv[1] if len(sys.argv) > 1 else (
     "Can you report whether synthetic-monitor is healthy right now? "
     "If its source is unavailable, say so without inferring a health value."
 )
