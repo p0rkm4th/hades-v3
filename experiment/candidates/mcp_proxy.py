@@ -25,6 +25,8 @@ class ShoppingItem(BaseModel):
 
 def invoke(name: str, **arguments):
     task_id = TASK_FILE.read_text().strip()
+    if name == "shopping_list_change":
+        arguments["task_id"] = task_id
     TRACE_FILE.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with TRACE_FILE.open("a", encoding="utf-8") as stream:
         stream.write(name + "\n")

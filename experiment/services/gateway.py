@@ -375,13 +375,26 @@ class Handler(BaseHTTPRequestHandler):
             key = item["name"].casefold()
             expected[key] = expected.get(key, 0) + float(item["amount"])
 
+        supplied_task_id = body.get("task_id")
         with database() as conn, conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO tasks (user_id, domain_id, goal, state) "
-                "VALUES (%s, %s, %s, 'RUNNING') RETURNING task_id",
-                (user_id, domain_id, "compound shopping-list change"),
-            )
-            task_id = cur.fetchone()["task_id"]
+            if supplied_task_id is not None:
+                try:
+                    task_id = uuid.UUID(str(supplied_task_id))
+                except (ValueError, TypeError):
+                    raise ClientError(400, "task_id must be a UUID") from None
+                cur.execute(
+                    "SELECT task_id FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s",
+                    (task_id, user_id, domain_id),
+                )
+                if cur.fetchone() is None:
+                    raise ClientError(404, "task not found")
+            else:
+                cur.execute(
+                    "INSERT INTO tasks (user_id, domain_id, goal, state) "
+                    "VALUES (%s, %s, %s, 'RUNNING') RETURNING task_id",
+                    (user_id, domain_id, "compound shopping-list change"),
+                )
+                task_id = cur.fetchone()["task_id"]
             request_body = Jsonb(body)
             cur.execute(
                 "INSERT INTO effects (task_id, user_id, domain_id, effect_kind, resource_key, state, request) "

@@ -23,6 +23,19 @@ Update this report at meaningful checkpoints with exact v2 and v3 revisions, tri
 
 **Next evidence step:** within the already authorized model profile, determine whether a locally runnable model can provide a verified context of at least 64,000 tokens while preserving the same endpoint for A, B, and C. If no such profile fits the existing experiment constraints, record B as incompatible with the selected model and continue A/C through the eight-family screen. Do not patch Hermes's context floor or misrepresent the server capacity to make B appear runnable. No winner can be recommended without the full required evidence.
 
+## Checkpoint 6 — compound shopping-list smoke and task/effect linkage
+
+**Status:** one valid one-shot compound integration smoke for A and C; exploratory attempts before the linkage fix are invalid. This is not a controlled comparison or scenario qualification.
+
+- **Provenance:** disposable Amber fixture, Qwen3-8B Q4_K_M on the CPU `llama.cpp` endpoint (`n_ctx=40,960`), prompt `Please add one Rice and two Eggs to my shopping list, and remove Milk.` Candidate C ran on the shared worktree after the task/effect linkage fix; Candidate A ran immediately after restoring the same seed. The initial seed was independently read as Milk 1 and Oats 1.
+- **Defect found:** earlier exploratory mutations returned a user-facing confirmation while the candidate's durable task remained `RUNNING` and the `CONFIRMED` effect was attached to a separate gateway-generated task. Those attempts also included an improperly reset fixture and are invalid evidence; their answers must not be counted as candidate success. Candidate tool adapters now pass their active task identity with the mutation. The gateway validates that identity belongs to the authenticated user and domain, then attaches the effect to that task. Operator setup calls without a task identity retain the fixture convenience behavior.
+- **Candidate C (lean):** task `2c1ec5a1-e06a-48c5-b82d-03ad867e965c` returned a confirmed compound change and listed Oats 1, Rice 1, Eggs 2. It used `shopping_list_change`; usage was 2,537 prompt and 135 completion tokens; elapsed time 17,161 ms. SQL read-back showed task `COMPLETED` with linked effect `5d7e58a6-df15-49ad-9d8e-92cfaab55232` `CONFIRMED`. A separate gateway read returned the exact resulting list.
+- **Candidate A (Pydantic AI):** task `a655b4d0-f658-4c8d-994e-79239caa7d85` was `COMPLETED`; linked effect `73ca47ca-71b2-42f4-91cf-254a94d780da` was `CONFIRMED`, with request adding Rice 1 and Eggs 2 and removing Milk. A separate gateway read returned Oats 1, Rice 1, Eggs 2. The process output was not retained, so candidate answer text, reported tool trace, token use, and elapsed time are unavailable and are not claimed.
+- **Limits:** one probe per candidate, CPU inference, and no randomized order or repeated trials; the durations cannot establish a ranking. Independent verification here means a second read through the shared gateway, not a direct Grocy operator read. These probes do not count toward the required multi-trial eight-family screen. Candidate B remains incompatible with the measured 40,960-token shared model context and Hermes's 64,000-token minimum. ADR-010 remains NOT READY.
+- **Living control:** public v2 source remains `fe222446c83a4034bfa37ac5a493d6a30b9abe74`; no current v2 runtime observation or owner comparison was collected.
+
+**Next evidence step:** record this sanitized task/effect linkage repair and checkpoint, then continue the eight-family A/C screen with clean resets, repeated trials, retained outputs, and separate outcome verification. Keep B's context mismatch explicit until an eligible common model profile is verified.
+
 ## Checkpoint 1 — shared fixture foundation
 
 **Status:** fixture smoke checks passed; candidate comparison not run.
