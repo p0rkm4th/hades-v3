@@ -1,0 +1,139 @@
+{
+  "checkpoint": 62,
+  "scenario": "family 2, one addition plus a different removal from CP61",
+  "seed": {
+    "Milk": 1,
+    "Oats": 1
+  },
+  "prompt": "Please add three units of Rice to my shopping list and remove Milk. Tell me what remains.",
+  "expected_after": {
+    "Oats": 1,
+    "Rice": 3
+  },
+  "model": "Qwen3-8B Q4_K_M",
+  "model_weight_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "endpoint": "same existing local llama.cpp endpoint used by the lab; route address omitted",
+  "effective_context": 40960,
+  "training_context": 40960,
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "threads": 16,
+  "request_timeout_seconds": 50,
+  "candidate_api_source_revision": "576b4807368f9ad50b2bc59391ec304e26ca7976",
+  "order": [
+    "pydantic",
+    "lean",
+    "lean",
+    "pydantic",
+    "pydantic",
+    "lean"
+  ],
+  "gpu_inference_used": false,
+  "results": {
+    "pydantic": {
+      "exact_after_state": "3/3",
+      "task_states": [
+        "COMPLETED",
+        "COMPLETED",
+        "COMPLETED"
+      ],
+      "effect_states": [
+        [
+          "CONFIRMED"
+        ],
+        [
+          "CONFIRMED"
+        ],
+        [
+          "CONFIRMED"
+        ]
+      ],
+      "tool_traces": [
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ],
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ],
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ]
+      ],
+      "duration_ms": [
+        21912,
+        22747,
+        23120
+      ],
+      "prompt_tokens": [
+        10900,
+        10901,
+        10902
+      ],
+      "completion_tokens": [
+        119,
+        110,
+        123
+      ]
+    },
+    "lean": {
+      "exact_after_state": "3/3",
+      "task_states": [
+        "COMPLETED",
+        "COMPLETED",
+        "COMPLETED"
+      ],
+      "effect_states": [
+        [
+          "CONFIRMED"
+        ],
+        [
+          "CONFIRMED"
+        ],
+        [
+          "CONFIRMED"
+        ]
+      ],
+      "tool_traces": [
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ],
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ],
+        [
+          "inventory_read",
+          "shopping_list_read",
+          "shopping_list_change"
+        ]
+      ],
+      "duration_ms": [
+        23303,
+        22771,
+        23773
+      ],
+      "prompt_tokens": [
+        10972,
+        10969,
+        10979
+      ],
+      "completion_tokens": [
+        108,
+        108,
+        119
+      ]
+    }
+  },
+  "seed_restored_and_verified": true,
+  "separate_existing_lab_seed_restored_and_verified": true,
+  "setup_diagnostic_excluded": true,
+  "interpretation": "six exact outcomes across this one operation; no candidate ranking or family qualification"
+}

@@ -129,6 +129,12 @@ Pinned current source records: [campaign state](https://github.com/p0rkm4th/hade
 
 Pinned public records: [current source commit](https://github.com/p0rkm4th/hades/commit/8be6ccba0c1d5009581e0e4ad5b1fc180fd2ebf1), [campaign state](https://github.com/p0rkm4th/hades/blob/8be6ccba0c1d5009581e0e4ad5b1fc180fd2ebf1/CAMPAIGN_STATE.md), [current blockers](https://github.com/p0rkm4th/hades/blob/8be6ccba0c1d5009581e0e4ad5b1fc180fd2ebf1/docs/current-blockers.md), and [owner-workflow scoreboard](https://github.com/p0rkm4th/hades/blob/8be6ccba0c1d5009581e0e4ad5b1fc180fd2ebf1/acceptance/owner-workflows.md).
 
+## Living-control source recheck — 2026-10-12, HADES v3 checkpoint 62
+
+- HTTPS `git ls-remote` still reports public v2 `main` at `8be6ccba0c1d5009581e0e4ad5b1fc180fd2ebf1`; no newer public source or acceptance evidence was observed in this read-only check.
+- The prior pinned campaign, blocker, and owner-workflow records still leave the owner-reported read-routing/memory-mutation issue open and unreproduced. This source-only recheck is not matched to CP62's synthetic family 2 task and establishes no v2 runtime behavior or ordinary-work ranking.
+- No v2 runtime, service, workload, production data, branch, deployment, or credential was accessed or changed.
+
 ## Living-control source recheck — 2026-10-12, HADES v3 checkpoint 61
 
 - A new HTTPS `git ls-remote` read still returns public v2 `main` at `8be6ccba0c1d5009581e0e4ad5b1fc180fd2ebf1`. I fetched `CAMPAIGN_STATE.md`, `docs/current-blockers.md`, and `acceptance/owner-workflows.md` pinned to that exact revision.
