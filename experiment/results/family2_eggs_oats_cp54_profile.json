@@ -1,0 +1,45 @@
+{
+  "checkpoint": "CP54",
+  "candidate_source_revision": "47c82e058e0b58488453f60cb6a05a13731f23ce",
+  "candidate_mapping": {
+    "pydantic": "A: thin Pydantic AI harness",
+    "lean": "C: lean custom model/tool loop"
+  },
+  "model": {
+    "name": "Qwen3-14B",
+    "repository_revision": "Qwen/Qwen3-14B-GGUF@530227a7d994db8eca5ab5ced2fb692b614357fd",
+    "quantization": "Q4_K_M",
+    "weights_sha256": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
+    "endpoint": "http://model-server-14b:8080/v1",
+    "model_id": "/models/Qwen3-14B-Q4_K_M.gguf",
+    "n_ctx": 40960,
+    "n_ctx_train": 40960
+  },
+  "runtime": {
+    "image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+    "threads": 16,
+    "threads_batch": 16,
+    "device": "CPU"
+  },
+  "limits": {
+    "model_request_timeout_seconds": 50,
+    "candidate_turn_timeout_seconds": 600,
+    "max_model_requests_per_turn": 16,
+    "max_tool_calls_per_turn": 18,
+    "max_completion_tokens": 1024
+  },
+  "task": {
+    "family": 2,
+    "prompt": "Take Oats off my shopping list, and add two Eggs. What will the list show?",
+    "seed": {
+      "Milk": 1,
+      "Oats": 1
+    },
+    "expected": {
+      "Milk": 1,
+      "Eggs": 2
+    }
+  },
+  "attempt_order": ["pydantic", "lean", "lean", "pydantic", "pydantic", "lean"],
+  "order_note": "Pairs were A/C, C/A, and A/C, reversing the first and third pairs from CP53's fixed C/A order. No latency ranking is supported."
+}
