@@ -77,6 +77,58 @@ class GatewayIntegration(unittest.TestCase):
         status, _ = call("GET", "/v1/memory/fixture-read-only-probe", COBALT)
         self.assertEqual(status, 404)
 
+        try:
+            status, corrected = call("POST", "/v1/memory/correct", AMBER, {
+                "query": "fixture read only probe",
+                "expected_value": {"sentinel": "unchanged"},
+                "value": {"sentinel": "corrected"},
+            })
+            self.assertEqual(status, 200)
+            self.assertEqual(corrected["memory_key"], "fixture-read-only-probe")
+            self.assertEqual(corrected["value"], {"sentinel": "corrected"})
+            status, saved = call("GET", "/v1/memory/fixture-read-only-probe", AMBER)
+            self.assertEqual(status, 200)
+            self.assertEqual(saved["value"], {"sentinel": "corrected"})
+
+            status, missing = call("POST", "/v1/memory/correct", AMBER, {
+                "query": "missing disposable preference",
+                "expected_value": {"format": "brief prose"},
+                "value": {"format": "short bullets"},
+            })
+            self.assertEqual(status, 404)
+            self.assertIn("no existing memory", missing["error"])
+
+            status, canonical = call("GET", "/v1/memory/answer_style", AMBER)
+            self.assertEqual(status, 200)
+            shared_value = canonical["value"]
+            status, _ = call("POST", "/v1/memory", AMBER, {
+                "key": "fixture-read-only-probe", "value": shared_value
+            })
+            self.assertEqual(status, 200)
+            status, ambiguous = call("POST", "/v1/memory/correct", AMBER, {
+                "query": "synthetic lab status updates answer style",
+                "expected_value": shared_value,
+                "value": {"scope": "synthetic lab status updates", "style": "short bullets"},
+            })
+            self.assertEqual(status, 409)
+            self.assertIn("ambiguous", ambiguous["error"])
+            status, unchanged = call("GET", "/v1/memory/answer_style", AMBER)
+            self.assertEqual(status, 200)
+            self.assertEqual(unchanged["value"], shared_value)
+
+            status, cross_user = call("POST", "/v1/memory/correct", COBALT, {
+                "query": "fixture read only probe",
+                "expected_value": {"sentinel": "corrected"},
+                "value": {"sentinel": "cross user"},
+            })
+            self.assertEqual(status, 404)
+        finally:
+            status, restored = call("POST", "/v1/memory", AMBER, {
+                "key": "fixture-read-only-probe", "value": {"sentinel": "unchanged"}
+            })
+            self.assertEqual(status, 200)
+            self.assertEqual(restored["value"], {"sentinel": "unchanged"})
+
         status, task = call("POST", "/v1/tasks", AMBER, {"goal": "fixture restart task"})
         self.assertEqual(status, 201)
         task_id = task["task_id"]
