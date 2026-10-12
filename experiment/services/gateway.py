@@ -18,6 +18,8 @@ from psycopg.types.json import Jsonb
 DATABASE_URL = os.environ["DATABASE_URL"]
 GROCY_URL = os.environ.get("GROCY_URL", "http://grocy").rstrip("/")
 GROCY_API_KEY_FILE = os.environ["GROCY_API_KEY_FILE"]
+COMMITMENT_URL = os.environ.get("COMMITMENT_URL", "http://commitment-simulator:8090").rstrip("/")
+COMMITMENT_API_TOKEN = os.environ["COMMITMENT_API_TOKEN"]
 TOOLS_PATH = os.environ.get("TOOLS_PATH", "/app/tools.json")
 MAX_BODY = 64 * 1024
 
@@ -57,6 +59,42 @@ def grocy_request(method: str, path: str, body: dict | None = None):
     except urllib.error.URLError:
         raise RuntimeError("Grocy did not respond") from None
     return json.loads(raw) if raw else None
+
+
+def commitment_request(method: str, path: str, body: dict | None = None):
+    data = None if body is None else json.dumps(body, separators=(",", ":")).encode()
+    request = urllib.request.Request(
+        f"{COMMITMENT_URL}{path}",
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {COMMITMENT_API_TOKEN}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            raw = response.read()
+            return response.status, json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as exc:
+        raw = exc.read()
+        try:
+            value = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            value = {}
+        return exc.code, value
+    except urllib.error.URLError:
+        raise RuntimeError("simulated commitment outcome is uncertain") from None
+
+
+def commitment_digest(target_id: str, details: str):
+    canonical = json.dumps(
+        {"target_id": target_id, "details": details},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def grocy_products():
@@ -248,6 +286,16 @@ class Handler(BaseHTTPRequestHandler):
             if self.command == "POST" and route.path == "/v1/shopping-list/changes":
                 return self.change_shopping_list(user_id, domain_id)
 
+            if self.command == "POST" and route.path == "/v1/commitments":
+                return self.commitment_submit(user_id, domain_id)
+            reconcile_match = re.fullmatch(
+                r"/v1/commitments/([0-9a-fA-F-]{36})/reconcile", route.path
+            )
+            if self.command == "POST" and reconcile_match:
+                return self.commitment_reconcile(
+                    reconcile_match.group(1), user_id, domain_id
+                )
+
             raise ClientError(404, "route not found")
         except ClientError as exc:
             self.send_json(exc.status, {"error": str(exc)})
@@ -354,6 +402,152 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json(200, {
             "task_id": str(task_id), "effect_id": str(effect_id), "state": "CONFIRMED",
             "verified_after": verified,
+        })
+
+    def commitment_submit(self, user_id: str, domain_id: str):
+        body = self.read_json()
+        task_id = body.get("task_id")
+        target_id = body.get("target_id")
+        details = body.get("details")
+        approval_id = body.get("approval_id")
+        if not isinstance(target_id, str) or not re.fullmatch(r"[a-z0-9-]{1,80}", target_id):
+            raise ClientError(400, "valid target_id is required")
+        if not isinstance(details, str) or not details.strip() or len(details) > 1000:
+            raise ClientError(400, "details must contain 1 to 1000 characters")
+        try:
+            task_uuid = uuid.UUID(str(task_id))
+            approval_uuid = uuid.UUID(str(approval_id))
+        except (ValueError, TypeError, AttributeError):
+            raise ClientError(400, "task_id and approval_id must be UUIDs") from None
+        details = details.strip()
+        digest = commitment_digest(target_id, details)
+
+        with database() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT task_id FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s",
+                (task_uuid, user_id, domain_id),
+            )
+            if cur.fetchone() is None:
+                raise ClientError(404, "task not found")
+            cur.execute(
+                "SELECT approval_id FROM commitment_approvals "
+                "WHERE approval_id=%s AND user_id=%s AND domain_id=%s AND task_id=%s "
+                "AND target_id=%s AND effect_digest=%s AND consumed_at IS NULL "
+                "AND expires_at > now() FOR UPDATE",
+                (approval_uuid, user_id, domain_id, task_uuid, target_id, digest),
+            )
+            if cur.fetchone() is None:
+                raise ClientError(403, "current exact-effect approval required")
+            cur.execute(
+                "INSERT INTO effects "
+                "(task_id, user_id, domain_id, effect_kind, resource_key, state, request) "
+                "VALUES (%s, %s, %s, 'EXTERNAL_COMMITMENT', %s, 'INTENDED', %s) "
+                "RETURNING effect_id",
+                (task_uuid, user_id, domain_id, f"commitment:{target_id}", Jsonb({
+                    "target_id": target_id, "details": details, "effect_digest": digest,
+                    "approval_id": str(approval_uuid),
+                })),
+            )
+            effect_id = cur.fetchone()["effect_id"]
+            cur.execute(
+                "UPDATE commitment_approvals SET consumed_at=now() WHERE approval_id=%s",
+                (approval_uuid,),
+            )
+
+        with database() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE effects SET state='DISPATCHED', updated_at=now() WHERE effect_id=%s",
+                (effect_id,),
+            )
+        try:
+            status, result = commitment_request("POST", "/v1/commit", {
+                "effect_id": str(effect_id), "target_id": target_id, "effect_digest": digest,
+            })
+        except RuntimeError:
+            status, result = -1, {}
+        if status == 200 and result.get("state") == "ACCEPTED":
+            with database() as conn, conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE effects SET state='CONFIRMED', result=%s, updated_at=now() "
+                    "WHERE effect_id=%s",
+                    (Jsonb({"target_result": result}), effect_id),
+                )
+            return self.send_json(200, {
+                "task_id": str(task_uuid), "effect_id": str(effect_id),
+                "state": "CONFIRMED", "target_result": result,
+            })
+        if status == 409 and result.get("state") == "REJECTED":
+            with database() as conn, conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE effects SET state='REJECTED', result=%s, updated_at=now() "
+                    "WHERE effect_id=%s",
+                    (Jsonb({"target_result": result}), effect_id),
+                )
+            return self.send_json(200, {
+                "task_id": str(task_uuid), "effect_id": str(effect_id),
+                "state": "REJECTED", "target_result": result,
+            })
+
+        uncertain = status == 504 or status < 0
+        with database() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE effects SET state='QUARANTINED', result=%s, updated_at=now() "
+                "WHERE effect_id=%s",
+                (Jsonb({"dispatch_state": "ACK_UNCERTAIN" if uncertain else "TARGET_ERROR"}), effect_id),
+            )
+        return self.send_json(202, {
+            "task_id": str(task_uuid), "effect_id": str(effect_id),
+            "state": "QUARANTINED", "reconcile_required": True,
+        })
+
+    def commitment_reconcile(self, effect_id: str, user_id: str, domain_id: str):
+        try:
+            effect_uuid = uuid.UUID(effect_id)
+        except ValueError:
+            raise ClientError(400, "invalid effect id") from None
+        with database() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT state, resource_key FROM effects "
+                "WHERE effect_id=%s AND user_id=%s AND domain_id=%s",
+                (effect_uuid, user_id, domain_id),
+            )
+            effect = cur.fetchone()
+        if effect is None:
+            raise ClientError(404, "effect not found")
+        if effect["state"] not in {"DISPATCHED", "QUARANTINED", "UNRESOLVED"}:
+            raise ClientError(409, "effect is not awaiting reconciliation")
+        status, target = commitment_request("GET", f"/v1/effects/{effect_uuid}")
+        if status != 200:
+            with database() as conn, conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE effects SET state='QUARANTINED', updated_at=now() "
+                    "WHERE effect_id=%s AND state IN ('DISPATCHED','QUARANTINED','UNRESOLVED')",
+                    (effect_uuid,),
+                )
+            return self.send_json(202, {
+                "effect_id": str(effect_uuid), "state": "QUARANTINED",
+                "reconcile_required": True,
+            })
+        if target.get("state") == "ACCEPTED" and target.get("target_id") == effect["resource_key"].removeprefix("commitment:"):
+            with database() as conn, conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE effects SET state='CONFIRMED', result=%s, updated_at=now() "
+                    "WHERE effect_id=%s AND state IN ('QUARANTINED','UNRESOLVED')",
+                    (Jsonb({"reconciled_target_state": target}), effect_uuid),
+                )
+            return self.send_json(200, {
+                "effect_id": str(effect_uuid), "state": "CONFIRMED",
+                "reconciled_target_state": target,
+            })
+        with database() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE effects SET state='QUARANTINED', result=%s, updated_at=now() "
+                "WHERE effect_id=%s AND state IN ('DISPATCHED','QUARANTINED','UNRESOLVED')",
+                (Jsonb({"reconciled_target_state": target}), effect_uuid),
+            )
+        return self.send_json(202, {
+            "effect_id": str(effect_uuid), "state": "QUARANTINED",
+            "reconcile_required": True,
         })
 
     def do_GET(self):
