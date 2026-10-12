@@ -100,6 +100,12 @@ Pinned current source records: [campaign state](https://github.com/p0rkm4th/hade
 - Read the campaign state, current blockers, and owner-workflow scoreboard pinned to that source tip. The Open WebUI P0 acceptance remains closed; the separate owner-reported read-routing/memory-mutation mission remains open and unreproduced in the public record. No new owner acceptance for this routing case is recorded.
 - No v2 runtime, production service, workload, branch, user data, credential, or deployment was accessed or changed. This is source/acceptance-record observation only and is not a matched v2 task comparison.
 
+## Living-control source recheck — 2026-10-12, HADES v3 checkpoints 50–51
+
+- Anonymous `git ls-remote` again returned public v2 `main` at `3df7bfb886bfcb891aab7d770be09139329b6ccd`; exact-SHA Public CI runs 38214947338 and 38214081660 remain successful.
+- The pinned campaign state and current blockers continue to describe the owner-reported read-routing/memory-mutation failure as open and not independently reproduced; the public owner-workflow scoreboard has no new acceptance result for that route. The Open WebUI P0 remains separately recorded as closed.
+- The family 6 v3 runs are synthetic and local; they are not matched against v2. No v2 runtime, service, workload, user data, branch, deployment, or credentials were accessed or modified.
+
 ## Living-control source recheck — 2026-10-12, HADES v3 checkpoint 46
 
 - Anonymous `git ls-remote` returned public v2 `main` at `3df7bfb886bfcb891aab7d770be09139329b6ccd`; the pinned campaign state, current-blocker record, and owner-workflow scoreboard were read at that exact revision.
