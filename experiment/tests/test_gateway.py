@@ -68,6 +68,12 @@ class GatewayIntegration(unittest.TestCase):
         status, probe = call("GET", "/v1/memory/fixture-read-only-probe", AMBER)
         self.assertEqual(status, 200)
         self.assertEqual(probe["value"], {"sentinel": "unchanged"})
+        status, matches = call("GET", "/v1/memory/search?q=sentinel+read+only+preference", AMBER)
+        self.assertEqual(status, 200)
+        self.assertEqual([row["memory_key"] for row in matches["memories"]], ["fixture-read-only-probe"])
+        status, matches = call("GET", "/v1/memory/search?q=sentinel+read+only+preference", COBALT)
+        self.assertEqual(status, 200)
+        self.assertEqual(matches["memories"], [])
         status, _ = call("GET", "/v1/memory/fixture-read-only-probe", COBALT)
         self.assertEqual(status, 404)
 

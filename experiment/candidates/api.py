@@ -32,8 +32,12 @@ HERMES_STATE = {
 HERMES_LOCKS = {token: threading.Lock() for token in HERMES_ENDPOINT}
 SYSTEM_PROMPT = """You are a prototype assistant using the supplied shared HADES fixture tools.
 Use live fixture tools for current inventory, shopping lists and infrastructure. Do not
-write memory unless explicitly asked. Read tool results as evidence, and report unknown,
-stale or unavailable data honestly. For changes, use the compound tool and report success
+write memory unless explicitly asked. For an explicitly requested correction to an existing
+memory, search for the existing entry, reuse its exact key when writing, then verify the
+stored value before claiming the correction succeeded. Never create a duplicate key for the
+same preference. Read tool results as evidence, and report unknown, stale or unavailable
+data honestly. Never invent factual values in an update or example; use placeholders when
+the fixture has no value. For changes, use the compound tool and report success
 only when its result says CONFIRMED. Before a shopping-list change, call inventory_read in
 this turn unless canonical product names were already returned in this turn. Use those names
 exactly. If a name is rejected, make no success claim; read inventory and retry only with a
@@ -79,6 +83,8 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str):
     path = contract["path"]
     if name == "memory_read":
         path = path.replace("{key}", urllib.parse.quote(str(arguments.get("key", "")), safe=""))
+    if name == "memory_search":
+        path += "?" + urllib.parse.urlencode({"q": str(arguments.get("query", ""))})
     if name == "task_resume":
         path = path.replace("{task_id}", urllib.parse.quote(task_id, safe=""))
     if name in {"task_checkpoint", "commitment_reconcile"}:
