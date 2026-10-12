@@ -97,4 +97,4 @@ The held-out family 2 Eggs/Milk operation passed its exact after-state in all si
 
 ## Last verified public checkpoint
 
-The owner-approved history remediation was published at `190d85398d39d67d08dc082a7a2acb6508f8c186`. Anonymous GitHub API and repository-page requests returned HTTP 200, API visibility was `public`, and remote `main` matched the published SHA. Exact-SHA Prototype CI run [38293278697](https://github.com/p0rkm4th/hades-v3/actions/runs/38293278697) passed with zero uploaded artifacts. CP63 evidence follows this public checkpoint and is being synchronized separately.
+The owner-approved history remediation was published at `190d85398d39d67d08dc082a7a2acb6508f8c186`. The CP63 checkpoint is published at `08bba69bde56b134421ce7e353c754ed25516e03`, which matched remote `main` at verification. Anonymous GitHub API and repository-page requests returned HTTP 200 and API visibility was `public`. Exact-SHA Prototype CI run [38294447934](https://github.com/p0rkm4th/hades-v3/actions/runs/38294447934) passed with zero uploaded artifacts.
