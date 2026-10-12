@@ -1,0 +1,24 @@
+{
+  "screen": "cp51-family6-restart-recovery-8b",
+  "candidate_source_revision": "0419786a1c4e4c971a0819cb7d0a16e3a3dd3612",
+  "model": "Qwen3-8B Q4_K_M",
+  "model_id": "/models/Qwen3-8B-Q4_K_M.gguf",
+  "model_weight_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "endpoint": "http://model-server-8b:8080/v1",
+  "effective_context_tokens": 40960,
+  "training_context_tokens_reported": 40960,
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "runtime_threads": 16,
+  "inference_device": "CPU; the disposable Compose model service has no GPU passthrough",
+  "per_model_request_timeout_seconds": 50,
+  "profile_verification": "Weight SHA checked against docs/MODEL_PROFILE.md; /v1/models verified before trials and after candidate-api restart; identical MODEL_URL and MODEL_NAME were passed to each runner process so API restarts retained this profile.",
+  "trial_order": [
+    "pydantic cp51-8b-a-01",
+    "lean cp51-8b-c-01",
+    "lean cp51-8b-c-02",
+    "pydantic cp51-8b-a-02",
+    "pydantic cp51-8b-a-03",
+    "lean cp51-8b-c-03"
+  ],
+  "raw_trial_records": "family6_restart_8b_cp51.jsonl"
+}
