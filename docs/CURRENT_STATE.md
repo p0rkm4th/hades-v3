@@ -84,3 +84,7 @@
 5. Obtain an owner-approved history-remediation plan for already-public historical material. Keep each new checkpoint sanitized and forward-only; do not force-push or claim that old history was scrubbed.
 
 Owner action is needed to choose an authorized remediation path for the private network detail already present in public history, and to confirm the canonical source identity of the frozen PRD. Remote GPU candidate trials need a resolvable host alias, verified ED25519 host-key identity, and a narrow route from the isolated experiment network; do not bypass host-key verification. The repository is already public. Full production implementation remains out of scope.
+
+## Public history remediation
+
+The owner-approved history rewrite and its external caching limitations are documented in [PUBLICATION_HISTORY_REMEDIATION.md](PUBLICATION_HISTORY_REMEDIATION.md). The recovery bundle and commit mapping are retained outside the public repository.
