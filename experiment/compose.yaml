@@ -51,6 +51,62 @@ services:
       retries: 15
     restart: "no"
 
+  workspace-amber:
+    build:
+      context: .
+      dockerfile: services/Workspace.Dockerfile
+    environment:
+      FIXTURE_USER: user-amber
+      WORKSPACE_ROOT: /workspace
+    volumes:
+      - workspace-amber-data:/workspace
+    networks: [workspace-amber-net]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 2g
+    ulimits:
+      fsize:
+        soft: 268435456
+        hard: 268435456
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+    restart: "no"
+
+  workspace-cobalt:
+    build:
+      context: .
+      dockerfile: services/Workspace.Dockerfile
+    environment:
+      FIXTURE_USER: user-cobalt
+      WORKSPACE_ROOT: /workspace
+    volumes:
+      - workspace-cobalt-data:/workspace
+    networks: [workspace-cobalt-net]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 2g
+    ulimits:
+      fsize:
+        soft: 268435456
+        hard: 268435456
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+    restart: "no"
+
   fixture-admin:
     build:
       context: .
@@ -74,6 +130,8 @@ services:
       GROCY_API_KEY_FILE: /run/fixture-secrets/grocy-api-key
       COMMITMENT_URL: http://commitment-simulator:8090
       COMMITMENT_API_TOKEN: ${COMMITMENT_API_TOKEN:-fixture-only-token-not-a-secret}
+      WORKSPACE_AMBER_URL: http://workspace-amber:8091
+      WORKSPACE_COBALT_URL: http://workspace-cobalt:8091
       TOOLS_PATH: /app/tools.json
     volumes:
       - grocy-api-key:/run/fixture-secrets:ro
@@ -84,7 +142,11 @@ services:
         condition: service_started
       commitment-simulator:
         condition: service_healthy
-    networks: [fixture-backend, operator]
+      workspace-amber:
+        condition: service_healthy
+      workspace-cobalt:
+        condition: service_healthy
+    networks: [fixture-backend, workspace-amber-net, workspace-cobalt-net, operator]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
       interval: 3s
@@ -164,9 +226,15 @@ volumes:
   postgres-data:
   grocy-data:
   grocy-api-key:
+  workspace-amber-data:
+  workspace-cobalt-data:
 
 networks:
   fixture-backend:
+    internal: true
+  workspace-amber-net:
+    internal: true
+  workspace-cobalt-net:
     internal: true
   operator:
     internal: true

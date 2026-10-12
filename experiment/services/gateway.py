@@ -20,6 +20,10 @@ GROCY_URL = os.environ.get("GROCY_URL", "http://grocy").rstrip("/")
 GROCY_API_KEY_FILE = os.environ["GROCY_API_KEY_FILE"]
 COMMITMENT_URL = os.environ.get("COMMITMENT_URL", "http://commitment-simulator:8090").rstrip("/")
 COMMITMENT_API_TOKEN = os.environ["COMMITMENT_API_TOKEN"]
+WORKSPACE_URLS = {
+    "user-amber": os.environ.get("WORKSPACE_AMBER_URL", "http://workspace-amber:8091"),
+    "user-cobalt": os.environ.get("WORKSPACE_COBALT_URL", "http://workspace-cobalt:8091"),
+}
 TOOLS_PATH = os.environ.get("TOOLS_PATH", "/app/tools.json")
 MAX_BODY = 64 * 1024
 
@@ -95,6 +99,31 @@ def commitment_digest(target_id: str, details: str):
         ensure_ascii=False,
     ).encode()
     return hashlib.sha256(canonical).hexdigest()
+
+
+def workspace_request(user_id: str, command: str):
+    base = WORKSPACE_URLS.get(user_id)
+    if base is None:
+        raise ClientError(403, "no disposable workspace for this identity")
+    request = urllib.request.Request(
+        f"{base.rstrip('/')}/v1/exec",
+        data=json.dumps({"command": command}).encode(),
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            raw = response.read()
+            return response.status, json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as exc:
+        raw = exc.read()
+        try:
+            value = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            value = {}
+        return exc.code, value
+    except urllib.error.URLError:
+        raise RuntimeError("workspace outcome is uncertain") from None
 
 
 def grocy_products():
@@ -288,6 +317,8 @@ class Handler(BaseHTTPRequestHandler):
 
             if self.command == "POST" and route.path == "/v1/commitments":
                 return self.commitment_submit(user_id, domain_id)
+            if self.command == "POST" and route.path == "/v1/workspace/exec":
+                return self.workspace_exec(user_id, domain_id)
             reconcile_match = re.fullmatch(
                 r"/v1/commitments/([0-9a-fA-F-]{36})/reconcile", route.path
             )
@@ -548,6 +579,65 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json(202, {
             "effect_id": str(effect_uuid), "state": "QUARANTINED",
             "reconcile_required": True,
+        })
+
+    def workspace_exec(self, user_id: str, domain_id: str):
+        body = self.read_json()
+        command = body.get("command")
+        try:
+            task_uuid = uuid.UUID(str(body.get("task_id")))
+        except (ValueError, TypeError, AttributeError):
+            raise ClientError(400, "task_id must be a UUID") from None
+        if not isinstance(command, str) or not command.strip() or len(command) > 8192:
+            raise ClientError(400, "command must contain 1 to 8192 characters")
+        command = command.strip()
+        with database() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT state FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s",
+                (task_uuid, user_id, domain_id),
+            )
+            task = cur.fetchone()
+            if task is None:
+                raise ClientError(404, "task not found")
+            if task["state"] not in {"RUNNING", "WAITING"}:
+                raise ClientError(409, "task is not active")
+            cur.execute(
+                "INSERT INTO effects "
+                "(task_id, user_id, domain_id, effect_kind, resource_key, state, request) "
+                "VALUES (%s, %s, %s, 'WORKSPACE_COMMAND', %s, 'INTENDED', %s) "
+                "RETURNING effect_id",
+                (task_uuid, user_id, domain_id, f"workspace:{user_id}", Jsonb({"command": command})),
+            )
+            effect_id = cur.fetchone()["effect_id"]
+        with database() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE effects SET state='DISPATCHED', updated_at=now() WHERE effect_id=%s",
+                (effect_id,),
+            )
+        try:
+            status, result = workspace_request(user_id, command)
+        except RuntimeError:
+            status, result = -1, {}
+        if status != 200 or result.get("timed_out"):
+            with database() as conn, conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE effects SET state='QUARANTINED', result=%s, updated_at=now() "
+                    "WHERE effect_id=%s",
+                    (Jsonb({"runner_status": status, "result": result}), effect_id),
+                )
+            return self.send_json(202, {
+                "task_id": str(task_uuid), "effect_id": str(effect_id),
+                "state": "QUARANTINED", "inspection_required": True,
+            })
+        with database() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE effects SET state='CONFIRMED', result=%s, updated_at=now() "
+                "WHERE effect_id=%s",
+                (Jsonb(result), effect_id),
+            )
+        return self.send_json(200, {
+            "task_id": str(task_uuid), "effect_id": str(effect_id),
+            "state": "CONFIRMED", **result,
         })
 
     def do_GET(self):

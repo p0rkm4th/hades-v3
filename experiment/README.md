@@ -8,6 +8,7 @@ This Compose project is a synthetic comparison fixture, not a production securit
 - Grocy `4.7.1-ls342`, pinned by image digest. It owns the disposable inventory and shopping list. Its generated API key lives only in a dedicated Docker volume and is not mounted into candidate processes.
 - The Python `3.13.16` tool gateway uses Psycopg `3.3.6`; it is the only candidate-adjacent service attached to both the fixture-backend network and the isolated operator network. The test runner (and future candidate workers) attach only to the operator network and receive no PostgreSQL credential or Grocy API-key volume.
 - The protected commitment simulator attaches only to the fixture-backend network. The gateway is its only candidate-adjacent caller. A one-shot `fixture-admin` operator command, also confined to the fixture-backend network and disabled behind a Compose profile, issues a short-lived approval bound to a task, user, target, and canonical details digest. Candidate containers receive neither database credentials nor access to the simulator or fixture-admin service.
+- Amber and Cobalt have separate shell/Git runner containers, named volumes, and internal networks. The gateway alone connects each runner to its matching identity; the runners cannot resolve each other or reach candidate/test-runner containers. Each runner is unprivileged, has a read-only root filesystem, no added capabilities, no external network route, a 2 GiB memory cap, 64-process cap, 20-second command timeout, 256 MiB per-file limit, and bounded captured output. Git is `2.39.5`; bash is `5.2.15-2+b13`.
 - Optional local inference profiles use the pinned CPU `llama.cpp` server image on the operator network. Start one model at a time with `--profile model-8b` or `--profile model-14b`. The model files are downloaded to `experiment/models/`, ignored by Git, and mounted read-only. The 8B profile is Qwen3-8B Q4_K_M; the stronger profile is Qwen3-14B Q4_K_M. Both use an 8,192-token context and 16 CPU threads for this host's GPU-inaccessible container runtime. Model and server identities are recorded in `docs/MODEL_PROFILE.md`.
 - All Compose networks are internal; no service port is published to the host.
 
@@ -18,8 +19,15 @@ docker compose -f experiment/compose.yaml up -d
 docker compose -f experiment/compose.yaml exec -T grocy sh /opt/hades-v3-scripts/initialize_grocy.sh
 docker compose -f experiment/compose.yaml exec -T grocy sh /opt/hades-v3-scripts/seed_grocy_data.sh
 sh experiment/tests/smoke_fixtures.sh
-docker compose -f experiment/compose.yaml up -d --build tool-gateway commitment-simulator
+docker compose -f experiment/compose.yaml up -d --build tool-gateway commitment-simulator workspace-amber workspace-cobalt
 docker compose -f experiment/compose.yaml run --build --rm test-runner
+```
+
+The default test run includes a real shell/Git scenario: the seeded discount test fails, the runner edits the implementation, the test passes, the change is committed, and a separate Cobalt workspace remains unchanged. It mutates the Amber workspace. Reset either synthetic workspace before repeating it:
+
+```sh
+docker compose -f experiment/compose.yaml exec -T -e WORKSPACE_RESET=1 workspace-amber python /app/workspace_runner.py
+docker compose -f experiment/compose.yaml exec -T -e WORKSPACE_RESET=1 workspace-cobalt python /app/workspace_runner.py
 ```
 
 For an explicitly approved synthetic commitment, create a user-owned task, then have the test operator issue an exact-effect approval from the fixture-admin profile. Pass that returned approval ID to the candidate only after the simulated confirmation step. The approval expires after five minutes by default and is consumed before dispatch. If the simulator loses its acknowledgment, the gateway records `QUARANTINED`; use `commitment_reconcile` to inspect the receiving fixture. The gateway never retries an ambiguous effect.
@@ -66,4 +74,4 @@ That command stops the optional model server and deletes the lab database, Grocy
 - Grocy isolation: each domain maps to a separate pantry location and shopping list within the one Grocy instance; Cobalt starts with an empty pantry/list.
 - Infrastructure: fresh, stale, and unknown observations; values and names are synthetic.
 
-The shared tool API provides inventory, shopping-list, infrastructure, scoped memory, task/checkpoint, and approval-gated simulated commitment operations. The commitment path uses durable pre-dispatch intent, target-side idempotency by effect ID, quarantine after ambiguous acknowledgment, and read-back reconciliation. Four targeted executions across accept, reject, and lost-ack behaviors passed; revocation, duplicate-safe replay, shell/Git workspace, Playwright-compatible app, candidate adapters, model-backed trials, and restart-kill recovery remain pending. This fixture does not certify production security.
+The shared tool API provides inventory, shopping-list, infrastructure, scoped memory, task/checkpoint, approval-gated simulated commitment, and per-user workspace execution operations. The commitment path uses durable pre-dispatch intent, target-side idempotency by effect ID, quarantine after ambiguous acknowledgment, and read-back reconciliation. Four targeted executions across accept, reject, and lost-ack behaviors passed. The workspace test passed with independent host-side verification. Revocation, duplicate-safe replay, Playwright-compatible app, candidate adapters, model-backed trials, and restart-kill recovery remain pending. The shell fixture is an experimental isolation boundary, not a production security guarantee; aggregate workspace volume usage is not quota-limited.
