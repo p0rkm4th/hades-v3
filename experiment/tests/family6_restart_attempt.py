@@ -8,6 +8,14 @@ import urllib.request
 TOKEN = "fixture-token-amber"
 GATEWAY = "http://tool-gateway:8080"
 CANDIDATE_API = "http://candidate-api:8080"
+CASES = {
+    "discount": {"source": "discount.py", "tests": "test_discount.py",
+                 "task": "repair the discount calculation so it reduces the price by the given percent",
+                 "commit": "Recover discount calculation"},
+    "tax_addition": {"source": "tax.py", "tests": "test_tax.py",
+                     "task": "repair the tax calculation so it adds the given percent to the amount",
+                     "commit": "Recover tax addition calculation"},
+}
 
 
 def get_task(task_id):
@@ -23,24 +31,24 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate", choices=("lean", "pydantic"), required=True)
     parser.add_argument("--trial", required=True)
+    parser.add_argument("--case", choices=tuple(CASES), default="discount")
     parser.add_argument("--phase", choices=("prepare", "resume"), required=True)
     parser.add_argument("--task-id")
     args = parser.parse_args()
 
-    goal = (
-        f"[FAMILY6 {args.trial}] In the synthetic repository, repair the discount calculation "
-        "so it reduces the price by the given percent. Run all tests, review the diff, and "
-        "commit the verified fix as `Recover discount calculation`."
-    )
+    case = CASES[args.case]
+    source, tests = case["source"], case["tests"]
+    goal = (f"[FAMILY6 {args.trial}] In the synthetic repository, {case['task']}. "
+            f"Run all tests, review the diff, and commit the verified fix as `{case['commit']}`.")
     if args.phase == "prepare":
         checkpoint = json.dumps({"summary": "Inspected the source and tests; no files changed.",
-                                 "completed": ["read discount.py", "read test_discount.py"],
+                                 "completed": [f"read {source}", f"read {tests}"],
                                  "pending": ["repair formula", "run tests", "review diff", "commit"],
                                  "family": "family6", "trial": args.trial,
                                  "phase": "source_inspected", "repair_pending": True})
         messages = [{"role": "user", "content":
             f"{goal} For this turn, do only two things: (1) use workspace_exec once to run "
-            "`cat discount.py && cat test_discount.py`; (2) call task_checkpoint with state "
+            f"`cat {source} && cat {tests}`; (2) call task_checkpoint with state "
             f"RUNNING and checkpoint exactly {checkpoint}. Do not edit files or call any other "
             "tool. Stop after the checkpoint call."}]
         task_id = None
