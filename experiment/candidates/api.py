@@ -16,6 +16,10 @@ TOOLS = json.loads((ROOT.parent / "contracts" / "tools.json").read_text())["tool
 GATEWAY = os.environ.get("GATEWAY_URL", "http://tool-gateway:8080")
 MODEL_URL = os.environ.get("MODEL_URL", "http://model-server-8b:8080/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen3-8B")
+MODEL_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("MODEL_REQUEST_TIMEOUT_SECONDS", "50"))
+MAX_MODEL_REQUESTS = 6
+MAX_TOOL_CALLS = 4
+MAX_COMPLETION_TOKENS = 1024
 MAX_BODY = 128 * 1024
 HERMES_ENDPOINT = {
     "fixture-token-amber": ("http://hermes-amber:8642/v1/chat/completions", "fixture-hermes-amber"),
@@ -102,13 +106,16 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str):
             return {"http_status": exc.code, "error": "tool request failed"}
 
 
-def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: str):
+def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: str, tools_used: list[str]):
     history = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
-    tool_trace = []
+    tool_trace = tools_used
     usage_totals = {"prompt_tokens": 0, "completion_tokens": 0}
     started = time.monotonic()
-    for _ in range(8):
-        body = {"model": MODEL_NAME, "messages": history, "temperature": 0, "stream": False}
+    for _ in range(MAX_MODEL_REQUESTS):
+        body = {
+            "model": MODEL_NAME, "messages": history, "temperature": 0,
+            "max_tokens": MAX_COMPLETION_TOKENS, "stream": False,
+        }
         if tools_enabled:
             body["tools"] = [{"type": "function", "function": t} for t in VISIBLE_TOOLS]
             body["tool_choice"] = "auto"
@@ -116,7 +123,7 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
             MODEL_URL.rstrip("/") + "/chat/completions", data=json.dumps(body).encode(),
             headers={"Content-Type": "application/json", "Authorization": "Bearer no-secret"},
         )
-        with urllib.request.urlopen(request, timeout=300) as response:
+        with urllib.request.urlopen(request, timeout=MODEL_REQUEST_TIMEOUT_SECONDS) as response:
             result = json.loads(response.read())
         usage = result.get("usage", {})
         usage_totals["prompt_tokens"] += usage.get("prompt_tokens", 0)
@@ -129,26 +136,24 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
                 "text": choice.get("content") or "", "tool_calls": tool_trace,
                 "usage": usage_totals, "duration_ms": round((time.monotonic() - started) * 1000),
             }
+        if len(tool_trace) + len(calls) > MAX_TOOL_CALLS:
+            raise RuntimeError("tool-call limit reached before dispatch")
         for call in calls:
             function = call["function"]
             args = json.loads(function.get("arguments") or "{}")
             tool_trace.append(function["name"])
             observation = gateway_call(function["name"], args, token, task_id)
             history.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(observation)})
-    return {
-        "text": "I could not complete this turn within the tool-call limit.",
-        "tool_calls": tool_trace, "usage": usage_totals,
-        "duration_ms": round((time.monotonic() - started) * 1000),
-    }
+    raise RuntimeError("model request limit reached before a final response")
 
 
-def chat_pydantic(messages: list[dict], token: str, task_id: str):
-    from pydantic_ai import Agent, FunctionToolset, Tool
+def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: list[str]):
+    from pydantic_ai import Agent, FunctionToolset, Tool, UsageLimits
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
     started = time.monotonic()
-    trace = []
+    trace = tools_used
     toolset = FunctionToolset()
     for spec in VISIBLE_TOOLS:
         name = spec["name"]
@@ -163,7 +168,18 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str):
     model = OpenAIChatModel(MODEL_NAME, provider=provider)
     agent = Agent(model, system_prompt=SYSTEM_PROMPT, toolsets=[toolset], retries=1)
     prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
-    result = agent.run_sync(prompt)
+    result = agent.run_sync(
+        prompt,
+        model_settings={
+            "timeout": MODEL_REQUEST_TIMEOUT_SECONDS,
+            "temperature": 0,
+            "max_tokens": MAX_COMPLETION_TOKENS,
+        },
+        usage_limits=UsageLimits(
+            request_limit=MAX_MODEL_REQUESTS,
+            tool_calls_limit=MAX_TOOL_CALLS,
+        ),
+    )
     usage = result.usage
     return {
         "text": str(result.output), "tool_calls": trace,
@@ -172,7 +188,7 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str):
     }
 
 
-def chat_hermes(messages: list[dict], token: str, task_id: str):
+def chat_hermes(messages: list[dict], token: str, task_id: str, tools_used: list[str]):
     endpoint, api_key = HERMES_ENDPOINT[token]
     task_file, trace_file = HERMES_STATE[token]
     with HERMES_LOCKS[token]:
@@ -188,10 +204,11 @@ def chat_hermes(messages: list[dict], token: str, task_id: str):
             endpoint, data=json.dumps(payload).encode(), method="POST",
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
         )
-        with urllib.request.urlopen(request, timeout=600) as response:
+        with urllib.request.urlopen(request, timeout=MODEL_REQUEST_TIMEOUT_SECONDS) as response:
             value = json.loads(response.read())
         usage = value.get("usage") or {}
         trace = [line for line in trace_file.read_text().splitlines() if line]
+        tools_used.extend(trace)
     message = value["choices"][0]["message"]
     content = message.get("content") or ""
     return {
@@ -212,12 +229,19 @@ def start_task(token: str, goal: str):
         return json.loads(response.read())
 
 
-def transition_task(token: str, task_id: str, state: str, tools_used: list[str]):
+def transition_task(
+    token: str, task_id: str, state: str, tools_used: list[str], error_type: str | None = None
+):
     current = gateway_call("task_resume", {}, token, task_id)
     if current.get("http_status") or current.get("task_id") != task_id:
         raise RuntimeError("task state could not be read")
     checkpoint = dict(current.get("checkpoint") or {})
-    checkpoint["candidate_turn"] = {"state": state, "tools": tools_used}
+    candidate_turn = {"state": state, "tools": tools_used}
+    if error_type is not None:
+        candidate_turn["error_type"] = error_type
+        candidate_turn["operator_review_required"] = True
+        candidate_turn["effect_outcome_uncertain"] = True
+    checkpoint["candidate_turn"] = candidate_turn
     updated = gateway_call(
         "task_checkpoint", {"state": state, "checkpoint": checkpoint}, token, task_id
     )
@@ -253,6 +277,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/api/turn":
             return self.send_json(404, {"error": "not found"})
+        active_token = None
+        active_task_id = None
+        candidate = None
+        tools_used = []
         try:
             if int(self.headers.get("Content-Length", "0")) > MAX_BODY:
                 return self.send_json(413, {"error": "request too large"})
@@ -272,22 +300,50 @@ class Handler(BaseHTTPRequestHandler):
                 task_id = start_task(token, str(user_messages[0]["content"]))["task_id"]
             else:
                 transition_task(token, task_id, "RUNNING", [])
+            active_token = token
+            active_task_id = task_id
             if candidate == "pydantic":
-                result = chat_pydantic(messages, token, task_id)
+                result = chat_pydantic(messages, token, task_id, tools_used)
             elif candidate == "hermes":
-                result = chat_hermes(messages, token, task_id)
+                result = chat_hermes(messages, token, task_id, tools_used)
             else:
-                result = chat_openai(messages, True, token, task_id)
+                result = chat_openai(messages, True, token, task_id, tools_used)
             current = gateway_call("task_resume", {}, token, task_id)
             if current.get("http_status") or current.get("task_id") != task_id:
                 raise RuntimeError("task state could not be read")
-            if current.get("state") == "RUNNING":
+            if current.get("state") in {"RUNNING", "COMPLETED"}:
                 transition_task(token, task_id, "COMPLETED", result.get("tool_calls", []))
+            else:
+                raise RuntimeError("candidate turn ended in an unexpected task state")
             result["task_id"] = task_id
             return self.send_json(200, result)
         except Exception as exc:
+            if candidate == "hermes" and active_token:
+                _, trace_file = HERMES_STATE[active_token]
+                try:
+                    if trace_file.exists():
+                        tools_used.extend(
+                            line for line in trace_file.read_text().splitlines()
+                            if line and line not in tools_used
+                        )
+                except OSError as trace_exc:
+                    print(f"Could not read Hermes tool trace: {type(trace_exc).__name__}")
+            if active_token and active_task_id:
+                try:
+                    transition_task(
+                        active_token,
+                        active_task_id,
+                        "FAILED",
+                        tools_used,
+                        type(exc).__name__,
+                    )
+                except Exception as checkpoint_exc:
+                    print(f"Could not close failed task: {type(checkpoint_exc).__name__}")
             print(f"Candidate request rejected: {type(exc).__name__}: {exc}")
-            return self.send_json(502, {"error": f"candidate request failed: {type(exc).__name__}"})
+            failure = {"error": f"candidate request failed: {type(exc).__name__}"}
+            if active_task_id:
+                failure["task_id"] = active_task_id
+            return self.send_json(502, failure)
 
 
 if __name__ == "__main__":
