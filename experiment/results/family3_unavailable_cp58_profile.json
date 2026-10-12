@@ -1,0 +1,37 @@
+{
+  "checkpoint": 58,
+  "date": "2026-10-12",
+  "purpose": "Incomplete family 3 timeout diagnostic; no matched A/C result",
+  "candidate_api_source_revision": "0419786a1c4e4c971a0819cb7d0a16e3a3dd3612",
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "runtime_threads": 16,
+  "request_timeout_seconds": 50,
+  "model_profiles": {
+    "Qwen3-8B Q4_K_M": {
+      "endpoint": "http://model-server-8b:8080/v1",
+      "weight_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "effective_context_tokens": 40960,
+      "training_context_tokens_reported": 40960,
+      "device": "CPU"
+    },
+    "Qwen3-14B Q4_K_M": {
+      "endpoint": "http://model-server-14b:8080/v1",
+      "weight_sha256": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
+      "effective_context_tokens": 40960,
+      "training_context_tokens_reported": 40960,
+      "device": "CPU"
+    }
+  },
+  "attempts": [
+    {"candidate": "lean", "profile": "Qwen3-8B Q4_K_M", "task_id": "65ad3dee-af6c-4567-a0a7-67327274f74e", "outcome": "FAILED before first tool call; zero effects"},
+    {"candidate": "lean", "profile": "Qwen3-14B Q4_K_M", "task_id": "7445a498-051c-4af7-900f-5b7ce75c6766", "outcome": "FAILED before first tool call; zero effects"}
+  ],
+  "cleanup": {
+    "temporary_observation_deleted": true,
+    "remaining_synthetic_monitor_rows": 0,
+    "original_seed_verified": true,
+    "candidate_api_restored_to": "Qwen3-8B Q4_K_M CPU",
+    "Qwen3_14B_service_stopped": true
+  },
+  "interpretation": "Both attempts stopped at the first interleaved Candidate C request, so Candidate A was not tested. These are excluded timeout diagnostics, not comparative results or family qualification."
+}
