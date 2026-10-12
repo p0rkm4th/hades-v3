@@ -9,6 +9,7 @@ COPY services/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY services/gateway.py /app/gateway.py
 COPY services/commitment_simulator.py /app/commitment_simulator.py
+COPY services/workspace_runner.py /app/workspace_runner.py
 COPY contracts/tools.json /app/tools.json
 USER 10001:10001
 EXPOSE 8080
