@@ -17,8 +17,8 @@ GATEWAY = os.environ.get("GATEWAY_URL", "http://tool-gateway:8080")
 MODEL_URL = os.environ.get("MODEL_URL", "http://model-server-8b:8080/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen3-8B")
 MODEL_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("MODEL_REQUEST_TIMEOUT_SECONDS", "50"))
-MAX_MODEL_REQUESTS = 6
-MAX_TOOL_CALLS = 4
+MAX_MODEL_REQUESTS = 16
+MAX_TOOL_CALLS = 18
 MAX_COMPLETION_TOKENS = 1024
 MAX_BODY = 128 * 1024
 HERMES_ENDPOINT = {
@@ -48,8 +48,15 @@ asked what the user prefers, previously requested, decided, or uses as a standin
 retrieve relevant memory with memory_search when the exact key is unknown, or memory_read
 when it is known, before answering. Do not infer a saved preference from the current
 conversation alone. Use only returned memories; if no relevant memory is found, say so after
-searching. Memory is not a source of live operational truth. For code work, inspect the
-repository, run its tests, inspect the result and commit only when asked.
+searching. Memory is not a source of live operational truth. For code work, use
+workspace_exec runs one shell command in the root of the already checked-out repository.
+Do not clone, fetch, pull or push external remotes; workspace network egress is
+disabled. Inspect the existing files, run their tests, inspect the result and
+diff, and commit only when asked. Plan a short sequence of commands; batch
+related read-only checks into one bounded command and avoid repeated inspections
+or temporary patch files when a direct edit is practical. After the requested
+change, tests, final diff review, and commit are complete, stop using tools and
+report the verified outcome.
 """
 
 
