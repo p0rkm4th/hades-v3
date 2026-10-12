@@ -2,6 +2,7 @@
 
 import json
 import sys
+from urllib.error import HTTPError
 import urllib.request
 
 
@@ -47,24 +48,55 @@ for candidate in ORDER:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=600) as response:
-        result = json.loads(response.read())
+    try:
+        with urllib.request.urlopen(request, timeout=600) as response:
+            result = json.loads(response.read())
+    except HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")
+        try:
+            failure = json.loads(body)
+        except json.JSONDecodeError:
+            failure = {"body": body}
+        task = None
+        if failure.get("task_id"):
+            try:
+                task = get_json(
+                    GATEWAY + f"/v1/tasks/{failure['task_id']}",
+                    {"Authorization": f"Bearer {TOKEN}"},
+                )
+            except Exception as task_error:  # Preserve the original API failure.
+                task = {"readback_error": type(task_error).__name__}
+        print(json.dumps({
+            "candidate": candidate,
+            "http_status": error.code,
+            "failure": failure,
+            "task_readback": task,
+        }), flush=True)
+        raise
     task = get_json(
         GATEWAY + f"/v1/tasks/{result['task_id']}",
         {"Authorization": f"Bearer {TOKEN}"},
     )
     candidate_turn = task.get("checkpoint", {}).get("candidate_turn", {})
-    assert task["state"] == "COMPLETED", task
-    assert candidate_turn.get("tools") == ["infrastructure_read"], task
+    if task["state"] != "COMPLETED":
+        print(json.dumps({
+            "candidate": candidate,
+            "task_id": result["task_id"],
+            "task": task,
+        }), flush=True)
+        raise RuntimeError(f"candidate task did not complete: {task['state']}")
     results.append({
         "candidate": candidate,
         "task_id": result["task_id"],
         "task_state": task["state"],
+        "task_tools": candidate_turn.get("tools", []),
+        "expected_read_used": candidate_turn.get("tools") == ["infrastructure_read"],
         "tool_calls": result.get("tool_calls", []),
         "usage": result.get("usage", {}),
         "duration_ms": result.get("duration_ms"),
         "text": result.get("text", ""),
     })
+    print(json.dumps(results[-1]), flush=True)
 
 after = observations()
 assert before == after, {"before": before, "after": after}
