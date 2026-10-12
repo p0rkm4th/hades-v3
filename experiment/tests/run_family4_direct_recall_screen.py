@@ -21,13 +21,13 @@ FRESH_RECALL = "What agenda order did I choose for the monthly planning meeting?
 ATTEMPTS = ("pydantic", "lean", "lean", "pydantic", "pydantic", "lean")
 
 
-def request_json(method, url, payload=None):
+def request_json(method, url, payload=None, timeout=40):
     data = None if payload is None else json.dumps(payload).encode()
     headers = {"Authorization": f"Bearer {TOKEN}"}
     if data is not None:
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(request, timeout=40) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read())
 
 
@@ -40,7 +40,7 @@ def post_turn(candidate, messages, attempt, turn):
         "candidate": candidate,
         "user_token": TOKEN,
         "messages": messages,
-    })
+    }, timeout=600)
     task = gateway(f"/v1/tasks/{result['task_id']}")
     record = {
         "candidate": candidate,
