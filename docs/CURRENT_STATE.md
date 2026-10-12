@@ -20,7 +20,7 @@
 ## Public checkpoint
 
 - Repository: [`https://github.com/p0rkm4th/hades-v3`](https://github.com/p0rkm4th/hades-v3), branch `main`.
-- Published code checkpoint before the current family 1 work: `1335470a79fb54f4f4ebcef36011270489f6f993`, which includes the durable task/effect linkage repair and successful-turn lifecycle fix. Family 1 results and this current-state update are being prepared for the next sanitized checkpoint.
+- Published family 1 code/evidence checkpoint: `6c37bcf0b2e197c912e023353564dc01f631760b` on `main`, including candidate lifecycle source `1335470a79fb54f4f4ebcef36011270489f6f993`. SSH push succeeded; `git ls-remote` returned the exact checkpoint SHA. Unauthenticated GitHub API returned `visibility=public`, `default_branch=main`, and an unauthenticated raw fetch returned the family 1 findings. The full 16-commit history and staged changes passed Gitleaks. This current-state sync follows the evidence commit.
 - Anonymous GitHub API verification returned `private=false`, default branch `main`; anonymous raw access to `experiment/candidates/api.py` returned source containing `chat_hermes`. The full 12-commit Git history and new public source/docs passed Gitleaks with no findings.
 - Changes include candidate A/C adapters, an early B Hermes runtime integration, the synthetic chat UI and one Playwright UI smoke test. Candidate B remains blocked by the verified 40,960-versus-64,000 context mismatch; ADR-010 remains NOT READY.
 - No owner action is required for authentication or visibility. Continue synchronizing meaningful sanitized checkpoints and reverify the remote SHA and anonymous access after later pushes.
