@@ -8,6 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = ["docker", "compose", "-f", "experiment/compose.yaml"]
+CASES = {"discount": ("discount.py", "1 + percent / 100"),
+         "tax_addition": ("tax.py", "1 - rate_percent / 100")}
 
 
 def compose(*args, timeout=120, check=True):
@@ -80,19 +82,20 @@ with urllib.request.urlopen(req,timeout=10) as r: print(json.dumps(json.loads(r.
                    script, task_id, timeout=30).stdout.strip().splitlines()[-1]
 
 
-def snapshot():
-    script = r'''import json,subprocess
+def snapshot(case):
+    source_file = CASES[case][0]
+    script = r'''import json,subprocess,sys
 r=lambda a:subprocess.run(a,cwd='/workspace',capture_output=True,text=True,timeout=30)
 status=r(['git','status','--porcelain']);head=r(['git','rev-parse','HEAD']);root=r(['git','rev-list','--max-parents=0','HEAD'])
-tests=r(['python','-m','unittest','-q']);source=open('/workspace/discount.py',encoding='utf-8').read()
+tests=r(['python','-m','unittest','-q']);source=open('/workspace/'+sys.argv[1],encoding='utf-8').read()
 print(json.dumps({'status':status.stdout,'head':head.stdout.strip(),'root':root.stdout.strip(),'test_exit':tests.returncode,'test_stdout':tests.stdout,'test_stderr':tests.stderr,'source':source}))'''
-    result = compose("exec", "-T", "workspace-amber", "python", "-c", script)
+    result = compose("exec", "-T", "workspace-amber", "python", "-c", script, source_file)
     return json.loads(result.stdout.strip().splitlines()[-1])
 
 
-def run_phase(trial, candidate, phase, task_id=None):
+def run_phase(trial, candidate, phase, task_id=None, case="discount"):
     command = ["run", "-T", "--rm", "--no-deps", "test-runner", "python",
-               "/app/tests/family6_restart_attempt.py", "--trial", trial,
+               "/app/tests/family6_restart_attempt.py", "--trial", trial, "--case", case,
                "--candidate", candidate, "--phase", phase]
     if task_id:
         command += ["--task-id", task_id]
@@ -103,6 +106,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate", choices=("lean", "pydantic"), required=True)
     parser.add_argument("--trial", required=True)
+    parser.add_argument("--case", choices=tuple(CASES), default="discount")
     parser.add_argument("--output", required=True)
     parser.add_argument("--checkpoint-timeout", type=int, default=240)
     args = parser.parse_args()
@@ -110,17 +114,17 @@ def main():
     output_path = (ROOT / args.output).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    compose("exec", "-T", "-e", "WORKSPACE_RESET=1", "workspace-amber",
+    compose("exec", "-T", "-e", "WORKSPACE_RESET=1", "-e", f"WORKSPACE_CASE={args.case}", "workspace-amber",
             "python", "/app/workspace_runner.py")
-    before = snapshot()
+    before = snapshot(args.case)
     if before["root"] != before["head"] or before["status"].strip():
         raise RuntimeError(f"Amber workspace is not at its synthetic seed: {before}")
-    if before["test_exit"] == 0 or "1 + percent / 100" not in before["source"]:
-        raise RuntimeError("Expected synthetic discount defect is not present")
+    if before["test_exit"] == 0 or CASES[args.case][1] not in before["source"]:
+        raise RuntimeError(f"Expected synthetic {args.case} defect is not present")
 
     initial = subprocess.Popen(
         COMPOSE + ["run", "-T", "--rm", "--no-deps", "test-runner", "python",
-                   "/app/tests/family6_restart_attempt.py", "--trial", trial,
+                   "/app/tests/family6_restart_attempt.py", "--trial", trial, "--case", args.case,
                    "--candidate", args.candidate, "--phase", "prepare"],
         cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
@@ -154,8 +158,8 @@ def main():
             close_task_for_review(task["task_id"])
             operator_closed = True
             task = trial_task(trial)
-        after = snapshot()
-        record = {"candidate": args.candidate, "trial": trial, "valid": False,
+        after = snapshot(args.case)
+        record = {"candidate": args.candidate, "trial": trial, "case": args.case, "valid": False,
                   "reason": "candidate did not persist the required recovery checkpoint; no interruption performed",
                   "task": task, "effects": task_effects,
                   "operator_closed_waiting_task": operator_closed,
@@ -179,7 +183,7 @@ def main():
             time.sleep(0.5)
         resume_records = []
         for resume_round in range(1, 4):
-            resumed = run_phase(trial, args.candidate, "resume", task_id)
+            resumed = run_phase(trial, args.candidate, "resume", task_id, args.case)
             resume_lines = [line for line in resumed.stdout.splitlines() if line.strip().startswith("{")]
             resume_record = json.loads(resume_lines[-1]) if resume_lines else None
             task_state = sql_json(
@@ -196,13 +200,13 @@ def main():
                 raise RuntimeError(f"Unresolved effects on waiting task; inspect before closure: {current_effects}")
             close_task_for_review(task_id)
             operator_closed = True
-        after = snapshot()
+        after = snapshot(args.case)
         final_task = sql_json(
             "SELECT json_build_object('task_id',task_id,'state',state,'revision',revision,"
             f"'checkpoint',checkpoint)::text FROM tasks WHERE task_id='{task_id}'"
         )
         task_effects = effects(task_id)
-        record = {"candidate": args.candidate, "trial": trial, "valid": bool(interrupted),
+        record = {"candidate": args.candidate, "trial": trial, "case": args.case, "valid": bool(interrupted),
                   "task_id": task_id, "checkpoint_observed": saved,
                   "candidate_api_killed": interrupted,
                   "state_after_interruption": state_after_interrupt,
@@ -229,9 +233,9 @@ def main():
         if any(effect["state"] not in {"CONFIRMED", "CANCELLED"} for effect in record["effects"]):
             raise RuntimeError(f"Unresolved effects; inspect before reset: {record}")
         # Do not reset unless all workspace effects are terminal and inspectable.
-        compose("exec", "-T", "-e", "WORKSPACE_RESET=1", "workspace-amber",
+        compose("exec", "-T", "-e", "WORKSPACE_RESET=1", "-e", f"WORKSPACE_CASE={args.case}", "workspace-amber",
                 "python", "/app/workspace_runner.py")
-        clean = snapshot()
+        clean = snapshot(args.case)
         if clean["root"] != clean["head"] or clean["status"].strip():
             raise RuntimeError(f"Synthetic workspace cleanup failed: {clean}")
     elif record.get("task") and record["task"]["state"] in {"COMPLETED", "FAILED"}:
@@ -239,7 +243,7 @@ def main():
             raise RuntimeError(f"Unresolved effects; inspect before reset: {record}")
         if record["after"]["status"].strip():
             raise RuntimeError(f"Workspace changed during checkpoint preparation; inspect before reset: {record}")
-        compose("exec", "-T", "-e", "WORKSPACE_RESET=1", "workspace-amber",
+        compose("exec", "-T", "-e", "WORKSPACE_RESET=1", "-e", f"WORKSPACE_CASE={args.case}", "workspace-amber",
                 "python", "/app/workspace_runner.py")
 
 

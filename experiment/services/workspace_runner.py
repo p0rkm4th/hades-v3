@@ -19,26 +19,55 @@ MAX_OUTPUT = 256 * 1024
 COMMAND_TIMEOUT = 20
 CONCURRENCY = BoundedSemaphore(4)
 
-SEED_FILES = {
-    ".gitignore": "__pycache__/\n*.py[cod]\n",
-    "README.md": "# Synthetic discount calculator\n\nRun checks with `python -m unittest -v`.\n",
-    "discount.py": (
-        "def apply_discount(price: float, percent: float) -> float:\n"
-        "    return price * (1 + percent / 100)\n"
-    ),
-    "test_discount.py": (
-        "import unittest\n\n"
-        "from discount import apply_discount\n\n\n"
-        "class DiscountTests(unittest.TestCase):\n"
-        "    def test_ten_percent_off(self):\n"
-        "        self.assertEqual(apply_discount(100, 10), 90)\n\n"
-        "    def test_zero_percent(self):\n"
-        "        self.assertEqual(apply_discount(100, 0), 100)\n\n"
-        "    def test_full_discount(self):\n"
-        "        self.assertEqual(apply_discount(100, 100), 0)\n\n\n"
-        "if __name__ == '__main__':\n"
-        "    unittest.main()\n"
-    ),
+SEED_CASES = {
+    "discount": {
+        "files": {
+            ".gitignore": "__pycache__/\n*.py[cod]\n",
+            "README.md": "# Synthetic discount calculator\n\nRun checks with `python -m unittest -v`.\n",
+            "discount.py": (
+                "def apply_discount(price: float, percent: float) -> float:\n"
+                "    return price * (1 + percent / 100)\n"
+            ),
+            "test_discount.py": (
+                "import unittest\n\n"
+                "from discount import apply_discount\n\n\n"
+                "class DiscountTests(unittest.TestCase):\n"
+                "    def test_ten_percent_off(self):\n"
+                "        self.assertEqual(apply_discount(100, 10), 90)\n\n"
+                "    def test_zero_percent(self):\n"
+                "        self.assertEqual(apply_discount(100, 0), 100)\n\n"
+                "    def test_full_discount(self):\n"
+                "        self.assertEqual(apply_discount(100, 100), 0)\n\n\n"
+                "if __name__ == '__main__':\n"
+                "    unittest.main()\n"
+            ),
+        },
+        "commit_message": "Seed synthetic discount task",
+    },
+    "tax_addition": {
+        "files": {
+            ".gitignore": "__pycache__/\n*.py[cod]\n",
+            "README.md": "# Synthetic tax calculator\n\nRun checks with `python -m unittest -v`.\n",
+            "tax.py": (
+                "def add_tax(amount: float, rate_percent: float) -> float:\n"
+                "    return amount * (1 - rate_percent / 100)\n"
+            ),
+            "test_tax.py": (
+                "import unittest\n\n"
+                "from tax import add_tax\n\n\n"
+                "class TaxTests(unittest.TestCase):\n"
+                "    def test_ten_percent_tax(self):\n"
+                "        self.assertEqual(add_tax(100, 10), 110)\n\n"
+                "    def test_zero_percent(self):\n"
+                "        self.assertEqual(add_tax(100, 0), 100)\n\n"
+                "    def test_one_hundred_percent(self):\n"
+                "        self.assertEqual(add_tax(100, 100), 200)\n\n\n"
+                "if __name__ == '__main__':\n"
+                "    unittest.main()\n"
+            ),
+        },
+        "commit_message": "Seed synthetic tax addition task",
+    },
 }
 
 
@@ -46,16 +75,20 @@ def seed_repository():
     os.makedirs(WORKSPACE_ROOT, mode=0o700, exist_ok=True)
     if os.path.isdir(os.path.join(WORKSPACE_ROOT, ".git")):
         return
-    for name, content in SEED_FILES.items():
+    case_name = os.environ.get("WORKSPACE_CASE", "discount")
+    case = SEED_CASES.get(case_name)
+    if case is None:
+        raise ValueError("unsupported synthetic workspace case")
+    for name, content in case["files"].items():
         path = os.path.join(WORKSPACE_ROOT, name)
         with open(path, "w", encoding="utf-8") as destination:
             destination.write(content)
     env = command_environment()
     subprocess.run(["git", "init", "--quiet", "--initial-branch=main"], cwd=WORKSPACE_ROOT,
                    env=env, check=True, timeout=5)
-    subprocess.run(["git", "add", ".gitignore", "README.md", "discount.py", "test_discount.py"],
+    subprocess.run(["git", "add", "--all"],
                    cwd=WORKSPACE_ROOT, env=env, check=True, timeout=5)
-    subprocess.run(["git", "commit", "--quiet", "-m", "Seed synthetic discount task"],
+    subprocess.run(["git", "commit", "--quiet", "-m", case["commit_message"]],
                    cwd=WORKSPACE_ROOT, env=env, check=True, timeout=5)
 
 
