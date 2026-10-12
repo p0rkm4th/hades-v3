@@ -1,0 +1,45 @@
+{
+  "attempts_per_candidate": 3,
+  "candidate_api_source_revision": "44f4983b585d3aab08eb92ed36c28d57b0ce5562",
+  "candidate_gpu_inference": false,
+  "candidate_order": [
+    "pydantic",
+    "lean",
+    "lean",
+    "pydantic",
+    "pydantic",
+    "lean"
+  ],
+  "candidates": {
+    "lean": "C",
+    "pydantic": "A"
+  },
+  "checkpoint": 60,
+  "durable_tasks": {
+    "completed": 0,
+    "operator_closed_failed": 24,
+    "total": 24,
+    "unresolved": 0
+  },
+  "effective_context": 40960,
+  "exact_correction_and_fresh_recall": {
+    "lean": "3/3",
+    "pydantic": "3/3"
+  },
+  "experiment_workspace_base_revision": "44f4983b585d3aab08eb92ed36c28d57b0ce5562",
+  "fixture_cleanup": "deployment_note_heading_order verified absent after trial 6",
+  "generation_throughput_measurement": "not a benchmark; per-turn latency/token usage are retained in raw JSONL",
+  "initial_direct_recall_memory_search": {
+    "lean": "0/3",
+    "pydantic": "0/3"
+  },
+  "linked_effects": 0,
+  "llama_cpp_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "model": "Qwen3-8B Q4_K_M",
+  "model_endpoint": "http://model-server-8b:8080/v1",
+  "model_request_timeout_seconds": 50,
+  "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "scenario": "family4 saved deployment-note preference correction and fresh-context recall",
+  "threads": 16,
+  "training_context": 40960
+}
