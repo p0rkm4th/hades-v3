@@ -93,3 +93,9 @@ Pinned current source snapshots: [Hermes coding-worker integration](https://gith
 - No v2 runtime, production service, branch, user data, credentials, or deployment was accessed or changed. This is a source and acceptance-record observation and not a matched result for the v3 family 2 task.
 
 Pinned current source records: [campaign state](https://github.com/p0rkm4th/hades/blob/3df7bfb886bfcb891aab7d770be09139329b6ccd/CAMPAIGN_STATE.md), [current blockers](https://github.com/p0rkm4th/hades/blob/3df7bfb886bfcb891aab7d770be09139329b6ccd/docs/current-blockers.md), and [owner-workflow scoreboard](https://github.com/p0rkm4th/hades/blob/3df7bfb886bfcb891aab7d770be09139329b6ccd/acceptance/owner-workflows.md).
+
+## Living-control source recheck — 2026-10-12, HADES v3 checkpoint 46
+
+- Anonymous `git ls-remote` returned public v2 `main` at `3df7bfb886bfcb891aab7d770be09139329b6ccd`; the pinned campaign state, current-blocker record, and owner-workflow scoreboard were read at that exact revision.
+- The owner-reported read-routing/memory-mutation mission remains open; source records do not claim reproduction or repair. No new owner acceptance for that route was recorded. The next recorded action remains a truth-only P0 change with hosted CI, followed by the focused owner-routing branch.
+- This is source/acceptance-record observation only. No v2 runtime, workload, user data, branch, deployment, or service was accessed or modified, and no matched v2 family 2 task was run.

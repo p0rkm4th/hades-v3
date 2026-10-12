@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -131,10 +132,30 @@ except urllib.error.HTTPError as error:
 
 
 def main():
+    global PROMPT, EXPECTED
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
+    parser.add_argument("--label", default="cp45-eggs-oats-8b")
+    parser.add_argument("--prompt", default=PROMPT)
+    parser.add_argument("--expected-json", default=None)
+    parser.add_argument("--order", default=",".join(ORDER))
     args = parser.parse_args()
+    PROMPT = args.prompt
+    if not re.fullmatch(r"[a-z0-9-]{1,48}", args.label):
+        raise SystemExit("label must use 1-48 lowercase letters, digits, or hyphens")
+    if args.expected_json:
+        EXPECTED = json.loads(args.expected_json)
+    if not isinstance(EXPECTED, dict) or not EXPECTED or not all(
+        isinstance(name, str) and isinstance(amount, (int, float)) and amount > 0
+        for name, amount in EXPECTED.items()
+    ):
+        raise SystemExit("expected after-state must be a nonempty JSON object")
+    order = tuple(args.order.split(","))
+    if len(order) != 6 or set(order) != {"lean", "pydantic"} or order.count("lean") != 3 or order.count("pydantic") != 3:
+        raise SystemExit("order must contain three lean and three pydantic attempts")
     output = (ROOT / args.output).resolve()
+    if not output.is_relative_to(ROOT):
+        raise SystemExit("evidence output must stay under the HADES v3 workspace")
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
         raise RuntimeError(f"refusing to overwrite existing evidence: {output.name}")
@@ -142,7 +163,7 @@ def main():
     if not profile.get("model_id") or not profile.get("n_ctx"):
         raise RuntimeError(f"model endpoint did not report identity and context: {profile}")
 
-    for index, candidate in enumerate(ORDER, start=1):
+    for index, candidate in enumerate(order, start=1):
         reset = reset_seed()
         before = list_quantities()
         result, error_task_id = attempt(candidate)
@@ -160,6 +181,7 @@ def main():
         final_task = task_record(task_id)
         row = {
             "attempt_order": index,
+            "run_label": args.label,
             "candidate": candidate,
             "model_profile": profile,
             "prompt": PROMPT,
