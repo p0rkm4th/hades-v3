@@ -307,6 +307,18 @@ This verifies one deterministic shared shell/Git fixture, not model-driven perfo
 
 **Next evidence step:** repeat this new formulation on the same 14B endpoint for both A and C to distinguish a profile-specific miss from a candidate/tool-selection effect. Keep the 8B counterexample and 14B successes; do not tune one candidate alone. Continue to use the CPU fallback until GPU host identity and isolated access are verified.
 
+## Checkpoint 34 — matched profile follow-up for the review-sequence prompt
+
+**Status:** the same direct-recall prompt that produced A 0/3 and C 2/3 on 8B in Checkpoint 33 passed 3/3 for A and 3/3 for C on the shared Qwen3-14B CPU endpoint. The profile contrast suggests model size matters for this formulation, but is too narrow to establish a general effect or candidate ranking.
+
+- **Matched conditions:** the same runner, prompt, unique synthetic memory key/value, A/C shared tool contract, order A/C/C/A/A/C, and per-profile CPU controls were used. Qwen3-14B Q4_K_M ran in the same digest-pinned `llama.cpp` image with 16 CPU threads, `n_ctx=40,960`, and `n_ctx_train=40,960`; the candidate API pointed to the one 14B endpoint throughout. Both profiles are below Hermes’s required 64,000 tokens. No remote GPU service was used.
+- **Results:** all six 14B calls completed, selected `memory_search`, found the seeded key, and returned `risks, decisions, then owners`. A passed 3/3; C passed 3/3. In the same prompt’s 8B screen, A used `task_resume` (once also `task_checkpoint`) and passed 0/3; C used `memory_search` and passed 2/3, with one task-resume miss. Per-turn traces and task IDs are recorded in [`family4_independent_direct_recall_14b.jsonl`](../experiment/results/family4_independent_direct_recall_14b.jsonl) and [`family4_independent_direct_recall_8b.jsonl`](../experiment/results/family4_independent_direct_recall_8b.jsonl).
+- **Postconditions:** SQL showed all six new tasks `COMPLETED`, zero linked effects, and the canonical row unchanged. The exact Amber user/domain/key row was deleted and a final query returned zero. The standard Qwen3-8B endpoint was restored and health-checked at HTTP 200.
+- **Latency and limits:** 14B adapter durations were 79,851 / 12,869 / 12,721 ms for A and 57,223 / 13,277 / 13,059 ms for C. The cold first attempts were slower; these are not candidate speed estimates. Comparing with 8B’s 0/3 and 2/3 is a small matched-profile signal, not a causal or general conclusion. Repeat with another independent formulation before broadening the interpretation.
+- **Publication:** the Checkpoint 33 commit `e86e1f74c28db562b4acc1cdad9d70cf69baf56e` is public. Exact-SHA workflow run [`38211135100`](https://github.com/p0rkm4th/hades-v3/actions/runs/38211135100) passed; its job log had no scanned credential, private-address, account/path, or known-host-label matches, and it uploaded no artifacts.
+
+**Next evidence step:** evaluate another distinct direct-recall formulation with A and C sharing one pinned endpoint and balanced order. Keep all misses and timeouts, and continue CPU testing until a verified GPU endpoint can be reached through a narrow isolated route.
+
 ## Checkpoint 23 — public repository and full-history safety audit
 
 **Status:** the requested repository is already public and anonymously readable, but the full-history safety gate fails. No new evidence commit was pushed.

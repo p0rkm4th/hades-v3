@@ -28,6 +28,7 @@ def request_json(method, url, payload=None, timeout=600):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
+    parser.add_argument("--profile", choices=("8b", "14b"), required=True)
     args = parser.parse_args()
     with open(args.output, "w", encoding="utf-8") as output:
         for index, candidate in enumerate(ORDER, 1):
@@ -44,7 +45,7 @@ def main():
             })
             task = request_json("GET", GATEWAY + f"/v1/tasks/{result['task_id']}", timeout=40)
             record = {
-                "profile": "Qwen3-8B-Q4_K_M-cpu-n_ctx40960",
+                "profile": f"Qwen3-{args.profile.upper()}-Q4_K_M-cpu-n_ctx40960",
                 "candidate": candidate,
                 "attempt": index,
                 "task_id": result["task_id"],
