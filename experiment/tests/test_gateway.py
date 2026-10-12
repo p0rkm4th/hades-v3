@@ -85,6 +85,20 @@ class GatewayIntegration(unittest.TestCase):
         status, _ = call("GET", f"/v1/tasks/{task_id}", COBALT)
         self.assertEqual(status, 404)
 
+        status, rejected = call("POST", "/v1/shopping-list/changes", AMBER, {
+            "task_id": task_id,
+            "remove": ["Oats"],
+            "add": [{"name": "Egg", "amount": 3}, {"name": "Pasta", "amount": 1}],
+        })
+        self.assertEqual(status, 404)
+        self.assertIn("inventory_read", rejected["error"])
+        self.assertIn("No changes applied", rejected["error"])
+        self.assertIn("Eggs", rejected["error"])
+        self.assertIn("Pasta", rejected["error"])
+        status, unchanged = call("GET", "/v1/shopping-list", AMBER)
+        self.assertEqual(status, 200)
+        self.assertEqual({item["name"] for item in unchanged["items"]}, {"Milk", "Oats"})
+
         status, _ = call("POST", "/v1/shopping-list/changes", COBALT, {
             "task_id": task_id,
             "remove": ["Milk"],

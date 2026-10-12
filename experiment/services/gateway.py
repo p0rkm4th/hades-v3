@@ -364,7 +364,12 @@ class Handler(BaseHTTPRequestHandler):
         by_name = {row["name"].casefold(): row for row in products}
         requested = [item["name"] for item in additions] + removals
         if any(name.casefold() not in by_name for name in requested):
-            raise ClientError(404, "one or more products are unknown")
+            canonical_names = ", ".join(sorted(row["name"] for row in products))
+            raise ClientError(
+                404,
+                "No changes applied: use exact canonical product names returned by "
+                f"inventory_read, then retry the compound change. Valid names: {canonical_names}.",
+            )
         domain = domain_config(domain_id)
         list_id = int(domain["grocy_shopping_list_id"])
         initial = shopping_for(domain_id)

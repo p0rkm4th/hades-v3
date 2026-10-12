@@ -35,7 +35,7 @@ def invoke(name: str, **arguments):
 
 @server.tool()
 def inventory_read() -> dict:
-    """Read current synthetic pantry stock for this user. This never writes memory."""
+    """Read current synthetic pantry stock. Returned product names are canonical for list changes. This never writes memory."""
     return invoke("inventory_read")
 
 
@@ -47,7 +47,7 @@ def shopping_list_read() -> dict:
 
 @server.tool()
 def shopping_list_change(add: list[ShoppingItem] | None = None, remove: list[str] | None = None) -> dict:
-    """Apply compound shopping-list additions/removals and verify the resulting state."""
+    """Apply compound list changes using exact names from inventory_read and verify the resulting state."""
     return invoke("shopping_list_change", add=[item.model_dump() for item in add or []], remove=remove or [])
 
 
