@@ -22,10 +22,10 @@
 ## Public checkpoint
 
 - Repository: [`https://github.com/p0rkm4th/hades-v3`](https://github.com/p0rkm4th/hades-v3), branch `main`.
-- Latest local source checkpoint: `4f9d6c4cab0816d4172870ba2f44b852ca783bae` adds shared canonical grocery-name guidance and an invalid-name regression. The sanitized GPU discovery and current family 2 evidence in this document and [COMPARISON_REPORT.md](COMPARISON_REPORT.md) are being prepared for publication with that source change.
-- Prior anonymous GitHub API verification returned `private=false`, default branch `main`; anonymous raw access to `experiment/candidates/api.py` returned source containing `chat_hermes`. The current proposed source and docs require publication-safety review before push.
+- Latest published evidence checkpoint: `8e4b60f880208c6e92704fe83609486b5e581398` on `main`, including sanitized GPU discovery and the matched one-attempt timeout diagnostic; it builds on source commit `4f9d6c4cab0816d4172870ba2f44b852ca783bae`. This checkpoint was pushed over SSH.
+- Post-push verification returned the same SHA from `git ls-remote`; an unauthenticated GitHub API request reported `private=false`, visibility `public`, and default branch `main`. Anonymous raw access returned the new `MODEL_PROFILE.md`. Staged and full-history Gitleaks scans found no leaks; the history scan covered 20 commits.
 - Changes include candidate A/C adapters, an early B Hermes runtime integration, the synthetic chat UI and one Playwright UI smoke test. Candidate B remains blocked on the configured CPU profiles' verified 40,960-versus-64,000 mismatch; the 65,536 GPU profile is not reachable from candidate containers yet. ADR-010 remains NOT READY.
-- The repository is public and SSH authentication is available. Reverify visibility, anonymous access, and exact remote SHA after this checkpoint is pushed.
+- The repository is public and SSH authentication is available. Reverify visibility, anonymous access, and exact remote SHA after each later checkpoint.
 - Frozen authority documents and local instruction files remain excluded from the public repository by `.gitignore`; they were not changed. No memorial content is in the public worktree.
 
 ## Next engineering actions
