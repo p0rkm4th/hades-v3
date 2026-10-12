@@ -295,6 +295,18 @@ This verifies one deterministic shared shell/Git fixture, not model-driven perfo
 
 **Next evidence step:** retain the 8B misses and this 14B success as counterbalanced model-profile evidence. Continue with a distinct direct-recall formulation under identical A/C endpoint settings. Remote GPU candidate trials remain blocked on verified host identity and an isolated route; the discovered 65,536 serving context remains valid for Hermes without metadata changes.
 
+## Checkpoint 33 — independent saved-choice recall on Qwen3-8B CPU
+
+**Status:** a new direct saved-choice formulation produced different A/C outcomes on the same Qwen3-8B CPU endpoint: Candidate C passed 2/3 attempts; Candidate A passed 0/3. This is one narrow screen, not a general ranking.
+
+- **Controls:** six independent one-turn calls used the same seed `risks, decisions, then owners`, key `quarterly_review_sequence`, direct prompt (“What sequence did I choose for our quarterly project review?”), shared system/tool contract, Qwen3-8B Q4_K_M, digest-pinned `llama.cpp` image, 16 CPU threads, and `n_ctx=40,960`. Order was A/C/C/A/A/C. The candidate service exposed the same `http://model-server-8b:8080/v1` endpoint and 50-second request bound to both candidates.
+- **Candidate C:** two attempts called `memory_search` and returned the exact stored sequence. The remaining attempt called `task_resume`, returned a pending-task style response, and did not retrieve memory.
+- **Candidate A:** all three attempts missed the memory lookup. Their tool traces used `task_resume` (one also used `task_checkpoint`) rather than `memory_search`; their responses described the task as pending or said the chosen sequence was unavailable. This resembles the prior A pattern but does not establish the cause.
+- **Durable outcome and cleanup:** SQL confirmed all six tasks `COMPLETED` with zero linked effects. The canonical memory remained the seeded value throughout and was then deleted by its exact Amber user/domain/key; final count was zero. Per-call records are in [`family4_independent_direct_recall_8b.jsonl`](../experiment/results/family4_independent_direct_recall_8b.jsonl).
+- **Latency and interpretation:** adapter durations were 53,138 / 10,441 / 10,125 ms for A and 35,214 / 7,483 / 7,505 ms for C. Startup/warm-up and irregular task-resume behavior make these unsuitable for a speed comparison. Together with Checkpoint 32, results show this formulation can separate candidate behavior on 8B, while the earlier agenda formulation passed for both candidates on 14B. Prompt sensitivity, model profile, and tool-selection behavior remain confounded; no overall winner is supported.
+
+**Next evidence step:** repeat this new formulation on the same 14B endpoint for both A and C to distinguish a profile-specific miss from a candidate/tool-selection effect. Keep the 8B counterexample and 14B successes; do not tune one candidate alone. Continue to use the CPU fallback until GPU host identity and isolated access are verified.
+
 ## Checkpoint 23 — public repository and full-history safety audit
 
 **Status:** the requested repository is already public and anonymously readable, but the full-history safety gate fails. No new evidence commit was pushed.
