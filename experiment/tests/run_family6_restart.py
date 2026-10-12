@@ -67,6 +67,19 @@ def effects(task_id):
     return sql_json(query) or []
 
 
+def close_waiting_task(task_id):
+    script = r'''import json,sys,urllib.request
+token='fixture-token-amber'; base='http://tool-gateway:8080'; task=sys.argv[1]
+headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'}
+req=urllib.request.Request(base+'/v1/tasks/'+task,headers=headers)
+with urllib.request.urlopen(req,timeout=10) as r: value=json.loads(r.read())
+checkpoint=value.get('checkpoint') or {}; checkpoint['operator_review_required']=True; checkpoint['operator_closed_after_pilot']=True
+req=urllib.request.Request(base+'/v1/tasks/'+task+'/checkpoint',data=json.dumps({'state':'FAILED','checkpoint':checkpoint}).encode(),headers=headers,method='POST')
+with urllib.request.urlopen(req,timeout=10) as r: print(json.dumps(json.loads(r.read())))'''
+    return compose("run", "-T", "--rm", "--no-deps", "test-runner", "python", "-c",
+                   script, task_id, timeout=30).stdout.strip().splitlines()[-1]
+
+
 def snapshot():
     script = r'''import json,subprocess
 r=lambda a:subprocess.run(a,cwd='/workspace',capture_output=True,text=True,timeout=30)
@@ -134,10 +147,18 @@ def main():
     if not saved:
         task = wait_terminal(trial)
         task_effects = effects(task["task_id"]) if task else []
+        operator_closed = False
+        if task and task["state"] == "WAITING":
+            if any(effect["state"] not in {"CONFIRMED", "CANCELLED"} for effect in task_effects):
+                raise RuntimeError(f"Unresolved effects on waiting task; inspect before closure: {task_effects}")
+            close_waiting_task(task["task_id"])
+            operator_closed = True
+            task = trial_task(trial)
         after = snapshot()
         record = {"candidate": args.candidate, "trial": trial, "valid": False,
                   "reason": "candidate did not persist the required recovery checkpoint; no interruption performed",
                   "task": task, "effects": task_effects,
+                  "operator_closed_waiting_task": operator_closed,
                   "prepare_exit": initial.returncode, "prepare_stdout": stdout[-4000:],
                   "prepare_stderr": stderr[-4000:], "before": before, "after": after}
     else:
@@ -156,9 +177,25 @@ def main():
             if probe.returncode == 0:
                 break
             time.sleep(0.5)
-        resumed = run_phase(trial, args.candidate, "resume", task_id)
-        resume_lines = [line for line in resumed.stdout.splitlines() if line.strip().startswith("{")]
-        resume_record = json.loads(resume_lines[-1]) if resume_lines else None
+        resume_records = []
+        for resume_round in range(1, 4):
+            resumed = run_phase(trial, args.candidate, "resume", task_id)
+            resume_lines = [line for line in resumed.stdout.splitlines() if line.strip().startswith("{")]
+            resume_record = json.loads(resume_lines[-1]) if resume_lines else None
+            task_state = sql_json(
+                f"SELECT json_build_object('state',state,'revision',revision)::text FROM tasks WHERE task_id='{task_id}'"
+            )
+            resume_records.append({"round": resume_round, "process_exit": resumed.returncode,
+                                   "result": resume_record, "task_state": task_state})
+            if task_state and task_state["state"] in {"COMPLETED", "FAILED"}:
+                break
+        operator_closed = False
+        if task_state and task_state["state"] == "WAITING":
+            current_effects = effects(task_id)
+            if any(effect["state"] not in {"CONFIRMED", "CANCELLED"} for effect in current_effects):
+                raise RuntimeError(f"Unresolved effects on waiting task; inspect before closure: {current_effects}")
+            close_waiting_task(task_id)
+            operator_closed = True
         after = snapshot()
         final_task = sql_json(
             "SELECT json_build_object('task_id',task_id,'state',state,'revision',revision,"
@@ -170,8 +207,9 @@ def main():
                   "candidate_api_killed": interrupted,
                   "state_after_interruption": state_after_interrupt,
                   "prepare_exit": initial.returncode, "prepare_stdout": stdout[-4000:],
-                  "prepare_stderr": stderr[-4000:], "resume_process_exit": resumed.returncode,
-                  "resume": resume_record, "final_task": final_task, "effects": task_effects,
+                  "prepare_stderr": stderr[-4000:], "resume_attempts": resume_records,
+                  "operator_closed_waiting_task": operator_closed,
+                  "final_task": final_task, "effects": task_effects,
                   "before": before, "after": after}
 
     with output_path.open("a", encoding="utf-8") as destination:

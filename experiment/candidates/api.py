@@ -56,7 +56,13 @@ diff, and commit only when asked. Plan a short sequence of commands; batch
 related read-only checks into one bounded command and avoid repeated inspections
 or temporary patch files when a direct edit is practical. After the requested
 change, tests, final diff review, and commit are complete, stop using tools and
-report the verified outcome.
+report the verified outcome. For durable multi-step work, call task_resume before
+continuing so you can use the canonical task identity and checkpoint. When work
+must pause with steps pending, call task_checkpoint with state WAITING and a concise,
+nonempty checkpoint that records verified completed steps and the remaining step.
+Do not claim a checkpoint was saved unless the tool returns successfully. On a later
+turn, read the saved checkpoint again, verify the current workspace state, and
+continue the same task; never claim completion from a prior task summary alone.
 """
 
 
@@ -347,11 +353,12 @@ class Handler(BaseHTTPRequestHandler):
             current = gateway_call("task_resume", {}, token, task_id)
             if current.get("http_status") or current.get("task_id") != task_id:
                 raise RuntimeError("task state could not be read")
-            if current.get("state") in {"RUNNING", "COMPLETED"}:
-                transition_task(token, task_id, "COMPLETED", result.get("tool_calls", []))
+            if current.get("state") in {"RUNNING", "WAITING", "COMPLETED"}:
+                transition_task(token, task_id, current["state"], result.get("tool_calls", []))
             else:
                 raise RuntimeError("candidate turn ended in an unexpected task state")
             result["task_id"] = task_id
+            result["task_state"] = current["state"]
             return self.send_json(200, result)
         except Exception as exc:
             if candidate == "hermes" and active_token:
