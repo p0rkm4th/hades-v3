@@ -113,6 +113,19 @@ This verifies one deterministic shared shell/Git fixture, not model-driven perfo
 
 **Next evidence step:** preserve the repeated 8B partial-completion defect and the targeted 14B recovery in the report. Continue family 2 with a different compound operation and fresh private wording before moving to stale/unavailable infrastructure. Keep canonical postcondition checks tied to the exact candidate task.
 
+## Checkpoint 12 — family 3 fresh, stale, and unknown infrastructure observations
+
+**Status:** three matched read-only attempts per candidate completed on the shared CPU profile. This is one repeated family 3 prompt, not full family qualification.
+
+- **Provenance and controls:** v3 source checkpoint `6e853467c0d6fb33a2be541cf696adaa52169237`; disposable Amber domain; Qwen3-8B Q4_K_M at the pinned `llama.cpp` CPU endpoint (`n_ctx=40,960`, `n_ctx_train=40,960`); one prompt repeated six times; candidate order C/A, C/A, A/C. No fixture reset was needed because every candidate call was read-only. The prompt asked for all synthetic infrastructure observations and explicitly requested fresh/stale/unknown distinctions without inferring unknown values.
+- **Canonical fixture state:** `synthetic-backup` is `STALE`, value `{"health":"unknown","services":1}`, observed `2026-10-10T00:00:54.365341+00:00`; `synthetic-lab-host` is `UNKNOWN` with null value and timestamp; `synthetic-router` is `FRESH`, value `{"health":"ok","services":2}`, observed `2026-10-12T00:00:54.365341+00:00`. Gateway reads immediately before and after the six calls matched these rows.
+- **Candidate C (lean):** all three answers preserved all three labels and values and used only `infrastructure_read`. Prompt/completion tokens and loop durations were 2,791/209 and 25,863 ms; 2,791/209 and 25,589 ms; 2,791/209 and 26,006 ms. Task IDs in call order: `82662799-7b0b-495e-9c10-b5f20f50c4a8`, `eaa221f4-14d7-43f8-b9a5-36bcdce673bc`, `4005d3b0-2128-4bf8-8de6-7fd5987b4c98`.
+- **Candidate A (Pydantic AI):** all three answers preserved all three labels and values and used only `infrastructure_read`. Prompt/completion tokens and loop durations were 2,789/252 and 30,008 ms; 2,789/252 and 29,278 ms; 2,789/248 and 28,572 ms. Task IDs in call order: `5b930553-9f97-42c1-906b-b93539e750e4`, `235afb3a-b280-4857-8876-c8f365c34953`, `215786a7-9ab2-44f0-92c8-48a0ac032a4d`.
+- **Verification and limits:** gateway task read-back showed all six tasks `COMPLETED`, with a single `infrastructure_read` tool in each checkpoint. The final canonical gateway observation matched the pre-run values; the operation created no effects. Both candidates passed this one prompt in all three attempts. This does not establish stale-data behavior across other scenarios, rank response quality, or constitute a full family 3 qualification. CPU loop durations are descriptive only and are not a ranking.
+- **GPU reuse finding:** the existing homelab Qwen3.6 35B endpoint remains outside the internal operator network; the last endpoint observation found an active client of unknown ownership. No further endpoint requests were made during this screen. A safe bounded route and a new access review are still prerequisites before any candidate uses it.
+
+**Next evidence step:** continue family 2 with a fresh compound operation under predeclared request bounds and a validated failed-task closure path; expand family 3 to unavailable/error observations and independent wording before claiming that family complete.
+
 ## Checkpoint 10 — existing homelab GPU inference discovery
 
 **Status:** read-only driver/service/catalog discovery plus four bounded direct inference probes on one already-running endpoint. These are endpoint diagnostics, not matched candidate trials.
