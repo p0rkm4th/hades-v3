@@ -200,6 +200,15 @@ def main():
                 raise RuntimeError(f"Unresolved effects on waiting task; inspect before closure: {current_effects}")
             close_task_for_review(task_id)
             operator_closed = True
+            settled = wait_terminal(trial, timeout=30)
+            if settled and settled["state"] in {"WAITING", "RUNNING"}:
+                settled_effects = effects(task_id)
+                if any(effect["state"] not in {"CONFIRMED", "CANCELLED"} for effect in settled_effects):
+                    raise RuntimeError(f"Unresolved effects after closure request: {settled_effects}")
+                close_task_for_review(task_id)
+                settled = wait_terminal(trial, timeout=30)
+            if not settled or settled["state"] not in {"COMPLETED", "FAILED"}:
+                raise RuntimeError(f"Task closure did not settle after inspection: {settled}")
         after = snapshot(args.case)
         final_task = sql_json(
             "SELECT json_build_object('task_id',task_id,'state',state,'revision',revision,"
