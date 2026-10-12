@@ -165,13 +165,13 @@ services:
       - --port
       - "8080"
       - --ctx-size
-      - "8192"
+      - "40960"
       - --threads
       - "16"
       - --threads-batch
       - "16"
-      - --chat-template-kwargs
-      - '{"enable_thinking":false}'
+      - --reasoning
+      - off
       - --no-webui
     volumes:
       - ./models:/models:ro
@@ -194,13 +194,13 @@ services:
       - --port
       - "8080"
       - --ctx-size
-      - "8192"
+      - "40960"
       - --threads
       - "16"
       - --threads-batch
       - "16"
-      - --chat-template-kwargs
-      - '{"enable_thinking":false}'
+      - --reasoning
+      - off
       - --no-webui
     volumes:
       - ./models:/models:ro
@@ -222,12 +222,107 @@ services:
     networks: [operator]
     restart: "no"
 
+  candidate-api:
+    build:
+      context: .
+      dockerfile: candidates/Candidate.Dockerfile
+    profiles: [harness]
+    environment:
+      GATEWAY_URL: http://tool-gateway:8080
+      MODEL_URL: ${MODEL_URL:-http://model-server-8b:8080/v1}
+      MODEL_NAME: ${MODEL_NAME:-Qwen3-8B}
+    volumes:
+      - hermes-amber-task:/hermes/amber-task
+      - hermes-amber-trace:/hermes/amber-trace
+      - hermes-cobalt-task:/hermes/cobalt-task
+      - hermes-cobalt-trace:/hermes/cobalt-trace
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    networks: [operator]
+    restart: "no"
+
+  hermes-amber:
+    build:
+      context: .
+      dockerfile: candidates/Hermes.Dockerfile
+    profiles: [harness]
+    environment:
+      API_SERVER_KEY: fixture-hermes-amber
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: fixture
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: fixture-dashboard-hermes
+      DASHBOARD_PASSWORD: fixture-dashboard-hermes
+      HADES_USER_TOKEN: fixture-token-amber
+      HADES_TASK_FILE: /var/hades-task/current
+      HADES_TRACE_FILE: /var/hades-trace/tool-trace.jsonl
+      MODEL_URL: ${MODEL_URL:-http://model-server-8b:8080/v1}
+      MODEL_NAME: ${MODEL_NAME:-Qwen3-8B}
+      MODEL_CONTEXT_LENGTH: ${MODEL_CONTEXT_LENGTH:-40960}
+    volumes:
+      - hermes-amber-home:/home/hermes/.hermes
+      - hermes-amber-task:/var/hades-task
+      - hermes-amber-trace:/var/hades-trace
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    networks: [operator]
+    restart: "no"
+
+  hermes-cobalt:
+    build:
+      context: .
+      dockerfile: candidates/Hermes.Dockerfile
+    profiles: [harness]
+    environment:
+      API_SERVER_KEY: fixture-hermes-cobalt
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: fixture
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: fixture-dashboard-hermes
+      DASHBOARD_PASSWORD: fixture-dashboard-hermes
+      HADES_USER_TOKEN: fixture-token-cobalt
+      HADES_TASK_FILE: /var/hades-task/current
+      HADES_TRACE_FILE: /var/hades-trace/tool-trace.jsonl
+      MODEL_URL: ${MODEL_URL:-http://model-server-8b:8080/v1}
+      MODEL_NAME: ${MODEL_NAME:-Qwen3-8B}
+    volumes:
+      - hermes-cobalt-home:/home/hermes/.hermes
+      - hermes-cobalt-task:/var/hades-task
+      - hermes-cobalt-trace:/var/hades-trace
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    networks: [operator]
+    restart: "no"
+
+  candidate-runner:
+    build:
+      context: .
+      dockerfile: services/Test.Dockerfile
+    profiles: [harness]
+    entrypoint: ["python", "/app/candidates/run_trial.py"]
+    volumes:
+      - ./candidates:/app/candidates:ro
+    depends_on:
+      candidate-api:
+        condition: service_started
+    networks: [operator]
+    restart: "no"
+
 volumes:
   postgres-data:
   grocy-data:
   grocy-api-key:
   workspace-amber-data:
   workspace-cobalt-data:
+  hermes-amber-task:
+  hermes-amber-trace:
+  hermes-cobalt-task:
+  hermes-cobalt-trace:
+  hermes-amber-home:
+  hermes-cobalt-home:
 
 networks:
   fixture-backend:

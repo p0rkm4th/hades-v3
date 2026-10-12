@@ -1,6 +1,8 @@
 *
 !services/
 !services/**
+!candidates/
+!candidates/**
 !contracts/
 !contracts/**
 !tests/

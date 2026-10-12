@@ -1,0 +1,49 @@
+model:
+  default: __MODEL_NAME__
+  provider: custom
+  base_url: __MODEL_URL__
+  api_key: no-secret
+  context_length: __MODEL_CONTEXT_LENGTH__
+
+dashboard:
+  basic_auth:
+    username: fixture
+    password_hash: __DASHBOARD_PASSWORD_HASH__
+
+platform_toolsets:
+  api_server:
+    - mcp-hades
+
+platforms:
+  api_server:
+    enabled: true
+    host: 0.0.0.0
+    port: 8642
+
+mcp_servers:
+  hades:
+    command: /opt/hermes/.venv/bin/python
+    args: ["/app/mcp_proxy.py"]
+    env:
+      GATEWAY_URL: http://tool-gateway:8080
+      HADES_USER_TOKEN: __USER_TOKEN__
+      HADES_TASK_FILE: __TASK_FILE__
+      HADES_TRACE_FILE: __TRACE_FILE__
+
+agent:
+  disabled_toolsets:
+    - file
+    - terminal
+    - web
+    - browser
+    - memory
+    - skills
+    - vision
+    - image_gen
+    - todo
+    - tts
+    - delegation
+    - code_execution
+    - cronjob
+    - session_search
+    - computer_use

@@ -6,7 +6,7 @@ The experiment compares a thin Pydantic AI harness, a reduced Hermes runtime, an
 
 ## Current status
 
-The shared PostgreSQL/Grocy fixture, scoped tool gateway, approval-gated simulated commitment, separate disposable shell/Git workspaces, and CPU-served Qwen3-8B and Qwen3-14B model profiles are available. Fixture and endpoint checks passed; no candidate adapters or comparative trials have run, and no harness is recommended. The exact v2 source revisions and evidence limits are in [`docs/V2_CONTROL_BASELINE.md`](docs/V2_CONTROL_BASELINE.md). Current blockers and next steps are in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
+The shared PostgreSQL/Grocy fixture, scoped tool gateway, approval-gated simulated commitment, separate disposable shell/Git workspaces, CPU-served Qwen3 models, and a synthetic chat UI are available. One kitchen-read integration smoke probe each passed for the lean and Pydantic AI candidates; these are not controlled comparison trials. Reduced Hermes reaches its API but cannot run against the selected Qwen context profile because Hermes requires at least 64,000 tokens and Qwen3-8B supports 40,960. No harness is recommended. The exact v2 source revisions and evidence limits are in [`docs/V2_CONTROL_BASELINE.md`](docs/V2_CONTROL_BASELINE.md). Current evidence and blockers are in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
 
 ## Scope and safety
 
