@@ -27,8 +27,8 @@ class DurableCheckpoint(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     summary: str = Field(min_length=1)
-    completed: list[str]
-    pending: list[str]
+    completed: list[str] = Field(description="Requested steps independently verified as complete.")
+    pending: list[str] = Field(description="Authorized remaining steps; leave empty when the task is complete.")
 
 
 def invoke(name: str, **arguments):
@@ -85,7 +85,7 @@ def task_resume() -> dict:
 
 @server.tool()
 def task_checkpoint(state: Literal["RUNNING", "COMPLETED", "FAILED"], checkpoint: DurableCheckpoint) -> dict:
-    """Persist progress with summary, completed and pending steps in the canonical task."""
+    """Persist canonical task status. Use COMPLETED only after all requested work is verified and pending is empty; RUNNING when authorized steps remain; FAILED when the task cannot proceed. WAITING is orchestrator-owned."""
     return invoke("task_checkpoint", state=state, checkpoint=checkpoint.model_dump())
 
 
