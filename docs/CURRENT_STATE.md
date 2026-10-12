@@ -15,9 +15,9 @@
 
 ## Living v2 control
 
-- Latest eligible public HADES v2 `main` source remains `fe222446c83a4034bfa37ac5a493d6a30b9abe74`; a direct upstream `git ls-remote` check on 2026-10-11 returned the same SHA as the recorded baseline.
+- Latest public HADES v2 `main` tip is `63b62a594b1a57e66dd9f59f9efe50c4ef9a4538`. Its current campaign state identifies code-bearing `main` as `99d8b706eb5263250400f55dc257ba43f191905d` and reports that exact-code CI passed.
 - The local HADES workspace remains at `6a46e18657b17c261a5725de3b0d09b24e7d3f60`, 1,229 commits ahead and 235 behind upstream, with local changes. It was inspected read-only and is not treated as an eligible current control.
-- Upstream `main` was rechecked read-only and remains at `fe222446c83a4034bfa37ac5a493d6a30b9abe74`. Its current public campaign record reports a newly surfaced owner routing failure, including a read-style question reaching memory mutation; reproduction and repair are explicitly not claimed there. No matched v2 chat/agent trial was performed; the direct model-endpoint probes recorded above were outside that application path. This remains a source-only observation and not a matched comparison or owner acceptance result. Details are in [V2_CONTROL_BASELINE.md](V2_CONTROL_BASELINE.md).
+- The latest public campaign record reports an owner-reported read-routing failure, including a read-style question reaching memory mutation; reproduction and repair are explicitly not claimed there. No matched v2 chat/agent trial was performed; the direct model-endpoint probes recorded above were outside that application path. The final endpoint check showed an active client of unknown ownership, so no additional inference requests were sent. This remains source-only evidence and not a matched comparison or owner acceptance result. Details are in [V2_CONTROL_BASELINE.md](V2_CONTROL_BASELINE.md).
 
 ## Public checkpoint
 
