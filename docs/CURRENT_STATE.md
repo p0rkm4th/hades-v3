@@ -20,9 +20,10 @@
 ## Public checkpoint
 
 - Repository: [`https://github.com/p0rkm4th/hades-v3`](https://github.com/p0rkm4th/hades-v3), branch `main`.
-- Last remotely verified SHA before this candidate checkpoint: `c87cb0a5b571864614ea591ff47ed354b0918175`.
-- Candidate adapters/UI/runtime changes are committed locally as `d2bb5b0` but not pushed yet. The findings document has a follow-up edit with exact post-commit A/C probe IDs and measurements; that documentation edit is not committed.
-- SSH authentication succeeds as `p0rkm4th`; no owner action is needed. After the final documentation update, rescan the working tree and full history, review the staged paths, push without force, then verify `git ls-remote` and anonymous GitHub API/raw access. Record the resulting published code SHA here.
+- Published experiment/evidence checkpoint: `eb4cc4e41a152f9f34f232564ca7c3c57ea160c2` (includes adapter revision `d2bb5b0`). SSH push succeeded without force; `git ls-remote` returned this exact `main` SHA.
+- Anonymous GitHub API verification returned `private=false`, default branch `main`; anonymous raw access to `experiment/candidates/api.py` returned source containing `chat_hermes`. The full 12-commit Git history and new public source/docs passed Gitleaks with no findings.
+- Changes include candidate A/C adapters, an early B Hermes runtime integration, the synthetic chat UI and one Playwright UI smoke test. Candidate B remains blocked by the verified 40,960-versus-64,000 context mismatch; ADR-010 remains NOT READY.
+- No owner action is required for authentication or visibility. Continue synchronizing meaningful sanitized checkpoints and reverify the remote SHA and anonymous access after later pushes.
 - Frozen authority documents and local instruction files remain excluded from the public repository by `.gitignore`; they were not changed. No memorial content is in the public worktree.
 
 ## Next engineering actions
