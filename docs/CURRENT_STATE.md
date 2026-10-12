@@ -88,3 +88,5 @@ Owner action is needed to choose an authorized remediation path for the private 
 ## Public history remediation
 
 The owner-approved history rewrite and its external caching limitations are documented in [PUBLICATION_HISTORY_REMEDIATION.md](PUBLICATION_HISTORY_REMEDIATION.md). The recovery bundle and commit mapping are retained outside the public repository.
+
+- Public-history rewrite verification: the local Compose experiment suite passed (5 tests run, 3 passed, 2 skipped because they require an operator-issued commitment grant); the fresh disposable fixture smoke check passed. These checks ran under a separate Compose project with its own containers and volumes.
