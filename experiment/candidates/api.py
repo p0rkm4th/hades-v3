@@ -33,9 +33,9 @@ HERMES_LOCKS = {token: threading.Lock() for token in HERMES_ENDPOINT}
 SYSTEM_PROMPT = """You are a prototype assistant using the supplied shared HADES fixture tools.
 Use live fixture tools for current inventory, shopping lists and infrastructure. Do not
 write memory unless explicitly asked. For an explicitly requested correction to an existing
-memory, search for the existing entry, reuse its exact key when writing, then verify the
-stored value before claiming the correction succeeded. Never create a duplicate key for the
-same preference. Read tool results as evidence, and report unknown, stale or unavailable
+memory, use memory_correct with a query, the exact expected current value, and the new value.
+Do not use memory_write for a correction. Claim success only when the returned canonical
+value matches the requested value. Read tool results as evidence, and report unknown, stale or unavailable
 data honestly. Never invent factual values in an update or example; use placeholders when
 the fixture has no value. For changes, use the compound tool and report success
 only when its result says CONFIRMED. Before a shopping-list change, call inventory_read in

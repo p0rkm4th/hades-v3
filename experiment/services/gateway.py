@@ -263,6 +263,45 @@ class Handler(BaseHTTPRequestHandler):
                     rows = cur.fetchall()
                 return self.send_json(200, {"memories": rows})
 
+            if self.command == "POST" and route.path == "/v1/memory/correct":
+                body = self.read_json()
+                query = body.get("query")
+                if not isinstance(query, str) or not 2 <= len(query.strip()) <= 200:
+                    raise ClientError(400, "query must contain 2 to 200 characters")
+                if "expected_value" not in body or "value" not in body:
+                    raise ClientError(400, "expected_value and value are required")
+                terms = re.findall(r"[a-zA-Z0-9]+", query.lower())
+                if not terms:
+                    raise ClientError(400, "query must include searchable words")
+                tsquery = " | ".join(terms)
+                document = "to_tsvector('simple', memory_key || ' ' || value::text)"
+                with database() as conn, conn.cursor() as cur:
+                    cur.execute(
+                        f"SELECT memory_key FROM scoped_memory "
+                        f"WHERE user_id = %s AND domain_id = %s "
+                        f"AND value = %s AND {document} @@ to_tsquery('simple', %s) "
+                        "ORDER BY memory_key LIMIT 2 FOR UPDATE",
+                        (user_id, domain_id, Jsonb(body["expected_value"]), tsquery),
+                    )
+                    matches = cur.fetchall()
+                    if not matches:
+                        raise ClientError(404, "no existing memory matches this query and expected value")
+                    if len(matches) != 1:
+                        raise ClientError(409, "memory correction is ambiguous; no value changed")
+                    cur.execute(
+                        "UPDATE scoped_memory SET value = %s, updated_at = now() "
+                        "WHERE user_id = %s AND domain_id = %s AND memory_key = %s AND value = %s "
+                        "RETURNING memory_key, value, updated_at",
+                        (
+                            Jsonb(body["value"]), user_id, domain_id,
+                            matches[0]["memory_key"], Jsonb(body["expected_value"]),
+                        ),
+                    )
+                    row = cur.fetchone()
+                if row is None:
+                    raise ClientError(409, "memory changed before correction; no value changed")
+                return self.send_json(200, row)
+
             memory_match = re.fullmatch(r"/v1/memory/([^/]+)", route.path)
             if self.command == "GET" and memory_match:
                 key = unquote(memory_match.group(1))

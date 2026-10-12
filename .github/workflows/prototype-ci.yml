@@ -1,0 +1,30 @@
+name: Prototype CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate Python and tool contract
+        run: |
+          python -m py_compile experiment/services/gateway.py experiment/candidates/api.py
+          python -m json.tool experiment/contracts/tools.json >/dev/null
+
+      - name: Run gateway integration test on disposable fixtures
+        run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_gateway.py
+
+      - name: Remove disposable services and volumes
+        if: always()
+        run: docker compose -f experiment/compose.yaml down --volumes --remove-orphans
