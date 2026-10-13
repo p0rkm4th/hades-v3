@@ -21,7 +21,7 @@ Historical rows preserve evidence through CP68. CP69 results below add strict of
 
 CP68 proves all three real harness integrations can complete a trusted tool lifecycle offline. On the live GPU endpoint, each selected the correct tool, but a shared follow-up request incompatibility prevented useful completion. Preserve both outcomes; do not rank A, B, or C. The exact upstream compatibility defect remains unproven. Further GPU traffic requires new owner authorization. ADR-010 remains NOT READY, and production implementation remains unauthorized.
 
-The CP69 strict-peer gate is complete. The next proposed step is the separately authorized CP70 live requalification; after that gate, prioritize crash recovery, memory continuity, compound operations, and protected-action comparisons.
+The CP69 strict-peer gate is complete. CP70 was owner-authorized but stopped before inference because the Hypnos Ollama API and approved model were not verifiably available. No candidate live result was collected. See [CP70 live requalification report](CP70_LIVE_REQUALIFICATION_REPORT.md). The CP70 authorization is exhausted; any new live attempt needs new owner authorization.
 
 ## CP69 strict offline compatibility and lifecycle matrix
 
@@ -40,4 +40,14 @@ The CP69 strict-peer gate is complete. The next proposed step is the separately 
 
 The adapter's previous raw pass-through preserved OpenAI tool-history syntax (`type:function`, stringified arguments, and tool results without native `tool_name`) for Ollama's native `/api/chat`. CP69 reproduces the schema rejection with an independent strict local peer and verifies the common adapter translation fixes it for all actual candidates. CP68 upstream HTTP 400 bodies were not retained and a local Ollama runtime was unavailable; the compatibility fault is strongly supported by reconstructed traces and the strict peer, while the exact historical upstream diagnostic remains unconfirmed. Do not change the historical CP68 classification to a proven exact error.
 
-Protocol compatibility, harness execution, model capability, durable lifecycle correctness, and semantic answer quality remain separate axes. CP69 is a strict offline integration pass only. There has been no CP70 live requalification or new GPU authorization; ADR-010 remains NOT READY.
+Protocol compatibility, harness execution, model capability, durable lifecycle correctness, and semantic answer quality remain separate axes. CP69 is a strict offline integration pass only. CP70 was stopped before inference at infrastructure preflight; it produced no live candidate result. ADR-010 remains NOT READY.
+
+## CP70 live preflight outcome
+
+| Dimension | Pydantic AI (A) | Reduced Hermes (B) | Lean loop (C) | Common evidence / limit |
+|---|---|---|---|---|
+| Live inference and end-to-end task | Not run | Not run | Not run | Preflight stopped before inference: Ollama API requests failed and the approved model, digest, residency, and context could not be verified. No live task or generation exists to score. |
+| Offline strict-peer integration | CP69 3/3 | CP69 3/3 | CP69 3/3 | Rechecked using the repository runner after CP70 preflight; all nine completed and memory rows were unchanged. Hermes used actual streaming/MCP. |
+| Harness viability | Viable for further qualification | Viable for further qualification | Viable for further qualification | Infrastructure-readiness blocker, not a candidate or model failure. This does not qualify live inference or establish a winner. |
+
+The CP70 attempt created no live route, firewall rule, candidate connection, or model request. CP67/CP68 outcomes remain unchanged. Next priority is crash recovery and durable continuation across restart, then memory continuity, exact-state compound operations, and protected-action resistance. ADR-010 remains NOT READY.
