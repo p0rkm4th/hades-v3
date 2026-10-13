@@ -391,11 +391,11 @@ class Handler(BaseHTTPRequestHandler):
                         if finalization is None or not orchestrator_authenticated:
                             raise ClientError(403, "task completion must be finalized by the orchestrator")
                         cur.execute(
-                            "SELECT state FROM effects WHERE task_id=%s ORDER BY created_at",
+                            "SELECT effect_id, effect_kind, state FROM effects WHERE task_id=%s ORDER BY created_at",
                             (checkpoint_match.group(1),),
                         )
-                        effect_states = [row["state"] for row in cur.fetchall()]
-                        reason = validate_finalization(finalization, checkpoint, effect_states)
+                        effects = cur.fetchall()
+                        reason = validate_finalization(finalization, checkpoint, effects)
                         if reason:
                             raise ClientError(409, reason)
                     cur.execute(
@@ -439,8 +439,8 @@ class Handler(BaseHTTPRequestHandler):
             )
             row = cur.fetchone()
             if row is not None:
-                cur.execute("SELECT state FROM effects WHERE task_id=%s ORDER BY created_at", (task_id,))
-                row["effect_states"] = [effect["state"] for effect in cur.fetchall()]
+                cur.execute("SELECT effect_id, effect_kind, state FROM effects WHERE task_id=%s ORDER BY created_at", (task_id,))
+                row["effects"] = [dict(effect, effect_id=str(effect["effect_id"])) for effect in cur.fetchall()]
         if row is None:
             raise ClientError(404, "task not found")
         return self.send_json(200, row)

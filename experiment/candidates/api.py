@@ -403,7 +403,8 @@ def finalize_turn(token: str, task_id: str, result: dict):
     state, reason = decide_turn_finalization(
         current.get("state"), result.get("text"),
         [item for item in evidence if item.get("kind") == "tool_evidence"], claim,
-        current.get("effect_states", []),
+        [],
+        current.get("effects", []),
     )
     if state == "RUNNING":
         return current
@@ -416,6 +417,10 @@ def finalize_turn(token: str, task_id: str, result: dict):
         checkpoint.setdefault("pending", [])
         finalization = {
             "response_nonempty": bool((result.get("text") or "").strip()),
+            "task_type": "EFFECTFUL" if current.get("effects") or any(
+                item.get("tool") in {"shopping_list_change", "workspace_exec", "commitment_submit", "commitment_reconcile", "memory_write", "memory_correct"}
+                for item in evidence if item.get("kind") == "tool_evidence"
+            ) else "READ_ONLY",
             "completion_claim": claim is not None,
             "tool_evidence": [item for item in evidence if item.get("kind") == "tool_evidence"],
             "reason": reason,
