@@ -147,11 +147,9 @@ services:
 
 networks:
   cp68-model-access:
-    name: hades-v3-cp69-model-access
     driver: bridge
     internal: true
   cp68-upstream:
-    name: hades-v3-cp69-upstream
     driver: bridge
     internal: true
 

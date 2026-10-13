@@ -13,6 +13,8 @@ jobs:
   synthetic-fixtures:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      COMPOSE_PROJECT_NAME: hades-v3-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -42,51 +44,51 @@ jobs:
           echo "CP69_LEAN_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
 
       - name: Validate isolated GPU route configuration
-        run: HYPNOS_INFERENCE_UPSTREAM=http://hypnos.invalid:11434 docker compose --profile gpu-trial -f experiment/compose.yaml -f experiment/compose.gpu-trial.yaml config --quiet
+        run: HYPNOS_INFERENCE_UPSTREAM=http://hypnos.invalid:11434 docker compose -p "$COMPOSE_PROJECT_NAME" --profile gpu-trial -f experiment/compose.yaml -f experiment/compose.gpu-trial.yaml config --quiet
 
       - name: Start disposable fixtures
-        run: docker compose -f experiment/compose.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway
 
       - name: Initialize synthetic Grocy data
         run: |
-          docker compose -f experiment/compose.yaml exec -T grocy sh /opt/hades-v3-scripts/initialize_grocy.sh
-          docker compose -f experiment/compose.yaml exec -T grocy sh /opt/hades-v3-scripts/seed_grocy_data.sh
+          docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml exec -T grocy sh /opt/hades-v3-scripts/initialize_grocy.sh
+          docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml exec -T grocy sh /opt/hades-v3-scripts/seed_grocy_data.sh
 
       - name: Run gateway integration test
-        run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_gateway.py
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_gateway.py
 
       - name: Run task lifecycle contract tests
-        run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_task_lifecycle.py
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_task_lifecycle.py
 
       - name: Run candidate task finalization tests
-        run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_candidate_finalization.py
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_candidate_finalization.py
 
       - name: Run isolated inference adapter security tests
-        run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_inference_adapter.py
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_inference_adapter.py
 
       - name: Run Hypnos user-service preflight regression tests
-        run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_hypnos_gpu_preflight.py
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_hypnos_gpu_preflight.py
 
       - name: Run CP71 firewall and durable budget contract tests
         run: |
-          docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_gpu_trial_firewall.py
-          docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_seed_trial_budget.py
+          docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_gpu_trial_firewall.py
+          docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_seed_trial_budget.py
 
       - name: Run native Ollama tool-history protocol tests
-        run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_ollama_protocol.py
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_ollama_protocol.py
 
       - name: Remove disposable services and volumes
         if: always()
-        run: docker compose -f experiment/compose.yaml down --volumes --remove-orphans
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml down --volumes --remove-orphans
 
       - name: Validate isolated CP69 offline profile
-        run: docker compose -p cp69offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml config --quiet
+        run: docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml config --quiet
 
       - name: Run strict three-harness offline end-to-end qualification
         run: |
-          docker compose -p cp69offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway cp68-scripted-ollama cp68-inference-adapter cp68-hermes-amber cp68-candidate-api
-          docker compose -p cp69offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml run --build --rm cp68-e2e-runner --output /tmp/cp69_offline_e2e.jsonl
+          docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway cp68-scripted-ollama cp68-inference-adapter cp68-hermes-amber cp68-candidate-api
+          docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml run --build --rm cp68-e2e-runner --output /tmp/cp69_offline_e2e.jsonl
 
       - name: Remove isolated CP69 fixtures and volumes
         if: always()
-        run: docker compose -p cp69offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml down --volumes --remove-orphans
+        run: docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml down --volumes --remove-orphans
