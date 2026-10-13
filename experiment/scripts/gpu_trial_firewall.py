@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 def chain_names(checkpoint):
-    if checkpoint not in {"CP67", "CP68"}:
+    if checkpoint not in {"CP67", "CP68", "CP71"}:
         raise ValueError("unsupported checkpoint")
     return f"H3{checkpoint}FWD", f"H3{checkpoint}IN"
 
@@ -54,7 +54,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("install", "rollback"))
     parser.add_argument("--adapter-ip", required=True)
-    parser.add_argument("--checkpoint", choices=("CP67", "CP68"), default="CP67")
+    parser.add_argument("--checkpoint", choices=("CP67", "CP68", "CP71"), default="CP67")
     parser.add_argument("--upstream-ip")
     parser.add_argument("--port", type=int, default=11434)
     args = parser.parse_args()
