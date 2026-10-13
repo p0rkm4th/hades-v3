@@ -62,7 +62,7 @@ CREATE TABLE infra_observations (
 
 CREATE TABLE commitment_targets (
     target_id text PRIMARY KEY,
-    behavior text NOT NULL CHECK (behavior IN ('ACCEPT','REJECT','ACCEPT_ACK_LOST','DUPLICATE_SAFE')),
+    behavior text NOT NULL CHECK (behavior IN ('ACCEPT','REJECT','ACCEPT_ACK_LOST','ACCEPT_ACK_LOST_DELAYED','DUPLICATE_SAFE')),
     accepted_effect_id uuid,
     receive_count integer NOT NULL DEFAULT 0,
     revision integer NOT NULL DEFAULT 0

@@ -222,7 +222,8 @@ services:
         condition: service_healthy
     environment:
       ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set ORCHESTRATOR_SECRET in the ignored local .env file}
-    networks: [operator]
+      DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
+    networks: [operator, fixture-backend]
     restart: "no"
 
   candidate-api:

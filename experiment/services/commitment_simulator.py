@@ -4,6 +4,7 @@ import hmac
 import json
 import os
 import re
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
@@ -107,13 +108,17 @@ class Simulator(BaseHTTPRequestHandler):
                     "receive_count=receive_count+1, revision=revision+1 WHERE target_id=%s",
                     (effect_id, target_id),
                 )
-                lose_ack = target["behavior"] == "ACCEPT_ACK_LOST"
+                lose_ack = target["behavior"] in {"ACCEPT_ACK_LOST", "ACCEPT_ACK_LOST_DELAYED"}
                 response_body = {
                     "state": "ACCEPTED", "effect_id": str(effect_id), "idempotent_replay": False
                 }
 
         if lose_ack:
             # The state is committed before the simulated transport failure.
+            # The delayed variant exposes a deterministic crash-injection window
+            # for the disposable CP72 recovery runner.
+            if target["behavior"] == "ACCEPT_ACK_LOST_DELAYED":
+                time.sleep(3)
             return self.send_json(504, {"error": "acknowledgment unavailable"})
         return self.send_json(response_status, response_body)
 

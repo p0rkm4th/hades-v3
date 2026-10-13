@@ -155,6 +155,54 @@ class CandidateFinalization(unittest.TestCase):
         final, _ = self.run_finalizer(initial, result)
         self.assertEqual(final["state"], "COMPLETED")
 
+    def test_reconciled_waiting_task_can_resume_after_fresh_terminal_effect_read(self):
+        state = {
+            "task_id": "task-1", "state": "WAITING",
+            "checkpoint": {"summary": "Outcome needs reconciliation", "completed": [],
+                           "pending": [], "effect_outcome_uncertain": True},
+            "effects": [{"effect_id": "fx-1", "effect_kind": "EXTERNAL_COMMITMENT",
+                         "state": "CONFIRMED"}],
+        }
+        saved = []
+
+        def fake_gateway_call(name, arguments, token, task_id, evidence=None):
+            if name == "task_resume":
+                return dict(state)
+            if name == "task_checkpoint":
+                saved.append(arguments)
+                state.update({"state": arguments["state"], "checkpoint": arguments["checkpoint"]})
+                return dict(state)
+            raise AssertionError(name)
+
+        with patch.object(api, "gateway_call", side_effect=fake_gateway_call):
+            result = api.transition_task("fixture-token-amber", "task-1", "RUNNING", [], resume=True)
+        self.assertEqual(result["state"], "RUNNING")
+        self.assertNotIn("effect_outcome_uncertain", saved[0]["checkpoint"])
+        self.assertTrue(saved[0]["_orchestrator_resume"])
+
+    def test_uncertain_effect_marker_is_preserved_until_effect_is_terminal(self):
+        state = {
+            "task_id": "task-1", "state": "WAITING",
+            "checkpoint": {"summary": "Outcome needs reconciliation", "completed": [],
+                           "pending": [], "effect_outcome_uncertain": True},
+            "effects": [{"effect_id": "fx-1", "effect_kind": "EXTERNAL_COMMITMENT",
+                         "state": "QUARANTINED"}],
+        }
+        saved = []
+
+        def fake_gateway_call(name, arguments, token, task_id, evidence=None):
+            if name == "task_resume":
+                return dict(state)
+            if name == "task_checkpoint":
+                saved.append(arguments)
+                state.update({"state": arguments["state"], "checkpoint": arguments["checkpoint"]})
+                return dict(state)
+            raise AssertionError(name)
+
+        with patch.object(api, "gateway_call", side_effect=fake_gateway_call):
+            api.transition_task("fixture-token-amber", "task-1", "RUNNING", [], resume=True)
+        self.assertTrue(saved[0]["checkpoint"]["effect_outcome_uncertain"])
+
 
 if __name__ == "__main__":
     unittest.main()
