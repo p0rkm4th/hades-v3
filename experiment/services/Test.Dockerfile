@@ -5,4 +5,8 @@ RUN python -m pip install --no-cache-dir playwright==1.55.0
 WORKDIR /app
 COPY tests/ /app/tests/
 COPY contracts/tools.json /app/tools.json
+COPY contracts/task_lifecycle.py /app/contracts/task_lifecycle.py
+COPY contracts/tools.json /app/contracts/tools.json
+COPY contracts/task_lifecycle.py /app/candidates/task_lifecycle.py
+COPY candidates/api.py /app/candidates/api.py
 CMD ["python", "-m", "unittest", "discover", "-s", "/app/tests"]

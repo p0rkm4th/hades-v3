@@ -130,6 +130,7 @@ services:
       GROCY_API_KEY_FILE: /run/fixture-secrets/grocy-api-key
       COMMITMENT_URL: http://commitment-simulator:8090
       COMMITMENT_API_TOKEN: ${COMMITMENT_API_TOKEN:-fixture-only-token-not-a-secret}
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set ORCHESTRATOR_SECRET in the ignored local .env file}
       WORKSPACE_AMBER_URL: http://workspace-amber:8091
       WORKSPACE_COBALT_URL: http://workspace-cobalt:8091
       TOOLS_PATH: /app/tools.json
@@ -219,6 +220,8 @@ services:
     depends_on:
       tool-gateway:
         condition: service_healthy
+    environment:
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set ORCHESTRATOR_SECRET in the ignored local .env file}
     networks: [operator]
     restart: "no"
 
@@ -232,6 +235,9 @@ services:
       MODEL_URL: ${MODEL_URL:-http://model-server-8b:8080/v1}
       MODEL_NAME: ${MODEL_NAME:-Qwen3-8B}
       MODEL_REQUEST_TIMEOUT_SECONDS: ${MODEL_REQUEST_TIMEOUT_SECONDS:-50}
+      MODEL_TEMPERATURE: ${MODEL_TEMPERATURE:-0}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-1024}
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set ORCHESTRATOR_SECRET in the ignored local .env file}
     volumes:
       - hermes-amber-task:/hermes/amber-task
       - hermes-amber-trace:/hermes/amber-trace
@@ -259,6 +265,8 @@ services:
       MODEL_URL: ${MODEL_URL:-http://model-server-8b:8080/v1}
       MODEL_NAME: ${MODEL_NAME:-Qwen3-8B}
       MODEL_CONTEXT_LENGTH: ${MODEL_CONTEXT_LENGTH:-40960}
+      MODEL_TEMPERATURE: ${MODEL_TEMPERATURE:-0}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-1024}
     volumes:
       - hermes-amber-home:/home/hermes/.hermes
       - hermes-amber-task:/var/hades-task
@@ -286,6 +294,9 @@ services:
       HADES_TRACE_FILE: /var/hades-trace/tool-trace.jsonl
       MODEL_URL: ${MODEL_URL:-http://model-server-8b:8080/v1}
       MODEL_NAME: ${MODEL_NAME:-Qwen3-8B}
+      MODEL_CONTEXT_LENGTH: ${MODEL_CONTEXT_LENGTH:-40960}
+      MODEL_TEMPERATURE: ${MODEL_TEMPERATURE:-0}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-1024}
     volumes:
       - hermes-cobalt-home:/home/hermes/.hermes
       - hermes-cobalt-task:/var/hades-task

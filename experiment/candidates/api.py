@@ -9,6 +9,10 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+try:
+    from task_lifecycle import decide_turn_finalization
+except ModuleNotFoundError:
+    from contracts.task_lifecycle import decide_turn_finalization
 
 
 ROOT = Path(__file__).resolve().parent
@@ -19,7 +23,9 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen3-8B")
 MODEL_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("MODEL_REQUEST_TIMEOUT_SECONDS", "50"))
 MAX_MODEL_REQUESTS = 16
 MAX_TOOL_CALLS = 18
-MAX_COMPLETION_TOKENS = 1024
+MAX_COMPLETION_TOKENS = int(os.environ.get("MODEL_MAX_TOKENS", "1024"))
+MODEL_TEMPERATURE = float(os.environ.get("MODEL_TEMPERATURE", "0"))
+ORCHESTRATOR_SECRET = os.environ.get("ORCHESTRATOR_SECRET", "")
 MAX_BODY = 128 * 1024
 HERMES_ENDPOINT = {
     "fixture-token-amber": ("http://hermes-amber:8642/v1/chat/completions", "fixture-hermes-amber"),
@@ -121,8 +127,17 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
     contract = next((item for item in TOOLS if item["name"] == name), None)
     if contract is None:
         raise ValueError("unknown shared tool")
-    if name == "task_checkpoint" and arguments.get("state") == "WAITING":
+    if (name == "task_checkpoint" and arguments.get("state") == "WAITING"
+            and "_orchestrator_finalization" not in arguments):
         return {"http_status": 400, "error": "WAITING is an orchestrator-owned task state"}
+    if (name == "task_checkpoint" and arguments.get("state") == "COMPLETED"
+            and "_orchestrator_finalization" not in arguments):
+        claim = arguments.get("checkpoint") or {}
+        if evidence is not None:
+            evidence.append({"kind": "completion_claim", "checkpoint": claim})
+        return {"state": "RUNNING", "completion_claim_recorded": True}
+    if name == "task_checkpoint" and arguments.get("state") == "RUNNING" and evidence is not None:
+        evidence.append({"kind": "progress_checkpoint", "checkpoint": arguments.get("checkpoint") or {}})
     path = contract["path"]
     if name == "memory_read":
         path = path.replace("{key}", urllib.parse.quote(str(arguments.get("key", "")), safe=""))
@@ -145,6 +160,12 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
         GATEWAY + path, data=data, method=contract["method"],
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
+    if name == "task_checkpoint" and any(
+        key in arguments for key in ("_orchestrator_finalization", "_orchestrator_resume")
+    ):
+        if not ORCHESTRATOR_SECRET:
+            raise RuntimeError("orchestrator credential is not configured")
+        req.add_header("X-Hades-Orchestrator", ORCHESTRATOR_SECRET)
     try:
         with urllib.request.urlopen(req, timeout=35) as response:
             observation = json.loads(response.read())
@@ -172,30 +193,42 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
             "then perform the next pending step now. Do not pause just to restate the plan; "
             "use WAITING only for a genuine missing input, approval, or external dependency."
         )
-    if evidence is not None and name in {"memory_search", "memory_read", "memory_correct"}:
+    if evidence is not None and name not in {"task_resume", "task_checkpoint"}:
         item = {
+            "kind": "tool_evidence",
             "tool": name,
             "status": "error" if observation.get("http_status") else "ok",
+            "http_status": observation.get("http_status", 200),
         }
-        if name == "memory_search":
-            memories = observation.get("memories", [])
-            item["result_count"] = len(memories)
-            item["memory_keys"] = [row.get("memory_key") for row in memories]
-        else:
-            item["memory_key"] = observation.get("memory_key")
+        for key in ("state", "effect_id", "exit_code", "verified_after", "reconcile_required"):
+            if key in observation:
+                item[key] = observation[key]
+        if name in {"memory_write", "memory_correct"} and item["status"] == "ok":
+            item["state"] = "CONFIRMED"
+        if name == "commitment_submit" and observation.get("http_status") in {400, 403}:
+            item["approval_pending"] = True
+        if observation.get("state") in {"QUARANTINED", "UNRESOLVED", "DISPATCHED"} or observation.get("reconcile_required"):
+            item["uncertain"] = True
+        if name in {"memory_search", "memory_read", "memory_correct"}:
+            if name == "memory_search":
+                memories = observation.get("memories", [])
+                item["result_count"] = len(memories)
+                item["memory_keys"] = [row.get("memory_key") for row in memories]
+            else:
+                item["memory_key"] = observation.get("memory_key")
         evidence.append(item)
     return observation
 
 
-def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: str, tools_used: list[str]):
+def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: str, tools_used: list[str], evidence: list[dict] | None = None):
     history = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
     tool_trace = tools_used
-    tool_evidence = []
+    tool_evidence = evidence if evidence is not None else []
     usage_totals = {"prompt_tokens": 0, "completion_tokens": 0}
     started = time.monotonic()
     for _ in range(MAX_MODEL_REQUESTS):
         body = {
-            "model": MODEL_NAME, "messages": history, "temperature": 0,
+            "model": MODEL_NAME, "messages": history, "temperature": MODEL_TEMPERATURE,
             "max_tokens": MAX_COMPLETION_TOKENS, "stream": False,
         }
         if tools_enabled:
@@ -230,14 +263,14 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
     raise RuntimeError("model request limit reached before a final response")
 
 
-def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: list[str]):
+def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: list[str], evidence: list[dict] | None = None):
     from pydantic_ai import Agent, FunctionToolset, Tool, UsageLimits
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
     started = time.monotonic()
     trace = tools_used
-    tool_evidence = []
+    tool_evidence = evidence if evidence is not None else []
     toolset = FunctionToolset()
     for spec in VISIBLE_TOOLS:
         name = spec["name"]
@@ -256,7 +289,7 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
         prompt,
         model_settings={
             "timeout": MODEL_REQUEST_TIMEOUT_SECONDS,
-            "temperature": 0,
+            "temperature": MODEL_TEMPERATURE,
             "max_tokens": MAX_COMPLETION_TOKENS,
         },
         usage_limits=UsageLimits(
@@ -276,6 +309,7 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
 def chat_hermes(messages: list[dict], token: str, task_id: str, tools_used: list[str]):
     endpoint, api_key = HERMES_ENDPOINT[token]
     task_file, trace_file = HERMES_STATE[token]
+    evidence_file = trace_file.with_name("tool-evidence.jsonl")
     with HERMES_LOCKS[token]:
         task_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         temp_task_file = task_file.with_suffix(".tmp")
@@ -283,7 +317,13 @@ def chat_hermes(messages: list[dict], token: str, task_id: str, tools_used: list
         temp_task_file.replace(task_file)
         trace_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         trace_file.write_text("")
-        payload = {"model": MODEL_NAME, "messages": [{"role": "system", "content": SYSTEM_PROMPT}, *messages]}
+        evidence_file.write_text("")
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [{"role": "system", "content": SYSTEM_PROMPT}, *messages],
+            "temperature": MODEL_TEMPERATURE,
+            "max_tokens": MAX_COMPLETION_TOKENS,
+        }
         started = time.monotonic()
         request = urllib.request.Request(
             endpoint, data=json.dumps(payload).encode(), method="POST",
@@ -294,11 +334,13 @@ def chat_hermes(messages: list[dict], token: str, task_id: str, tools_used: list
         usage = value.get("usage") or {}
         trace = [line for line in trace_file.read_text().splitlines() if line]
         tools_used.extend(trace)
+        tool_evidence = [json.loads(line) for line in evidence_file.read_text().splitlines() if line]
     message = value["choices"][0]["message"]
     content = message.get("content") or ""
     return {
         "text": content if isinstance(content, str) else json.dumps(content),
         "tool_calls": trace,
+        "tool_evidence": tool_evidence,
         "usage": {"prompt_tokens": usage.get("prompt_tokens", 0), "completion_tokens": usage.get("completion_tokens", 0)},
         "duration_ms": round((time.monotonic() - started) * 1000),
     }
@@ -315,7 +357,8 @@ def start_task(token: str, goal: str):
 
 
 def transition_task(
-    token: str, task_id: str, state: str, tools_used: list[str], error_type: str | None = None
+    token: str, task_id: str, state: str, tools_used: list[str], error_type: str | None = None,
+    finalization: dict | None = None, resume: bool = False, annotations: dict | None = None,
 ):
     current = gateway_call("task_resume", {}, token, task_id)
     if current.get("http_status") or current.get("task_id") != task_id:
@@ -328,14 +371,69 @@ def transition_task(
     if error_type is not None:
         candidate_turn["error_type"] = error_type
         candidate_turn["operator_review_required"] = True
-        candidate_turn["effect_outcome_uncertain"] = True
+        if error_type in {"effect_outcome_uncertain", "write_outcome_not_confirmed"}:
+            candidate_turn["effect_outcome_uncertain"] = True
     checkpoint["candidate_turn"] = candidate_turn
-    updated = gateway_call(
-        "task_checkpoint", {"state": state, "checkpoint": checkpoint}, token, task_id
-    )
+    if annotations:
+        checkpoint.update(annotations)
+    arguments = {"state": state, "checkpoint": checkpoint}
+    if finalization is not None:
+        arguments["_orchestrator_finalization"] = finalization
+    if resume:
+        arguments["_orchestrator_resume"] = True
+    updated = gateway_call("task_checkpoint", arguments, token, task_id)
     if updated.get("http_status") or updated.get("state") != state:
         raise RuntimeError("task state could not be saved")
     return updated
+
+
+def finalize_turn(token: str, task_id: str, result: dict):
+    current = gateway_call("task_resume", {}, token, task_id)
+    if current.get("http_status") or current.get("task_id") != task_id:
+        raise RuntimeError("task state could not be read after candidate turn")
+    if current.get("state") in {"COMPLETED", "FAILED", "CANCELLED", "WAITING"}:
+        return current
+    evidence = result.get("tool_evidence", [])
+    claim_entry = next((item for item in reversed(evidence) if item.get("kind") == "completion_claim"), None)
+    claim = claim_entry.get("checkpoint") if claim_entry else None
+    if claim is None:
+        progress = next((item for item in reversed(evidence) if item.get("kind") == "progress_checkpoint"), None)
+        if progress and (progress.get("checkpoint") or {}).get("pending"):
+            claim = progress["checkpoint"]
+    state, reason = decide_turn_finalization(
+        current.get("state"), result.get("text"),
+        [item for item in evidence if item.get("kind") == "tool_evidence"], claim,
+        current.get("effect_states", []),
+    )
+    if state == "RUNNING":
+        return current
+    tools = result.get("tool_calls", [])
+    finalization = None
+    if state == "COMPLETED":
+        checkpoint = dict(claim or {})
+        checkpoint.setdefault("summary", "Model response completed from verified tool evidence")
+        checkpoint.setdefault("completed", [reason])
+        checkpoint.setdefault("pending", [])
+        finalization = {
+            "response_nonempty": bool((result.get("text") or "").strip()),
+            "completion_claim": claim is not None,
+            "tool_evidence": [item for item in evidence if item.get("kind") == "tool_evidence"],
+            "reason": reason,
+        }
+        return transition_task(
+            token, task_id, state, tools, finalization=finalization,
+            annotations={**checkpoint, "task_finalization": {"reason": reason}},
+        )
+    if state == "WAITING":
+        finalization = {
+            "response_nonempty": bool((result.get("text") or "").strip()),
+            "tool_evidence": [item for item in evidence if item.get("kind") == "tool_evidence"],
+            "reason": reason,
+        }
+        annotations = {"approval_pending": True} if reason == "approval_pending" else {"effect_outcome_uncertain": True}
+        annotations["task_finalization"] = {"reason": reason}
+        return transition_task(token, task_id, state, tools, finalization=finalization, annotations=annotations)
+    return transition_task(token, task_id, state, tools, error_type=reason)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -369,6 +467,7 @@ class Handler(BaseHTTPRequestHandler):
         active_task_id = None
         candidate = None
         tools_used = []
+        turn_evidence = []
         try:
             if int(self.headers.get("Content-Length", "0")) > MAX_BODY:
                 return self.send_json(413, {"error": "request too large"})
@@ -387,22 +486,25 @@ class Handler(BaseHTTPRequestHandler):
             if not task_id:
                 task_id = start_task(token, str(user_messages[0]["content"]))["task_id"]
             else:
-                transition_task(token, task_id, "RUNNING", [])
+                current = gateway_call("task_resume", {}, token, task_id)
+                if current.get("http_status") or current.get("task_id") != task_id:
+                    return self.send_json(404, {"error": "task not found"})
+                if current.get("state") in {"COMPLETED", "FAILED", "CANCELLED"}:
+                    return self.send_json(409, {"error": "terminal task cannot be resumed", "task_state": current.get("state")})
+                if current.get("state") == "WAITING":
+                    checkpoint = current.get("checkpoint") or {}
+                    if checkpoint.get("approval_pending") or checkpoint.get("effect_outcome_uncertain"):
+                        return self.send_json(409, {"error": "task requires approval or effect reconciliation before resume", "task_state": "WAITING"})
+                    transition_task(token, task_id, "RUNNING", [], resume=True)
             active_token = token
             active_task_id = task_id
             if candidate == "pydantic":
-                result = chat_pydantic(messages, token, task_id, tools_used)
+                result = chat_pydantic(messages, token, task_id, tools_used, turn_evidence)
             elif candidate == "hermes":
                 result = chat_hermes(messages, token, task_id, tools_used)
             else:
-                result = chat_openai(messages, True, token, task_id, tools_used)
-            current = gateway_call("task_resume", {}, token, task_id)
-            if current.get("http_status") or current.get("task_id") != task_id:
-                raise RuntimeError("task state could not be read")
-            if current.get("state") in {"RUNNING", "WAITING", "COMPLETED"}:
-                transition_task(token, task_id, current["state"], result.get("tool_calls", []))
-            else:
-                raise RuntimeError("candidate turn ended in an unexpected task state")
+                result = chat_openai(messages, True, token, task_id, tools_used, turn_evidence)
+            current = finalize_turn(token, task_id, result)
             result["task_id"] = task_id
             result["task_state"] = current["state"]
             return self.send_json(200, result)
@@ -417,15 +519,35 @@ class Handler(BaseHTTPRequestHandler):
                         )
                 except OSError as trace_exc:
                     print(f"Could not read Hermes tool trace: {type(trace_exc).__name__}")
+                _, trace_file = HERMES_STATE[active_token]
+                evidence_file = trace_file.with_name("tool-evidence.jsonl")
+                try:
+                    turn_evidence.extend(json.loads(line) for line in evidence_file.read_text().splitlines() if line)
+                except (OSError, json.JSONDecodeError) as evidence_exc:
+                    print(f"Could not read Hermes tool evidence: {type(evidence_exc).__name__}")
             if active_token and active_task_id:
                 try:
-                    transition_task(
-                        active_token,
-                        active_task_id,
-                        "FAILED",
-                        tools_used,
-                        type(exc).__name__,
-                    )
+                    current = gateway_call("task_resume", {}, active_token, active_task_id)
+                    if current.get("state") == "RUNNING":
+                        approval_pending = any(item.get("approval_pending") for item in turn_evidence)
+                        uncertain = any(
+                            state in {"INTENDED", "DISPATCHED", "QUARANTINED", "UNRESOLVED"}
+                            for state in current.get("effect_states", [])
+                        ) or any(item.get("uncertain") for item in turn_evidence)
+                        if approval_pending:
+                            transition_task(
+                                active_token, active_task_id, "WAITING", tools_used,
+                                finalization={"response_nonempty": False, "tool_evidence": turn_evidence},
+                                annotations={"approval_pending": True, "task_finalization": {"reason": "approval_pending_after_error"}},
+                            )
+                        elif uncertain:
+                            transition_task(
+                                active_token, active_task_id, "WAITING", tools_used,
+                                finalization={"response_nonempty": False, "tool_evidence": []},
+                                annotations={"effect_outcome_uncertain": True, "task_finalization": {"reason": "effect_outcome_uncertain_after_error"}},
+                            )
+                        else:
+                            transition_task(active_token, active_task_id, "FAILED", tools_used, type(exc).__name__)
                 except Exception as checkpoint_exc:
                     print(f"Could not close failed task: {type(checkpoint_exc).__name__}")
             print(f"Candidate request rejected: {type(exc).__name__}: {exc}")

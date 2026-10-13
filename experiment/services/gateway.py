@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import hmac
 import os
 import re
 import urllib.error
@@ -13,9 +14,11 @@ from urllib.parse import parse_qs, unquote, urlsplit
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+from task_lifecycle import validate_finalization
 
 
 DATABASE_URL = os.environ["DATABASE_URL"]
+ORCHESTRATOR_SECRET = os.environ.get("ORCHESTRATOR_SECRET", "")
 GROCY_URL = os.environ.get("GROCY_URL", "http://grocy").rstrip("/")
 GROCY_API_KEY_FILE = os.environ["GROCY_API_KEY_FILE"]
 COMMITMENT_URL = os.environ.get("COMMITMENT_URL", "http://commitment-simulator:8090").rstrip("/")
@@ -365,7 +368,36 @@ class Handler(BaseHTTPRequestHandler):
                         or not isinstance(checkpoint.get("pending"), list)
                         or not all(isinstance(item, str) for item in checkpoint["pending"])):
                     raise ClientError(400, "checkpoint requires a nonempty summary and completed/pending string lists")
+                finalization = body.get("_orchestrator_finalization")
+                orchestrator_resume = body.get("_orchestrator_resume") is True
+                orchestrator_authenticated = bool(ORCHESTRATOR_SECRET) and hmac.compare_digest(
+                    self.headers.get("X-Hades-Orchestrator", ""), ORCHESTRATOR_SECRET,
+                )
                 with database() as conn, conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT state FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s FOR UPDATE",
+                        (checkpoint_match.group(1), user_id, domain_id),
+                    )
+                    current = cur.fetchone()
+                    if current is None:
+                        raise ClientError(404, "task not found")
+                    if current["state"] in {"COMPLETED", "FAILED", "CANCELLED"} and state != current["state"]:
+                        raise ClientError(409, "terminal task state cannot be changed")
+                    if current["state"] == "WAITING" and state != "WAITING" and not (orchestrator_resume and orchestrator_authenticated):
+                        raise ClientError(409, "waiting task requires an explicit orchestrator resume")
+                    if state == "WAITING" and current["state"] != "WAITING" and (finalization is None or not orchestrator_authenticated):
+                        raise ClientError(403, "only the orchestrator may place a task in WAITING")
+                    if state == "COMPLETED":
+                        if finalization is None or not orchestrator_authenticated:
+                            raise ClientError(403, "task completion must be finalized by the orchestrator")
+                        cur.execute(
+                            "SELECT state FROM effects WHERE task_id=%s ORDER BY created_at",
+                            (checkpoint_match.group(1),),
+                        )
+                        effect_states = [row["state"] for row in cur.fetchall()]
+                        reason = validate_finalization(finalization, checkpoint, effect_states)
+                        if reason:
+                            raise ClientError(409, reason)
                     cur.execute(
                         "UPDATE tasks SET state=%s, checkpoint=%s, revision=revision+1, updated_at=now() "
                         "WHERE task_id=%s AND user_id=%s AND domain_id=%s "
@@ -406,6 +438,9 @@ class Handler(BaseHTTPRequestHandler):
                 (task_id, user_id, domain_id),
             )
             row = cur.fetchone()
+            if row is not None:
+                cur.execute("SELECT state FROM effects WHERE task_id=%s ORDER BY created_at", (task_id,))
+                row["effect_states"] = [effect["state"] for effect in cur.fetchall()]
         if row is None:
             raise ClientError(404, "task not found")
         return self.send_json(200, row)
@@ -508,10 +543,6 @@ class Handler(BaseHTTPRequestHandler):
             cur.execute(
                 "UPDATE effects SET state='CONFIRMED', result=%s, updated_at=now() WHERE effect_id=%s",
                 (Jsonb({"verified_after": verified}), effect_id),
-            )
-            cur.execute(
-                "UPDATE tasks SET state='COMPLETED', updated_at=now() WHERE task_id=%s",
-                (task_id,),
             )
         return self.send_json(200, {
             "task_id": str(task_id), "effect_id": str(effect_id), "state": "CONFIRMED",

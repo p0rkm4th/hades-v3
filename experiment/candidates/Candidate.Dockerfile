@@ -6,5 +6,6 @@ COPY candidates/requirements.lock.txt /app/requirements.lock.txt
 RUN pip install --no-cache-dir -r /app/requirements.lock.txt
 COPY candidates/api.py candidates/index.html candidates/run_trial.py /app/candidates/
 COPY contracts/tools.json /app/contracts/tools.json
+COPY contracts/task_lifecycle.py /app/candidates/task_lifecycle.py
 EXPOSE 8080
 CMD ["python", "/app/candidates/api.py"]

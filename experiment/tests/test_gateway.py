@@ -10,10 +10,12 @@ AMBER = "fixture-token-amber"
 COBALT = "fixture-token-cobalt"
 
 
-def call(method, path, token=None, body=None):
+def call(method, path, token=None, body=None, orchestrator=False):
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    if orchestrator:
+        headers["X-Hades-Orchestrator"] = os.environ["ORCHESTRATOR_SECRET"]
     data = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request(BASE + path, data=data, headers=headers, method=method)
     try:
@@ -132,6 +134,40 @@ class GatewayIntegration(unittest.TestCase):
         status, task = call("POST", "/v1/tasks", AMBER, {"goal": "fixture restart task"})
         self.assertEqual(status, 201)
         task_id = task["task_id"]
+        status, read_task = call("POST", "/v1/tasks", AMBER, {"goal": "report current infrastructure observations"})
+        self.assertEqual(status, 201)
+        status, infra = call("GET", "/v1/infrastructure", AMBER)
+        self.assertEqual(status, 200)
+        status, rejected = call("POST", f"/v1/tasks/{read_task['task_id']}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": {
+                "summary": "Read complete", "completed": ["read infrastructure"], "pending": []
+            }
+        })
+        self.assertEqual(status, 403)
+        proof = {
+            "response_nonempty": True, "completion_claim": True,
+            "tool_evidence": [{"tool": "infrastructure_read", "status": "ok"}],
+        }
+        status, forged_read = call("POST", f"/v1/tasks/{read_task['task_id']}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": {
+                "summary": "Read and report completed", "completed": ["read infrastructure"], "pending": []
+            }, "_orchestrator_finalization": proof,
+        })
+        self.assertEqual(status, 403)
+        status, completed_read = call("POST", f"/v1/tasks/{read_task['task_id']}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": {
+                "summary": "Read and report completed", "completed": ["read infrastructure"], "pending": []
+            },
+            "_orchestrator_finalization": proof,
+        }, orchestrator=True)
+        self.assertEqual(status, 200, completed_read)
+        self.assertEqual(completed_read["state"], "COMPLETED")
+        status, rejected = call("POST", f"/v1/tasks/{read_task['task_id']}/checkpoint", AMBER, {
+            "state": "FAILED", "checkpoint": {
+                "summary": "Should not overwrite terminal", "completed": [], "pending": []
+            }
+        })
+        self.assertEqual(status, 409)
         status, rejected = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
             "state": "WAITING", "checkpoint": {}
         })
@@ -143,14 +179,27 @@ class GatewayIntegration(unittest.TestCase):
                 "completed": ["inventory_read"],
                 "pending": ["continue task"],
                 "step": "after-source-read",
-            }
-        })
+            },
+            "_orchestrator_finalization": {"response_nonempty": True, "tool_evidence": []},
+        }, orchestrator=True)
         self.assertEqual(status, 200)
         self.assertEqual(saved["revision"], 1)
         status, resumed = call("GET", f"/v1/tasks/{task_id}", AMBER)
         self.assertEqual(status, 200)
         self.assertEqual(resumed["checkpoint"]["step"], "after-source-read")
         self.assertEqual(resumed["checkpoint"]["completed"], ["inventory_read"])
+        status, still_waiting = call("GET", f"/v1/tasks/{task_id}", AMBER)
+        self.assertEqual(still_waiting["state"], "WAITING")
+        status, denied_resume = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "RUNNING", "checkpoint": {"summary": "Candidate cannot resume", "completed": ["inventory_read"], "pending": ["continue task"]}
+        })
+        self.assertEqual(status, 409)
+        status, resumed = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "RUNNING", "checkpoint": {"summary": "Explicit resume", "completed": ["inventory_read"], "pending": ["continue task"]},
+            "_orchestrator_resume": True,
+        }, orchestrator=True)
+        self.assertEqual(status, 200)
+        self.assertEqual(resumed["state"], "RUNNING")
         status, _ = call("GET", f"/v1/tasks/{task_id}", COBALT)
         self.assertEqual(status, 404)
 
@@ -189,6 +238,26 @@ class GatewayIntegration(unittest.TestCase):
         expected = {"Oats": 1, "Rice": 1, "Eggs": 2}
         actual = {item["name"]: item["amount"] for item in changed["verified_after"]}
         self.assertEqual(actual, expected)
+        status, still_running = call("GET", f"/v1/tasks/{task_id}", AMBER)
+        self.assertEqual(still_running["state"], "RUNNING")
+        status, no_http_shortcut = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": {"summary": "Done", "completed": ["change"], "pending": []}
+        })
+        self.assertEqual(status, 403)
+        status, completed_write = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": {
+                "summary": "Compound list change verified", "completed": ["list read-back matched"], "pending": []
+            },
+            "_orchestrator_finalization": {
+                "response_nonempty": True, "completion_claim": True,
+                "tool_evidence": [{
+                    "tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED",
+                    "verified_after": changed["verified_after"],
+                }],
+            },
+        }, orchestrator=True)
+        self.assertEqual(status, 200, completed_write)
+        self.assertEqual(completed_write["state"], "COMPLETED")
 
         status, cobalt_after = call("GET", "/v1/shopping-list", COBALT)
         self.assertEqual(status, 200)

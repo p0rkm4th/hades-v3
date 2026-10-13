@@ -1,0 +1,127 @@
+{
+  "checkpoint": 66,
+  "scenario": "family 3 read-only question with a temporary unavailable observation, rerun under shared lifecycle finalization",
+  "prompt": "Can you report whether synthetic-monitor is healthy right now? If its source is unavailable, say so without inferring a health value.",
+  "temporary_fixture": {
+    "domain": "synthetic Amber",
+    "subject": "synthetic-monitor",
+    "state": "ERROR",
+    "value": null,
+    "observed_at": null,
+    "cleanup": "exact inserted observation deleted; pre/post database snapshot and gateway read matched"
+  },
+  "model": "Qwen3-8B Q4_K_M",
+  "model_weight_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "endpoint": "same existing lab CPU endpoint as CP63; internal route omitted",
+  "effective_context": 40960,
+  "training_context": 40960,
+  "runtime_image": "ghcr.io/ggml-org/llama.cpp@sha256:fc9b506e89c1a1cfdd7bc056480f54dc657c1c04d76839a08642dc280b8ed2f6",
+  "threads": 16,
+  "request_timeout_seconds": 50,
+  "candidate_source_revision": "772b4023b288d5d3f4bd7eecf93a9f572d23499d plus the uncommitted lifecycle changes identified by candidate API image",
+  "candidate_api_runtime_image_id": "sha256:2b8caf42d94c67ef1b48ff38bc02fa6054f045b3639fe2f672a25ff7cc638ce6",
+  "order": [
+    "pydantic",
+    "lean",
+    "lean",
+    "pydantic",
+    "pydantic",
+    "lean"
+  ],
+  "gpu_inference_used": false,
+  "results": {
+    "pydantic": {
+      "read_tool_scope": "3/3 infrastructure_read only",
+      "reports_unavailable": "3/3",
+      "candidate_api_http_status": [
+        200,
+        200,
+        200
+      ],
+      "task_state_at_api_return": [
+        "FAILED",
+        "FAILED",
+        "FAILED"
+      ],
+      "operator_final_task_state": [
+        "FAILED",
+        "FAILED",
+        "FAILED"
+      ],
+      "task_completion_pass": "0/3; model omitted explicit completion claim in all attempts",
+      "effects_created": [
+        0,
+        0,
+        0
+      ],
+      "duration_ms": [
+        11564,
+        11039,
+        10996
+      ],
+      "duration_range_ms": [
+        10996,
+        11564
+      ],
+      "median_duration_ms": 11039,
+      "prompt_tokens": [
+        5420,
+        5420,
+        5420
+      ],
+      "completion_tokens": [
+        45,
+        45,
+        45
+      ]
+    },
+    "lean": {
+      "read_tool_scope": "3/3 infrastructure_read only",
+      "reports_unavailable": "3/3",
+      "candidate_api_http_status": [
+        200,
+        200,
+        200
+      ],
+      "task_state_at_api_return": [
+        "FAILED",
+        "FAILED",
+        "FAILED"
+      ],
+      "operator_final_task_state": [
+        "FAILED",
+        "FAILED",
+        "FAILED"
+      ],
+      "task_completion_pass": "0/3; model omitted explicit completion claim in all attempts",
+      "effects_created": [
+        0,
+        0,
+        0
+      ],
+      "duration_ms": [
+        11677,
+        11703,
+        12262
+      ],
+      "duration_range_ms": [
+        11677,
+        12262
+      ],
+      "median_duration_ms": 11703,
+      "prompt_tokens": [
+        5448,
+        5448,
+        5448
+      ],
+      "completion_tokens": [
+        42,
+        42,
+        42
+      ]
+    }
+  },
+  "fixture_restored_and_independently_verified": true,
+  "interpretation": "The lifecycle change converts all six unclaimed successful read turns from indefinitely RUNNING to FAILED with read_completion_not_claimed and operator_review_required. The model responses remain correct unavailable reports with zero effects. No task counts as completed; this is negative task-completion evidence, not family qualification.",
+  "task_finalization_contract": "candidate claim + nonempty response + verified read/write evidence; HTTP 200 is not completion"
+}
