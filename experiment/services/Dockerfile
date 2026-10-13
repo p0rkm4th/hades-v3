@@ -11,6 +11,7 @@ COPY services/gateway.py /app/gateway.py
 COPY services/commitment_simulator.py /app/commitment_simulator.py
 COPY services/workspace_runner.py /app/workspace_runner.py
 COPY contracts/tools.json /app/tools.json
+COPY contracts/task_lifecycle.py /app/task_lifecycle.py
 USER 10001:10001
 EXPOSE 8080
 CMD ["python", "/app/gateway.py"]

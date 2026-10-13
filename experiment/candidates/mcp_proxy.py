@@ -16,6 +16,7 @@ server = MCPServer("HADES shared fixture tools")
 USER_TOKEN = os.environ["HADES_USER_TOKEN"]
 TASK_FILE = Path(os.environ["HADES_TASK_FILE"])
 TRACE_FILE = Path(os.environ["HADES_TRACE_FILE"])
+EVIDENCE_FILE = TRACE_FILE.with_name("tool-evidence.jsonl")
 
 
 class ShoppingItem(BaseModel):
@@ -38,7 +39,12 @@ def invoke(name: str, **arguments):
     TRACE_FILE.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with TRACE_FILE.open("a", encoding="utf-8") as stream:
         stream.write(name + "\n")
-    return gateway_call(name, arguments, USER_TOKEN, task_id)
+    evidence = []
+    result = gateway_call(name, arguments, USER_TOKEN, task_id, evidence)
+    with EVIDENCE_FILE.open("a", encoding="utf-8") as stream:
+        for item in evidence:
+            stream.write(json.dumps(item, ensure_ascii=False) + "\n")
+    return result
 
 
 @server.tool()

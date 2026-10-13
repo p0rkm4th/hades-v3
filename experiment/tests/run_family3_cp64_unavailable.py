@@ -1,6 +1,7 @@
 """Run matched family 3 unavailable-observation trials with exact fixture cleanup."""
 
 import json
+import argparse
 import subprocess
 import uuid
 import urllib.request
@@ -89,6 +90,11 @@ with urllib.request.urlopen(q,timeout=20) as r: print(json.dumps(json.load(r)))'
 
 
 def main():
+    global OUTPUT
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=OUTPUT)
+    args = parser.parse_args()
+    OUTPUT = args.output
     existing = [json.loads(line) for line in OUTPUT.read_text().splitlines()] if OUTPUT.exists() else []
     if len(existing) > len(ORDER) or [row["candidate"] for row in existing] != list(ORDER[:len(existing)]):
         raise RuntimeError("existing evidence is not a valid prefix of the predeclared order")
