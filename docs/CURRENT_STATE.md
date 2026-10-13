@@ -106,3 +106,7 @@ Both candidates used only `infrastructure_read` and reported the temporary unava
 ## CP64 publication status
 
 CP64 is published at `504089d994ea70ff1f2c17e0be2393f8dd01cedc`; the remote `main` SHA matched at verification. Anonymous repository API and page requests returned HTTP 200, with API visibility `public`. Exact-SHA Prototype CI run [38295537180](https://github.com/p0rkm4th/hades-v3/actions/runs/38295537180) passed and uploaded zero artifacts.
+
+## Checkpoint 65 — GPU inference revalidation
+
+The documented Codex break-glass identity reached the existing GPU hosts using strict host-key checking, correcting the previous access blocker. Read-only NVIDIA checks showed healthy drivers; the Ollama and OpenAI-compatible model APIs responded. A bounded generation on the existing Gemma 4 12B endpoint completed with GPU activity, and the loaded-model record reported effective context 65,536, meeting Hermes's numeric floor. The model and serving metadata were not changed. Because the candidate/model network remains intentionally isolated from the homelab, no matched candidate comparison used this endpoint; CP63 and CP64 remain valid CPU-matched results. See [MODEL_PROFILE.md](MODEL_PROFILE.md) for measured details and limits. No production or HADES v2 service was modified.

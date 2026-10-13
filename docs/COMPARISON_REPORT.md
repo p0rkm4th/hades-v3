@@ -729,3 +729,15 @@ This verifies one deterministic shared shell/Git fixture, not model-driven perfo
 - **Evidence:** [six attempt records](../experiment/results/family3_unavailable_cp64_8b.jsonl), [profile and interpretation](../experiment/results/family3_unavailable_cp64_profile.json), and [repeatable runner](../experiment/tests/run_family3_cp64_unavailable.py).
 
 **Next evidence step:** preserve the task-lifecycle failures alongside the correct unavailable-read behavior and inspect the shared completion contract before treating family 3 as qualified. Keep request limits and candidate configurations unchanged. ADR-010 remains NOT READY.
+
+## Checkpoint 65 — read-only GPU inference revalidation
+
+**Status:** the previous SSH access blocker was incorrect. The documented Codex break-glass identity reached the existing GPU inference hosts under strict host-key checking. GPU health, reachable model APIs, model catalogs, and one bounded generation were verified without changing infrastructure.
+
+- NVIDIA drivers reported healthy on the existing inference hosts. Ollama-compatible and OpenAI-compatible model-list APIs responded. Catalogs contained existing Qwen3, Gemma, and Dolphin models; no model was resident before the check.
+- One bounded request to an existing Gemma 4 12B Q4_K_M endpoint requested a 65,536-token context and returned `42`. Ollama's loaded-model record reported effective `context_length=65,536`; GPU memory use was about 10.7 GB. During generation, sampled GPU utilization peaked at 34%.
+- The three-token response took 128 ms of reported generation time, about 23 tokens/s. This is a smoke measurement only and does not establish sustained throughput. Model catalog context is 262,144; effective serving context observed during the request was 65,536. No context metadata was altered.
+- Candidate runs were not moved to this GPU endpoint. The experiment model network is intentionally isolated and has no homelab route; adding a route/proxy would change the fixture boundary. CP63 and CP64 remain matched CPU comparisons on the same endpoint and configuration. No model-serving infrastructure was duplicated.
+- The detailed host routes and private infrastructure identifiers are omitted from this public record. Full read-only measurements and scope limits are in [MODEL_PROFILE.md](MODEL_PROFILE.md).
+
+**Next evidence step:** inspect and address the shared task-completion contract exposed by CP64, then continue matched candidate trials on the existing CPU endpoint while the experiment network remains isolated. ADR-010 remains NOT READY.
