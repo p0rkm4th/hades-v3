@@ -575,6 +575,36 @@ class Handler(BaseHTTPRequestHandler):
             if cur.fetchone() is None:
                 raise ClientError(404, "task not found")
             cur.execute(
+                "SELECT effect_id, state, request, result FROM effects "
+                "WHERE task_id=%s AND user_id=%s AND domain_id=%s "
+                "AND effect_kind='EXTERNAL_COMMITMENT' AND resource_key=%s "
+                "ORDER BY created_at DESC LIMIT 1",
+                (task_uuid, user_id, domain_id, f"commitment:{target_id}"),
+            )
+            prior = cur.fetchone()
+            if prior is not None:
+                if (prior["request"].get("target_id") != target_id
+                        or prior["request"].get("details") != details):
+                    raise ClientError(409, "this task already has a different commitment for that target")
+                effect_id = str(prior["effect_id"])
+                if prior["state"] == "CONFIRMED":
+                    return self.send_json(200, {
+                        "task_id": str(task_uuid), "effect_id": effect_id,
+                        "state": "CONFIRMED", "already_recorded": True,
+                        "target_result": prior["result"],
+                    })
+                if prior["state"] == "REJECTED":
+                    return self.send_json(200, {
+                        "task_id": str(task_uuid), "effect_id": effect_id,
+                        "state": "REJECTED", "already_recorded": True,
+                        "target_result": prior["result"],
+                    })
+                return self.send_json(202, {
+                    "task_id": str(task_uuid), "effect_id": effect_id,
+                    "state": prior["state"], "reconcile_required": True,
+                    "already_recorded": True,
+                })
+            cur.execute(
                 "SELECT approval_id FROM commitment_approvals "
                 "WHERE approval_id=%s AND user_id=%s AND domain_id=%s AND task_id=%s "
                 "AND target_id=%s AND effect_digest=%s AND consumed_at IS NULL "
@@ -677,7 +707,11 @@ class Handler(BaseHTTPRequestHandler):
             with database() as conn, conn.cursor() as cur:
                 cur.execute(
                     "UPDATE effects SET state='CONFIRMED', result=%s, updated_at=now() "
-                    "WHERE effect_id=%s AND state IN ('QUARANTINED','UNRESOLVED')",
+                    # A restart can leave the durable effect DISPATCHED after the
+                    # simulator committed but before the gateway persisted its
+                    # acknowledgment outcome. Reconciliation is authoritative
+                    # for that state too.
+                    "WHERE effect_id=%s AND state IN ('DISPATCHED','QUARANTINED','UNRESOLVED')",
                     (Jsonb({"reconciled_target_state": target}), effect_uuid),
                 )
             return self.send_json(200, {

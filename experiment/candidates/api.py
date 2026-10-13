@@ -416,6 +416,14 @@ def transition_task(
     if current.get("http_status") or current.get("task_id") != task_id:
         raise RuntimeError("task state could not be read")
     checkpoint = dict(current.get("checkpoint") or {})
+    if resume and checkpoint.get("effect_outcome_uncertain"):
+        effects = current.get("effects") or []
+        if effects and all(item.get("state") in {"CONFIRMED", "REJECTED", "FAILED"}
+                           for item in effects):
+            # A trusted reconciliation may settle the effect after the task was
+            # parked. Clear the stale uncertainty marker only after a fresh
+            # task read proves every recorded effect is terminal.
+            checkpoint.pop("effect_outcome_uncertain", None)
     checkpoint.setdefault("summary", "Candidate turn state update")
     checkpoint.setdefault("completed", [])
     checkpoint.setdefault("pending", [])
@@ -494,7 +502,7 @@ def finalize_turn(token: str, task_id: str, result: dict):
             "tool_evidence": [item for item in evidence if item.get("kind") == "tool_evidence"],
             "reason": reason,
         }
-        annotations = {"approval_pending": True} if reason == "approval_pending" else {"effect_outcome_uncertain": True}
+        annotations = {"approval_pending": True} if reason in {"approval_pending", "approval_required"} else {"effect_outcome_uncertain": True}
         annotations["task_finalization"] = {"reason": reason}
         return transition_task(token, task_id, state, tools, finalization=finalization, annotations=annotations)
     return transition_task(token, task_id, state, tools, error_type=reason)
@@ -557,7 +565,14 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json(409, {"error": "terminal task cannot be resumed", "task_state": current.get("state")})
                 if current.get("state") == "WAITING":
                     checkpoint = current.get("checkpoint") or {}
-                    if checkpoint.get("approval_pending") or checkpoint.get("effect_outcome_uncertain"):
+                    effects = current.get("effects") or []
+                    effects_settled = bool(effects) and all(
+                        item.get("state") in {"CONFIRMED", "REJECTED", "FAILED"}
+                        for item in effects
+                    )
+                    if checkpoint.get("approval_pending") or (
+                        checkpoint.get("effect_outcome_uncertain") and not effects_settled
+                    ):
                         return self.send_json(409, {"error": "task requires approval or effect reconciliation before resume", "task_state": "WAITING"})
                     transition_task(token, task_id, "RUNNING", [], resume=True)
             active_token = token

@@ -66,7 +66,11 @@ class ProtectedCommitmentFlow(unittest.TestCase):
         self.assertEqual(reconciled["reconciled_target_state"]["receive_count"], 1)
 
         status, repeated = call("POST", "/v1/commitments", AMBER, request)
-        self.assertEqual(status, 403, repeated)
+        self.assertEqual(status, 200, repeated)
+        self.assertEqual(repeated["state"], "CONFIRMED")
+        self.assertEqual(repeated["effect_id"], effect_id)
+        self.assertTrue(repeated["already_recorded"])
+        self.assertEqual(repeated["target_result"]["reconciled_target_state"]["receive_count"], 1)
 
 
 if __name__ == "__main__":
