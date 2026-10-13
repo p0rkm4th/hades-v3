@@ -21,15 +21,15 @@ class FirewallRuleConstructionTests(unittest.TestCase):
 
         with patch.object(firewall, "exists", side_effect=lambda chain: chain == "DOCKER-USER"), \
                 patch.object(firewall, "run", side_effect=record):
-            firewall.install("172.30.0.5", "192.0.2.9", 11434, *firewall.chain_names("CP71"))
+            firewall.install("198.51.100.5", "192.0.2.9", 11434, *firewall.chain_names("CP71"))
 
         self.assertIn(("-A", "H3CP71FWD", "-d", "192.0.2.9/32", "-p", "tcp", "--dport", "11434", "-j", "ACCEPT"), calls)
-        self.assertIn(("-A", "H3CP71FWD", "-s", "172.30.0.5/32", "-j", "DROP"), calls)
-        self.assertIn(("-A", "H3CP71IN", "-s", "172.30.0.5/32", "-j", "DROP"), calls)
-        self.assertIn(("-I", "DOCKER-USER", "1", "-s", "172.30.0.5/32", "-j", "H3CP71FWD"), calls)
-        self.assertIn(("-I", "INPUT", "1", "-s", "172.30.0.5/32", "-j", "H3CP71IN"), calls)
+        self.assertIn(("-A", "H3CP71FWD", "-s", "198.51.100.5/32", "-j", "DROP"), calls)
+        self.assertIn(("-A", "H3CP71IN", "-s", "198.51.100.5/32", "-j", "DROP"), calls)
+        self.assertIn(("-I", "DOCKER-USER", "1", "-s", "198.51.100.5/32", "-j", "H3CP71FWD"), calls)
+        self.assertIn(("-I", "INPUT", "1", "-s", "198.51.100.5/32", "-j", "H3CP71IN"), calls)
         allow_index = calls.index(("-A", "H3CP71FWD", "-d", "192.0.2.9/32", "-p", "tcp", "--dport", "11434", "-j", "ACCEPT"))
-        drop_index = calls.index(("-A", "H3CP71FWD", "-s", "172.30.0.5/32", "-j", "DROP"))
+        drop_index = calls.index(("-A", "H3CP71FWD", "-s", "198.51.100.5/32", "-j", "DROP"))
         self.assertLess(allow_index, drop_index)
 
 
