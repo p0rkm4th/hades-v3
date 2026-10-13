@@ -30,6 +30,16 @@ class TaskLifecycleContract(unittest.TestCase):
         proof = {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True, "tool_evidence": evidence}
         self.assertIsNone(validate_finalization(proof, claim, [effect]))
 
+    def test_memory_write_waits_for_task_linked_durable_effect_record(self):
+        claim = {"completed": ["memory stored"], "pending": []}
+        evidence = [{"tool": "memory_write", "status": "ok", "state": "CONFIRMED", "memory_key": "x"}]
+        self.assertEqual(decide_turn_finalization("RUNNING", "Stored.", evidence, claim),
+                         ("WAITING", "memory_effect_evidence_unproven"))
+        self.assertEqual(validate_finalization(
+            {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
+             "tool_evidence": evidence}, claim, []),
+            "memory write completion is unproven without a task-linked durable effect record")
+
     def test_wrong_or_missing_effect_id_is_rejected_even_when_counts_match(self):
         claim = {"completed": ["write"], "pending": []}
         effect = {"effect_id": "persisted-1", "effect_kind": "GROCERY_LIST", "state": "CONFIRMED"}
