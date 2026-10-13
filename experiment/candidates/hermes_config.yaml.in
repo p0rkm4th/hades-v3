@@ -2,7 +2,7 @@ model:
   default: __MODEL_NAME__
   provider: custom
   base_url: __MODEL_URL__
-  api_key: no-secret
+  api_key: __MODEL_API_KEY__
   context_length: __MODEL_CONTEXT_LENGTH__
 
 dashboard:

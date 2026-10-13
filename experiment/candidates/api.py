@@ -20,16 +20,21 @@ TOOLS = json.loads((ROOT.parent / "contracts" / "tools.json").read_text())["tool
 GATEWAY = os.environ.get("GATEWAY_URL", "http://tool-gateway:8080")
 MODEL_URL = os.environ.get("MODEL_URL", "http://model-server-8b:8080/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen3-8B")
+MODEL_API_KEY = os.environ.get("MODEL_API_KEY", "no-secret")
+MODEL_API_KEYS = {
+    "pydantic": MODEL_API_KEY,
+    "lean": os.environ.get("MODEL_API_KEY_LEAN", "no-secret"),
+}
 MODEL_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("MODEL_REQUEST_TIMEOUT_SECONDS", "50"))
-MAX_MODEL_REQUESTS = 16
+MAX_MODEL_REQUESTS = int(os.environ.get("MODEL_MAX_REQUESTS", "16"))
 MAX_TOOL_CALLS = 18
 MAX_COMPLETION_TOKENS = int(os.environ.get("MODEL_MAX_TOKENS", "1024"))
 MODEL_TEMPERATURE = float(os.environ.get("MODEL_TEMPERATURE", "0"))
 ORCHESTRATOR_SECRET = os.environ.get("ORCHESTRATOR_SECRET", "")
 MAX_BODY = 128 * 1024
 HERMES_ENDPOINT = {
-    "fixture-token-amber": ("http://hermes-amber:8642/v1/chat/completions", "fixture-hermes-amber"),
-    "fixture-token-cobalt": ("http://hermes-cobalt:8642/v1/chat/completions", "fixture-hermes-cobalt"),
+    "fixture-token-amber": (os.environ.get("HERMES_AMBER_ENDPOINT", "http://hermes-amber:8642/v1/chat/completions"), "fixture-hermes-amber"),
+    "fixture-token-cobalt": (os.environ.get("HERMES_COBALT_ENDPOINT", "http://hermes-cobalt:8642/v1/chat/completions"), "fixture-hermes-cobalt"),
 }
 HERMES_STATE = {
     "fixture-token-amber": (Path("/hermes/amber-task/current"), Path("/hermes/amber-trace/tool-trace.jsonl")),
@@ -220,7 +225,7 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
     return observation
 
 
-def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: str, tools_used: list[str], evidence: list[dict] | None = None):
+def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: str, tools_used: list[str], evidence: list[dict] | None = None, harness_id: str = "lean"):
     history = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
     tool_trace = tools_used
     tool_evidence = evidence if evidence is not None else []
@@ -234,9 +239,12 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
         if tools_enabled:
             body["tools"] = [{"type": "function", "function": t} for t in VISIBLE_TOOLS]
             body["tool_choice"] = "auto"
+        model_api_key = MODEL_API_KEYS.get(harness_id)
+        if not model_api_key:
+            raise RuntimeError("candidate model authorization is not configured")
         request = urllib.request.Request(
             MODEL_URL.rstrip("/") + "/chat/completions", data=json.dumps(body).encode(),
-            headers={"Content-Type": "application/json", "Authorization": "Bearer no-secret"},
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {model_api_key}"},
         )
         with urllib.request.urlopen(request, timeout=MODEL_REQUEST_TIMEOUT_SECONDS) as response:
             result = json.loads(response.read())
@@ -281,7 +289,7 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
             function=invoke, name=name, description=spec["description"],
             json_schema=spec["parameters"],
         ))
-    provider = OpenAIProvider(base_url=MODEL_URL, api_key="no-secret")
+    provider = OpenAIProvider(base_url=MODEL_URL, api_key=MODEL_API_KEY)
     model = OpenAIChatModel(MODEL_NAME, provider=provider)
     agent = Agent(model, system_prompt=SYSTEM_PROMPT, toolsets=[toolset], retries=1)
     prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
@@ -508,7 +516,7 @@ class Handler(BaseHTTPRequestHandler):
             elif candidate == "hermes":
                 result = chat_hermes(messages, token, task_id, tools_used)
             else:
-                result = chat_openai(messages, True, token, task_id, tools_used, turn_evidence)
+                result = chat_openai(messages, True, token, task_id, tools_used, turn_evidence, "lean")
             current = finalize_turn(token, task_id, result)
             result["task_id"] = task_id
             result["task_state"] = current["state"]

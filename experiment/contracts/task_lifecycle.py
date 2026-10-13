@@ -8,6 +8,7 @@ WRITE_TOOLS = {
     "shopping_list_change", "workspace_exec", "commitment_submit",
     "commitment_reconcile", "memory_write", "memory_correct",
 }
+MEMORY_WRITES = {"memory_write", "memory_correct"}
 
 
 def _verified_reads(evidence):
@@ -48,6 +49,11 @@ def decide_turn_finalization(current_state, response, evidence, claim, effect_st
     writes = [item for item in evidence if item.get("tool") in WRITE_TOOLS]
     writes = [item for item in writes if not (item.get("uncertain")
               and str(item.get("effect_id")) in resolved_ids)]
+    if any(item.get("tool") in MEMORY_WRITES for item in writes):
+        # The current memory table stores only canonical state. It has no task-linked
+        # durable effect record, so a successful HTTP response is not enough to
+        # establish which task caused the change or independently verify it later.
+        return "WAITING", "memory_effect_evidence_unproven"
     effects = [item for item in effect_states]
     if effect_records:
         effects = [item.get("state") for item in effect_records]
@@ -79,6 +85,8 @@ def validate_finalization(proof, checkpoint, effects):
         return "completed task steps are required"
     reads = [e for e in evidence if e.get("tool") in READ_TOOLS and e.get("status") == "ok"]
     writes = [e for e in evidence if e.get("tool") in WRITE_TOOLS]
+    if any(item.get("tool") in MEMORY_WRITES for item in writes):
+        return "memory write completion is unproven without a task-linked durable effect record"
     resolved_ids = {str(item.get("effect_id")) for item in evidence
                     if item.get("tool") == "commitment_reconcile" and item.get("state") == "CONFIRMED"}
     if any(item.get("status") == "error" and not (item.get("uncertain")

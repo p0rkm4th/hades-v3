@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import urllib.request
 import urllib.error
 
@@ -15,7 +16,7 @@ payload = {
     "messages": [{"role": "user", "content": args.prompt}],
 }
 request = urllib.request.Request(
-    "http://candidate-api:8080/api/turn",
+    os.environ.get("CANDIDATE_API_URL", "http://candidate-api:8080/api/turn"),
     data=json.dumps(payload).encode(),
     headers={"Content-Type": "application/json"},
     method="POST",

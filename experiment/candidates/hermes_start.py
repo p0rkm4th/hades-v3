@@ -19,6 +19,7 @@ values = {
     "__MODEL_NAME__": os.environ.get("MODEL_NAME", "Qwen3-8B"),
     "__MODEL_URL__": os.environ.get("MODEL_URL", "http://model-server-8b:8080/v1"),
     "__MODEL_CONTEXT_LENGTH__": os.environ.get("MODEL_CONTEXT_LENGTH", "40960"),
+    "__MODEL_API_KEY__": os.environ.get("MODEL_API_KEY", "no-secret"),
     "__USER_TOKEN__": os.environ["HADES_USER_TOKEN"],
     "__TASK_FILE__": os.environ["HADES_TASK_FILE"],
     "__TRACE_FILE__": os.environ["HADES_TRACE_FILE"],

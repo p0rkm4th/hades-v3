@@ -1,0 +1,21 @@
+# HADES v3 comparison and qualification matrix
+
+This matrix reflects the latest evidence through CP67. A successful HTTP response or one smoke trial does not qualify a harness or establish a winner.
+
+| Capability | Pydantic AI (A) | Reduced Hermes (B) | Lean loop (C) | Evidence / remaining gap |
+|---|---|---|---|---|
+| Common GPU model/context | Reached `gemma4:12b`; one adapter success; read tool invoked | Reached same model; two adapter successes after a zero-generation compatibility failure; no tool invoked | Reached same model; one adapter success; read tool invoked | Shared Q4_K_M digest, effective context 65,536, temperature 0, 1,024 output limit. All four durable CP67 tasks failed; no candidate qualified. |
+| Read-only task completion | `FAILED` after tool call; no final answer | `FAILED`; no tool call or task answer | `FAILED` after tool call; no final answer | Gateway evidence supports automatic read completion in regression tests; live harness completion within two calls remains unproven. |
+| Honest unavailable-data report | Prior CP66 A/C report unavailable data, but task completion failed | No CP67 observation result | Prior CP66 A/C report unavailable data, but task completion failed | Repeat on one common GPU endpoint after the harness request loops fit the authorized cap. |
+| Multi-step household operation | Earlier matched CPU evidence includes both successes and exact-state omissions | Not fully compared at common GPU context | Earlier matched CPU evidence includes both successes and exact-state omissions | Continue with repeated trials and exact independent final-state checks; avoid redundant kitchen-list variants. |
+| Memory correction and fresh-context recall | Prior limited CPU evidence; not qualified | Not qualified at a common endpoint | Prior limited CPU evidence; not qualified | Test correction, durable read-back, and fresh-context recall. Memory writes currently lack a task-linked effect record and remain `WAITING` as unproven. |
+| Shell/Git work and verified outcomes | Existing isolated CPU evidence includes both success and failure cases | Not qualified at a common GPU endpoint | Existing isolated CPU evidence includes both success and failure cases | Continue held-out work, commit identity checks, tests, and independent repository verification. |
+| Crash recovery / continuation | Earlier shared failures and limited outcomes | Not qualified at a common GPU endpoint | Earlier shared failures and limited outcomes | Test interruption, restart, durable checkpoint inspection, continuation, and exact completion. |
+| Authorization / prompt injection | Partial historical coverage | Not qualified at a common GPU endpoint | Partial historical coverage | Continue negative tests for unauthorized effects, injected instructions, approval boundaries, and effect reconciliation. |
+| Inference route isolation | Passed CP67 candidate direct-egress and API-allowlist checks | Same route; initial stream request was rejected before inference, then stream requests reached Ollama but no live streamed tool call occurred | Passed CP67 candidate direct-egress and API-allowlist checks | Fake-upstream tests verify streamed tool-call translation. Temporary host firewall and route were rolled back after the six-reservation trial. A new bounded GPU window requires fresh authorization. |
+
+## Decision status
+
+CP67 proves that the existing GPU model can be reached through a narrowly host-enforced route under the requested configuration. It does not prove useful three-harness operation: all three tasks failed, and tool behavior differed. Preserve these failures as integration evidence. Do not rank A, B, or C from CP67. ADR-010 remains NOT READY, and production implementation remains unauthorized.
+
+The next GPU comparison needs a per-harness loop that reliably completes the tool call and final answer within the same generation ceiling for A, B, and C, plus a newly authorized trial window. The next broader comparisons should prioritize multi-step household operations with exact final-state verification, memory correction and fresh-context recall, honest uncertainty, shell/Git outcomes, crash recovery, and authorization resistance. Keep identical model endpoint/configuration, repeated trials, independent oracles, and failures in the report.
