@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -32,6 +33,21 @@ MAX_COMPLETION_TOKENS = int(os.environ.get("MODEL_MAX_TOKENS", "1024"))
 MODEL_TEMPERATURE = float(os.environ.get("MODEL_TEMPERATURE", "0"))
 ORCHESTRATOR_SECRET = os.environ.get("ORCHESTRATOR_SECRET", "")
 MAX_BODY = 128 * 1024
+_PROVIDER_DIAGNOSTICS = (
+    re.compile(r"\b(?:model|inference|llm) provider\b.{0,100}\b(?:rate[- ]?limit(?:ing|ed)?|retry|error|unavailable|failed)\b", re.I),
+    re.compile(r"\bprovider\b.{0,100}\b(?:rate[- ]?limit(?:ing|ed)?|429|too many requests|temporarily unavailable)\b", re.I),
+    re.compile(r"\b(?:rate[- ]?limit(?:ing|ed)?)\b.{0,100}\b(?:provider|retry|try again|request)\b", re.I),
+)
+
+
+class ProviderFailure(RuntimeError):
+    """A provider/runtime diagnostic must not be treated as a final answer."""
+
+
+def provider_diagnostic(text: str) -> bool:
+    return isinstance(text, str) and any(pattern.search(text) for pattern in _PROVIDER_DIAGNOSTICS)
+
+
 HERMES_ENDPOINT = {
     "fixture-token-amber": (os.environ.get("HERMES_AMBER_ENDPOINT", "http://hermes-amber:8642/v1/chat/completions"), "fixture-hermes-amber"),
     "fixture-token-cobalt": (os.environ.get("HERMES_COBALT_ENDPOINT", "http://hermes-cobalt:8642/v1/chat/completions"), "fixture-hermes-cobalt"),
@@ -248,6 +264,10 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
         )
         with urllib.request.urlopen(request, timeout=MODEL_REQUEST_TIMEOUT_SECONDS) as response:
             result = json.loads(response.read())
+        if not isinstance(result, dict) or not isinstance(result.get("choices"), list) or not result["choices"]:
+            raise ProviderFailure("model provider returned an invalid completion")
+        if result["choices"][0].get("finish_reason") in {"error", "length", "content_filter"}:
+            raise ProviderFailure("model provider did not return a complete assistant turn")
         usage = result.get("usage", {})
         usage_totals["prompt_tokens"] += usage.get("prompt_tokens", 0)
         usage_totals["completion_tokens"] += usage.get("completion_tokens", 0)
@@ -290,7 +310,14 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
             json_schema=spec["parameters"],
         ))
     provider = OpenAIProvider(base_url=MODEL_URL, api_key=MODEL_API_KEY)
-    model = OpenAIChatModel(MODEL_NAME, provider=provider)
+    # Ollama's native /api/chat tool schema has no OpenAI `strict` extension.
+    # Pydantic AI otherwise advertises strict tool definitions by default.
+    # Tool arguments remain validated by the declared JSON schemas and gateway.
+    model = OpenAIChatModel(
+        MODEL_NAME,
+        provider=provider,
+        profile={"openai_supports_strict_tool_definition": False},
+    )
     agent = Agent(model, system_prompt=SYSTEM_PROMPT, toolsets=[toolset], retries=1)
     prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
     result = agent.run_sync(
@@ -339,14 +366,26 @@ def chat_hermes(messages: list[dict], token: str, task_id: str, tools_used: list
         )
         with urllib.request.urlopen(request, timeout=MODEL_REQUEST_TIMEOUT_SECONDS) as response:
             value = json.loads(response.read())
+        if not isinstance(value, dict) or value.get("error"):
+            raise ProviderFailure("Hermes returned a provider error")
+        choices = value.get("choices")
+        if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
+            raise ProviderFailure("Hermes returned an invalid completion")
+        choice = choices[0]
+        if choice.get("finish_reason") in {"error", "length", "content_filter"}:
+            raise ProviderFailure("Hermes did not return a complete assistant turn")
+        message = choice.get("message")
+        if not isinstance(message, dict) or not isinstance(message.get("content", ""), str):
+            raise ProviderFailure("Hermes returned an invalid assistant message")
+        content = message.get("content") or ""
+        if provider_diagnostic(content):
+            raise ProviderFailure("Hermes returned a provider diagnostic instead of a final answer")
         usage = value.get("usage") or {}
         trace = [line for line in trace_file.read_text().splitlines() if line]
         tools_used.extend(trace)
         tool_evidence = [json.loads(line) for line in evidence_file.read_text().splitlines() if line]
-    message = value["choices"][0]["message"]
-    content = message.get("content") or ""
     return {
-        "text": content if isinstance(content, str) else json.dumps(content),
+        "text": content,
         "tool_calls": trace,
         "tool_evidence": tool_evidence,
         "usage": {"prompt_tokens": usage.get("prompt_tokens", 0), "completion_tokens": usage.get("completion_tokens", 0)},
@@ -424,6 +463,7 @@ def finalize_turn(token: str, task_id: str, result: dict):
         [item for item in evidence if item.get("kind") == "tool_evidence"], claim,
         [],
         current.get("effects", []),
+        turn_error=result.get("provider_error") or provider_diagnostic(result.get("text", "")),
     )
     if state == "RUNNING":
         return current

@@ -7,6 +7,7 @@ RUN mkdir -p /app/services /state && chown 10001:10001 /state
 COPY tests/ /app/tests/
 COPY scripts/seed_cp67_trial_budget.py /app/scripts/seed_cp67_trial_budget.py
 COPY services/inference_adapter.py /app/services/inference_adapter.py
+COPY services/ollama_protocol.py /app/services/ollama_protocol.py
 COPY contracts/tools.json /app/tools.json
 COPY contracts/task_lifecycle.py /app/contracts/task_lifecycle.py
 COPY contracts/tools.json /app/contracts/tools.json

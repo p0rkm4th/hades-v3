@@ -27,9 +27,9 @@ services:
       MAX_GENERATIONS_PER_HARNESS: "9"
       MAX_GENERATIONS_TOTAL: "27"
       TRIAL_SECONDS: "1200"
-      CP67_PYDANTIC_KEY: ${CP68_PYDANTIC_KEY:?set the isolated offline trial key}
-      CP67_HERMES_KEY: ${CP68_HERMES_KEY:?set the isolated offline trial key}
-      CP67_LEAN_KEY: ${CP68_LEAN_KEY:?set the isolated offline trial key}
+      CP67_PYDANTIC_KEY: ${CP69_PYDANTIC_KEY:?set the isolated offline trial key}
+      CP67_HERMES_KEY: ${CP69_HERMES_KEY:?set the isolated offline trial key}
+      CP67_LEAN_KEY: ${CP69_LEAN_KEY:?set the isolated offline trial key}
     networks: [cp68-model-access, cp68-upstream]
     read_only: true
     tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
@@ -52,8 +52,8 @@ services:
       MODEL_TEMPERATURE: "0"
       MODEL_MAX_TOKENS: "1024"
       MODEL_MAX_REQUESTS: "3"
-      MODEL_API_KEY: ${CP68_PYDANTIC_KEY:?set the isolated offline trial key}
-      MODEL_API_KEY_LEAN: ${CP68_LEAN_KEY:?set the isolated offline trial key}
+      MODEL_API_KEY: ${CP69_PYDANTIC_KEY:?set the isolated offline trial key}
+      MODEL_API_KEY_LEAN: ${CP69_LEAN_KEY:?set the isolated offline trial key}
       HERMES_AMBER_ENDPOINT: http://cp68-hermes-amber:8642/v1/chat/completions
       ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set the local orchestrator secret}
     volumes:
@@ -98,7 +98,7 @@ services:
       MODEL_CONTEXT_LENGTH: "65536"
       MODEL_TEMPERATURE: "0"
       MODEL_MAX_TOKENS: "1024"
-      MODEL_API_KEY: ${CP68_HERMES_KEY:?set the isolated offline trial key}
+      MODEL_API_KEY: ${CP69_HERMES_KEY:?set the isolated offline trial key}
       MODEL_REQUEST_TIMEOUT_SECONDS: "30"
       ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set the local orchestrator secret}
     volumes:
@@ -147,11 +147,11 @@ services:
 
 networks:
   cp68-model-access:
-    name: hades-v3-cp68-model-access
+    name: hades-v3-cp69-model-access
     driver: bridge
     internal: true
   cp68-upstream:
-    name: hades-v3-cp68-upstream
+    name: hades-v3-cp69-upstream
     driver: bridge
     internal: true
 

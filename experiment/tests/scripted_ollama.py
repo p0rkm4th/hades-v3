@@ -1,4 +1,4 @@
-"""Deterministic Ollama protocol peer for isolated CP68 harness integration tests."""
+"""Protocol-strict deterministic Ollama peer for isolated CP69 integration tests."""
 from __future__ import annotations
 
 import hashlib
@@ -47,6 +47,65 @@ def _tool_calls(messages):
         if message.get("role") == "assistant":
             calls.extend(message.get("tool_calls") or [])
     return calls
+
+
+def _validate_native_history(messages):
+    """Independent peer-side schema check; do not reuse the adapter translator."""
+    allowed = {"role", "content", "thinking", "images", "tool_calls", "tool_name", "tool_call_id"}
+    outstanding = {}
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict) or set(message) - allowed:
+            return False, f"message_{index}_has_non_native_fields"
+        role = message.get("role")
+        if role not in {"system", "user", "assistant", "tool"}:
+            return False, f"message_{index}_has_invalid_role"
+        if not isinstance(message.get("content", ""), str):
+            return False, f"message_{index}_content_is_not_string"
+        if outstanding and role != "tool":
+            return False, "assistant_tool_call_not_followed_by_tool_result"
+        if role == "assistant":
+            calls = message.get("tool_calls", [])
+            if not isinstance(calls, list):
+                return False, f"message_{index}_tool_calls_not_array"
+            for call in calls:
+                if not isinstance(call, dict) or set(call) - {"id", "function"}:
+                    return False, f"message_{index}_tool_call_not_native"
+                call_id = call.get("id")
+                function = call.get("function")
+                if not isinstance(function, dict) or set(function) - {"name", "arguments"}:
+                    return False, f"message_{index}_function_not_native"
+                if (not isinstance(call_id, str) or not call_id or call_id in outstanding
+                        or not isinstance(function.get("name"), str)
+                        or not isinstance(function.get("arguments"), dict)):
+                    return False, f"message_{index}_function_arguments_must_be_object"
+                outstanding[call_id] = function["name"]
+        elif role == "tool":
+            call_id = message.get("tool_call_id")
+            if not isinstance(call_id, str) or call_id not in outstanding:
+                return False, f"message_{index}_tool_result_has_no_matching_call_id"
+            if message.get("tool_name") != outstanding[call_id]:
+                return False, f"message_{index}_tool_name_mismatch"
+            del outstanding[call_id]
+    if outstanding:
+        return False, "history_has_unanswered_tool_calls"
+    return True, None
+
+
+def _validate_native_tools(tools):
+    if tools is None:
+        return True, None
+    if not isinstance(tools, list):
+        return False, "tools_not_array"
+    for index, tool in enumerate(tools):
+        if (not isinstance(tool, dict) or set(tool) != {"type", "function"}
+                or tool.get("type") != "function"):
+            return False, f"tool_{index}_not_native"
+        function = tool.get("function")
+        if (not isinstance(function, dict) or set(function) - {"name", "description", "parameters"}
+                or not isinstance(function.get("name"), str)
+                or not isinstance(function.get("parameters"), dict)):
+            return False, f"tool_{index}_function_not_native"
+    return True, None
 
 
 def _search_result(messages):
@@ -117,6 +176,12 @@ class Handler(BaseHTTPRequestHandler):
         messages = payload.get("messages")
         if not isinstance(messages, list):
             return self._send(400, {"error": "messages required"})
+        history_valid, history_error = _validate_native_history(messages)
+        if not history_valid:
+            return self._send(400, {"error": "invalid native Ollama chat history", "detail": history_error})
+        tools_valid, tools_error = _validate_native_tools(payload.get("tools"))
+        if not tools_valid:
+            return self._send(400, {"error": "invalid native Ollama tool declaration", "detail": tools_error})
         tool_names = [
             ((tool.get("function") or {}).get("name"))
             for tool in payload.get("tools", []) if isinstance(tool, dict)
@@ -142,6 +207,10 @@ class Handler(BaseHTTPRequestHandler):
             ],
             "configuration_matches": config_matches,
             "genuine_observation_received": observation is not None,
+            "native_history_valid": history_valid,
+            "native_tools_valid": tools_valid,
+            "tool_result_names": [message.get("tool_name") for message in messages if message.get("role") == "tool"],
+            "tool_result_ids": [message.get("tool_call_id") for message in messages if message.get("role") == "tool"],
             "observation_sha256": hashlib.sha256(
                 json.dumps(observation, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest() if observation is not None else None,

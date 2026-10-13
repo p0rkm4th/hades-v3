@@ -809,6 +809,36 @@ The adapter was the only candidate path to Hypnos. Candidate containers were cap
 
 All three harnesses demonstrated successful initial tool selection on this model, so the live failure is not evidence that the model cannot select the read. They share a follow-up adapter/Ollama compatibility failure. Their error handling differs: A retried to its ceiling, C stopped after the upstream error, and Hermes retried internally and returned a rate-limit message. This does not qualify any harness or distinguish model semantics after tool use.
 
-### Next corrective experiment
+### CP68 next corrective step (closed by CP69 offline work)
 
-The smallest next step is an offline adapter protocol test that validates the exact post-tool conversation history against Ollama's native message schema, then exercises all three real runtimes through the scripted peer with malformed and valid tool-history cases. Preserve the CP68 GPU failures as recorded; this authorization ended with the sequential smoke and does not permit another Hypnos run. A new GPU trial requires separate owner authorization after the shared adapter fix passes offline. Prioritize crash recovery, memory continuity, compound work, and protected actions after that compatibility gate. ADR-010 remains NOT READY and production implementation remains unauthorized.
+At the CP68 decision point, the smallest next step was an offline adapter protocol test that validates the exact post-tool conversation history against Ollama's native message schema, then exercises all three real runtimes through the scripted peer with malformed and valid tool-history cases. Preserve the CP68 GPU failures as recorded; this authorization ended with the sequential smoke and does not permit another Hypnos run. A new GPU trial requires separate owner authorization after the shared adapter fix passes offline. Prioritize crash recovery, memory continuity, compound work, and protected actions after that compatibility gate. ADR-010 remains NOT READY and production implementation remains unauthorized.
+
+## CP69 — native Ollama tool-history compatibility
+
+### Reconstructed cause and confidence
+
+The shared inference adapter previously forwarded OpenAI-compatible messages into Ollama's native `/api/chat` unchanged. OpenAI assistant tool calls use `type: "function"` and encode `function.arguments` as a JSON string. Ollama's native history represents arguments as a JSON object. OpenAI tool results refer to the call ID and can omit the function name; native tool results use `tool_name` and may retain the call ID. The original A/C and Hermes request-building paths therefore produced a history shape that the native endpoint can reject after the tool call. Pydantic AI also advertised `strict: true`, a field not supported by Ollama's native tool declaration.
+
+CP69 reproduces the invalid native shape with an independently implemented strict Ollama peer and proves that the common adapter translation produces valid native history and declarations accepted by that peer. It covers role ordering, call/result IDs and names, multiple tool calls, argument parsing, tool declaration fields, Hermes `tool_search`/`tool_call`, and streaming conversion. This is a reproduced protocol incompatibility in the reconstructed request and the leading explanation for the five CP68 HTTP 400 responses. The exact historical upstream error is not proven: CP68 did not retain the bodies and no local compatible Ollama runtime was available to replay them.
+
+The adapter maps the OpenAI fields into the native schema while preserving names, arguments, order, call/result associations, observations, model identity, settings, and streaming. Unsupported or malformed fields are rejected before reservation and dispatch with a sanitized diagnostic. Pydantic AI's pinned profile disables advertising the unsupported `strict` extension; the candidate retains its JSON schemas and gateway validation. The adapter applies the same shared mapping for every candidate.
+
+### Strict offline end-to-end result
+
+| Harness | Trials | Exact generation trace | Protocol/tool result | Answer and task result | Integrity |
+|---|---:|---|---|---|---|
+| Pydantic AI (A) | 3/3 | `tool_request → answer` (2 each) | Native history and tools valid; exact `infrastructure_read` | Oracle-matching fresh/healthy, stale/unknown, unknown/no-health answer; 3/3 `COMPLETED` | 0 effects; memory unchanged |
+| Reduced Hermes (B) | 3/3 | `tool_search → tool_dispatch → answer` (3 each) | Native streaming history valid; actual MCP read dispatched | Same oracle-matching answer; 3/3 `COMPLETED` | 0 effects; memory unchanged |
+| Lean loop (C) | 3/3 | `tool_request → answer` (2 each) | Native history and tools valid; exact `infrastructure_read` | Same oracle-matching answer; 3/3 `COMPLETED` | 0 effects; memory unchanged |
+
+All final generations received the same genuine authenticated gateway observation digest. The strict peer validated every dispatched request. No auxiliary generations or unexplained retries occurred; no task remained RUNNING. Records: [CP69 strict offline trials](../experiment/results/cp69_offline_e2e.jsonl). These deterministic trials demonstrate runtime/protocol integration, not live model answer quality and not overall harness qualification.
+
+### Provider failures and lifecycle
+
+Finalization now receives known provider failure status and rejects recognized Hermes provider diagnostic messages as final answers. A successful read followed by HTTP 400, timeout/transport failure, invalid provider output, or exhausted generation allowance cannot be completed from read evidence alone; such turns become FAILED unless preserved approval or uncertain-effect conditions require WAITING. Useful final answers after a trusted read can complete. A superficially successful answer cannot complete a partial effectful task. Memory writes remain WAITING because their task-linked durable effect guarantee is still unproven. Semantic scoring remains independent of task state.
+
+Regression tests cover complete strict-peer interactions, malformed and mismatched histories, invalid tool arguments, provider HTTP errors, timeout, invalid response, budget rejection, retry accounting, successful reads, diagnostic output, and partial effects. The exact pinned candidate dependencies remain in `experiment/candidates/requirements.lock.txt`; reduced Hermes remains pinned by its Dockerfile source revision. CI includes protocol, adapter, lifecycle, and full three-harness offline checks. The matched task text and generation ceilings are in `experiment/tests/run_cp68_e2e.py`; model ID, 65,536 context, temperature 0, and 1,024 output ceiling are enforced by `experiment/compose.cp68-offline.yaml` and the strict peer. Pydantic AI is pinned at 2.55.0 with OpenAI client 3.29.0; reduced Hermes is pinned to commit `e4d86423856350825a3a0dc4f52aed89759e11bd` with `uv` 0.13.0. Candidate container base images are digest-pinned in their Dockerfiles. The recorded timings are local scripted-peer latencies, not inference throughput.
+
+### CP70 proposal and comparison status
+
+The bounded live requalification protocol is proposed in [CP70](CP70_LIVE_REQUALIFICATION_PROTOCOL.md). It specifies all entry gates, matched settings, per-candidate acceptance, maximum three generations each/nine total, a durable 20-minute deadline, network checks, independent task/fixture verification, and rollback. CP69 performed no live inference. CP68's failures remain unchanged and no new GPU trial is authorized. Continue toward crash recovery, then memory continuity, compound work, and protected actions. ADR-010 remains NOT READY; production implementation remains unauthorized.
