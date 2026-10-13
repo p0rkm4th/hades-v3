@@ -8,6 +8,8 @@ The new [Hypnos preflight](../experiment/scripts/hypnos_gpu_preflight.py) querie
 
 Ten automated regression tests cover the CP70 loopback/system-service false negative, user-unit health, configured listener selection, unloaded model acceptance, model digest and quantization, loaded context status, API/port drift, and managed/live configuration drift. They are included in Prototype CI.
 
+The existing adapter and firewall helper now also support CP71's offline control contract: a separate one-use context-probe credential, durable count and deadline state, a clock that starts with the first reserved generation, and checkpoint-scoped CP71 firewall chain names. Reservations are persisted before dispatch, with file and directory sync. The context probe has a hard one-generation cap; tests exercise three-per-candidate and ten-total settings. A separate regression suite validates firewall rule construction without applying it. All 28 relevant preflight, adapter, budget-seeding, and firewall-construction tests pass in a network-isolated container. These tests do not prove host firewall enforcement or a live model route.
+
 ## Read-only Hypnos result
 
 - The correct `scotty` user service is enabled and active; process owner is `scotty`.

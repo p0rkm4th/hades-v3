@@ -26,16 +26,23 @@ _harness_keys = {
     "hermes": os.environ.get("CP67_HERMES_KEY"),
     "lean": os.environ.get("CP67_LEAN_KEY"),
 }
+_context_probe_key = os.environ.get("CP71_CONTEXT_KEY")
+if _context_probe_key:
+    _harness_keys["context"] = _context_probe_key
 if any(_harness_keys.values()) and (any(not value for value in _harness_keys.values())
                                     or len(set(_harness_keys.values())) != len(_harness_keys)):
-    raise RuntimeError("CP67 harness keys must all be set and unique")
+    raise RuntimeError("trial harness keys must all be set and unique")
 _harness_tokens = {key: harness for harness, key in _harness_keys.items() if key}
 _generation_counts = {name: 0 for name in _harness_tokens.values()}
 TRIAL_SECONDS = int(os.environ.get("TRIAL_SECONDS", "900"))
 _state_path = os.environ.get("TRIAL_STATE_FILE")
-_deadline_epoch = time.time() + TRIAL_SECONDS
+_deadline_epoch = None if _state_path else time.time() + TRIAL_SECONDS
 MAX_GENERATIONS_PER_HARNESS = int(os.environ.get("MAX_GENERATIONS_PER_HARNESS", "2"))
 MAX_GENERATIONS_TOTAL = int(os.environ.get("MAX_GENERATIONS_TOTAL", "6"))
+
+
+def _limit_for(harness):
+    return 1 if harness == "context" else MAX_GENERATIONS_PER_HARNESS
 
 
 def _load_budget():
@@ -46,13 +53,13 @@ def _load_budget():
     counts = state.get("generation_counts")
     deadline = state.get("deadline_epoch")
     if (not isinstance(counts, dict) or set(counts) != set(_generation_counts)
-            or any(type(value) is not int or value < 0 or value > MAX_GENERATIONS_PER_HARNESS
-                   for value in counts.values())
+            or any(type(value) is not int or value < 0 or value > _limit_for(name)
+                   for name, value in counts.items())
             or sum(counts.values()) > MAX_GENERATIONS_TOTAL
-            or not isinstance(deadline, (int, float))):
+            or (deadline is not None and (isinstance(deadline, bool) or not isinstance(deadline, (int, float))))):
         raise RuntimeError("invalid persisted trial budget; refusing inference")
     _generation_counts = counts
-    _deadline_epoch = float(deadline)
+    _deadline_epoch = None if deadline is None else float(deadline)
 
 
 def _persist_budget():
@@ -60,9 +67,17 @@ def _persist_budget():
         return
     path = Path(_state_path)
     temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(json.dumps({"deadline_epoch": _deadline_epoch,
-                                "generation_counts": _generation_counts}, sort_keys=True), encoding="utf-8")
+    with temp.open("w", encoding="utf-8") as handle:
+        handle.write(json.dumps({"deadline_epoch": _deadline_epoch,
+                                 "generation_counts": _generation_counts}, sort_keys=True))
+        handle.flush()
+        os.fsync(handle.fileno())
     os.replace(temp, path)
+    directory_fd = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 if _state_path:
@@ -70,21 +85,26 @@ if _state_path:
 
 
 def _reserve_generation(token):
+    global _deadline_epoch
     harness = _harness_tokens.get(token)
     if harness is None:
         return None
     with _budget_lock:
-        if time.time() >= _deadline_epoch:
+        if _deadline_epoch is not None and time.time() >= _deadline_epoch:
             return None
-        if _generation_counts[harness] >= MAX_GENERATIONS_PER_HARNESS:
+        if _generation_counts[harness] >= _limit_for(harness):
             return None
         if sum(_generation_counts.values()) >= MAX_GENERATIONS_TOTAL:
             return None
+        old_deadline = _deadline_epoch
+        if _deadline_epoch is None:
+            _deadline_epoch = time.time() + TRIAL_SECONDS
         _generation_counts[harness] += 1
         try:
             _persist_budget()
         except OSError:
             _generation_counts[harness] -= 1
+            _deadline_epoch = old_deadline
             return None
         return harness, _generation_counts[harness]
 

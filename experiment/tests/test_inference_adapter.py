@@ -302,5 +302,39 @@ class AdapterIsolation(unittest.TestCase):
             self.assertEqual(adapter._generation_counts["pydantic"], 1)
         adapter._state_path, adapter._generation_counts, adapter._deadline_epoch = old_path, old_counts, old_deadline
 
+    def test_cp71_context_probe_counts_toward_durable_budget_and_starts_deadline_once(self):
+        attributes = ("_state_path", "_generation_counts", "_deadline_epoch", "_harness_tokens",
+                      "TRIAL_SECONDS", "MAX_GENERATIONS_PER_HARNESS", "MAX_GENERATIONS_TOTAL")
+        old = {name: getattr(adapter, name) for name in attributes}
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                adapter._state_path = str(Path(directory) / "budget.json")
+                adapter._harness_tokens = {**adapter._harness_tokens, "test-context-key": "context"}
+                adapter._generation_counts = {**adapter._generation_counts, "context": 0}
+                adapter._deadline_epoch = None
+                adapter.TRIAL_SECONDS = 1200
+                adapter.MAX_GENERATIONS_PER_HARNESS = 3
+                adapter.MAX_GENERATIONS_TOTAL = 10
+                adapter._persist_budget()
+                initial = json.loads(Path(adapter._state_path).read_text())
+                self.assertIsNone(initial["deadline_epoch"])
+
+                reservation = adapter._reserve_generation("test-context-key")
+                self.assertEqual(reservation, ("context", 1))
+                started = json.loads(Path(adapter._state_path).read_text())
+                self.assertIsNotNone(started["deadline_epoch"])
+                self.assertEqual(started["generation_counts"]["context"], 1)
+                self.assertEqual(sum(started["generation_counts"].values()), 1)
+
+                adapter._generation_counts = {name: 0 for name in adapter._generation_counts}
+                adapter._deadline_epoch = None
+                adapter._load_budget()
+                self.assertEqual(adapter._generation_counts["context"], 1)
+                self.assertEqual(adapter._deadline_epoch, started["deadline_epoch"])
+                self.assertIsNone(adapter._reserve_generation("test-context-key"))
+            finally:
+                for name, value in old.items():
+                    setattr(adapter, name, value)
+
 
 if __name__ == "__main__": unittest.main()
