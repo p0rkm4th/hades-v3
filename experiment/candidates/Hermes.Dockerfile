@@ -13,8 +13,10 @@ RUN git init /opt/hermes \
 WORKDIR /app
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin hermes \
     && mkdir -p /home/hermes/.hermes \
-    && chown -R hermes:hermes /home/hermes
+    && mkdir -p /var/hades-task /var/hades-trace \
+    && chown -R hermes:hermes /home/hermes /var/hades-task /var/hades-trace
 COPY candidates/api.py /app/candidates/api.py
+COPY contracts/task_lifecycle.py /app/candidates/task_lifecycle.py
 COPY candidates/mcp_proxy.py candidates/hermes_config.yaml.in candidates/hermes_start.py /app/
 COPY contracts/tools.json /app/contracts/tools.json
 USER hermes

@@ -1,0 +1,161 @@
+name: hades-v3-lab
+
+services:
+  cp68-scripted-ollama:
+    build:
+      context: .
+      dockerfile: services/Test.Dockerfile
+    command: ["python", "/app/tests/scripted_ollama.py"]
+    networks: [cp68-upstream]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=8m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 256m
+    profiles: [cp68-offline]
+    restart: "no"
+
+  cp68-inference-adapter:
+    build:
+      context: .
+      dockerfile: services/InferenceAdapter.Dockerfile
+    environment:
+      OLLAMA_UPSTREAM: http://cp68-scripted-ollama:11434
+      MODEL_ID: cp68-scripted-model
+      UPSTREAM_TIMEOUT_SECONDS: "10"
+      MAX_GENERATIONS_PER_HARNESS: "9"
+      MAX_GENERATIONS_TOTAL: "27"
+      TRIAL_SECONDS: "1200"
+      CP67_PYDANTIC_KEY: ${CP68_PYDANTIC_KEY:?set the isolated offline trial key}
+      CP67_HERMES_KEY: ${CP68_HERMES_KEY:?set the isolated offline trial key}
+      CP67_LEAN_KEY: ${CP68_LEAN_KEY:?set the isolated offline trial key}
+    networks: [cp68-model-access, cp68-upstream]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 256m
+    profiles: [cp68-offline]
+    restart: "no"
+
+  cp68-candidate-api:
+    build:
+      context: .
+      dockerfile: candidates/Candidate.Dockerfile
+    environment:
+      GATEWAY_URL: http://tool-gateway:8080
+      MODEL_URL: http://cp68-inference-adapter:8098/v1
+      MODEL_NAME: cp68-scripted-model
+      MODEL_REQUEST_TIMEOUT_SECONDS: "30"
+      MODEL_TEMPERATURE: "0"
+      MODEL_MAX_TOKENS: "1024"
+      MODEL_MAX_REQUESTS: "3"
+      MODEL_API_KEY: ${CP68_PYDANTIC_KEY:?set the isolated offline trial key}
+      MODEL_API_KEY_LEAN: ${CP68_LEAN_KEY:?set the isolated offline trial key}
+      HERMES_AMBER_ENDPOINT: http://cp68-hermes-amber:8642/v1/chat/completions
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set the local orchestrator secret}
+    volumes:
+      - cp68-hermes-task:/hermes/amber-task
+      - cp68-hermes-trace:/hermes/amber-trace
+    networks: [operator, cp68-model-access]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+      cp68-inference-adapter:
+        condition: service_started
+      cp68-hermes-amber:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    mem_limit: 1g
+    profiles: [cp68-offline]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    restart: "no"
+
+  cp68-hermes-amber:
+    build:
+      context: .
+      dockerfile: candidates/Hermes.Dockerfile
+    environment:
+      API_SERVER_KEY: fixture-hermes-amber
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: fixture
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: offline-hermes-dashboard
+      DASHBOARD_PASSWORD: offline-hermes-dashboard
+      HADES_USER_TOKEN: fixture-token-amber
+      HADES_TASK_FILE: /var/hades-task/current
+      HADES_TRACE_FILE: /var/hades-trace/tool-trace.jsonl
+      MODEL_URL: http://cp68-inference-adapter:8098/v1
+      MODEL_NAME: cp68-scripted-model
+      MODEL_CONTEXT_LENGTH: "65536"
+      MODEL_TEMPERATURE: "0"
+      MODEL_MAX_TOKENS: "1024"
+      MODEL_API_KEY: ${CP68_HERMES_KEY:?set the isolated offline trial key}
+      MODEL_REQUEST_TIMEOUT_SECONDS: "30"
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set the local orchestrator secret}
+    volumes:
+      - cp68-hermes-home:/home/hermes/.hermes
+      - cp68-hermes-task:/var/hades-task
+      - cp68-hermes-trace:/var/hades-trace
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    networks: [operator, cp68-model-access]
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+      cp68-inference-adapter:
+        condition: service_started
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    mem_limit: 2g
+    profiles: [cp68-offline]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8642/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
+    restart: "no"
+
+  cp68-e2e-runner:
+    build:
+      context: .
+      dockerfile: services/Test.Dockerfile
+    entrypoint: ["python", "/app/tests/run_cp68_e2e.py"]
+    environment:
+      CANDIDATE_API_URL: http://cp68-candidate-api:8080/api/turn
+      GATEWAY_URL: http://tool-gateway:8080
+      DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
+    networks: [operator, fixture-backend, cp68-upstream]
+    depends_on:
+      cp68-candidate-api:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 512m
+    profiles: [cp68-offline]
+    restart: "no"
+
+networks:
+  cp68-model-access:
+    name: hades-v3-cp68-model-access
+    driver: bridge
+    internal: true
+  cp68-upstream:
+    name: hades-v3-cp68-upstream
+    driver: bridge
+    internal: true
+
+volumes:
+  cp68-hermes-home:
+  cp68-hermes-task:
+  cp68-hermes-trace:

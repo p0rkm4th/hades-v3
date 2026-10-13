@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-sys.path.insert(0, "/app/candidates")
+sys.path[:0] = ["/app", "/app/candidates"]
 from api import gateway_call
 from mcp.server import MCPServer
 from pydantic import BaseModel, ConfigDict, Field

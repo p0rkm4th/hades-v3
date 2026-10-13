@@ -1,0 +1,246 @@
+name: hades-v3-cp68-gpu
+
+services:
+  cp68-gpu-budget-init:
+    image: hades-v3-cp68-budget-init
+    build:
+      context: .
+      dockerfile: services/Test.Dockerfile
+    user: "10001:10001"
+    profiles: [cp68-gpu-trial]
+    entrypoint: ["python", "/app/scripts/seed_cp67_trial_budget.py"]
+    volumes:
+      - cp68-gpu-state:/state
+    network_mode: none
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=8m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: "no"
+
+  cp68-gpu-egress-probe:
+    image: python:3.13-slim-bookworm@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641
+    profiles: [cp68-gpu-trial]
+    environment:
+      CP68_HYPNOS_IP: ${CP68_HYPNOS_IP:?set the locally verified Hypnos address}
+      CP68_TARTARUS_IP: ${CP68_TARTARUS_IP:?set the locally verified Tartarus address}
+      CP68_HERMES_IP: ${CP68_HERMES_IP:?set the locally verified Hermes address}
+    entrypoint: ["python", "-c"]
+    command:
+      - |
+        import os
+        import socket
+        targets = [(os.environ['CP68_HYPNOS_IP'], 11434), (os.environ['CP68_HYPNOS_IP'], 22), (os.environ['CP68_TARTARUS_IP'], 22), (os.environ['CP68_HERMES_IP'], 22)]
+        unexpected = []
+        for host, port in targets:
+            try:
+                socket.create_connection((host, port), timeout=2).close()
+                print('UNEXPECTED reachable {}:{}'.format(host, port))
+                unexpected.append('{}:{}'.format(host, port))
+            except OSError:
+                print('blocked {}:{}'.format(host, port))
+        if unexpected:
+            raise SystemExit('candidate egress boundary failed')
+    networks: [operator, cp68-gpu-model-access]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 16
+    mem_limit: 128m
+    restart: "no"
+
+  cp68-gpu-api-probe:
+    image: python:3.13-slim-bookworm@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641
+    profiles: [cp68-gpu-trial]
+    environment:
+      CP68_PYDANTIC_KEY: ${CP68_PYDANTIC_KEY:?set a fresh per-trial adapter key}
+    entrypoint: ["python", "-c"]
+    command:
+      - |
+        import json, os, urllib.error, urllib.request
+        base = 'http://cp68-gpu-inference-adapter:8098'
+        token = os.environ['CP68_PYDANTIC_KEY']
+        def call(path, method='GET', body=None):
+            headers = {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'}
+            data = None if body is None else json.dumps(body).encode()
+            req = urllib.request.Request(base + path, data=data, headers=headers, method=method)
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    return response.status, response.read()
+            except urllib.error.HTTPError as error:
+                return error.code, error.read()
+        status, payload = call('/v1/models')
+        assert status == 200 and json.loads(payload)['data'][0]['id'] == 'gemma4:12b'
+        assert call('/api/ps')[0] == 404
+        assert call('/v1/chat/completions', 'POST', {'model':'wrong','messages':[{'role':'user','content':'probe'}]})[0] == 400
+        assert call('/v1/chat/completions', 'POST', {'model':'gemma4:12b','messages':[{'role':'user','content':'probe'}],'upstream':'http://invalid'})[0] == 400
+        assert call('/v1/chat/completions', 'PUT', {'model':'gemma4:12b','messages':[]})[0] == 405
+        print('adapter fixed model listing passed; administrative route, model override, destination override, and unsupported method rejected')
+    networks: [operator, cp68-gpu-model-access]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 16
+    mem_limit: 128m
+    restart: "no"
+
+  cp68-gpu-inference-adapter:
+    image: hades-v3-cp68-inference-adapter
+    build:
+      context: .
+      dockerfile: services/InferenceAdapter.Dockerfile
+    environment:
+      OLLAMA_UPSTREAM: ${HYPNOS_INFERENCE_UPSTREAM:?set the locally verified Hypnos URL}
+      MODEL_ID: gemma4:12b
+      UPSTREAM_TIMEOUT_SECONDS: "120"
+      TRIAL_SECONDS: "1200"
+      TRIAL_STATE_FILE: /run/cp68-state/budget.json
+      MAX_GENERATIONS_PER_HARNESS: "3"
+      MAX_GENERATIONS_TOTAL: "9"
+      CP67_PYDANTIC_KEY: ${CP68_PYDANTIC_KEY:?set a fresh per-trial adapter key}
+      CP67_HERMES_KEY: ${CP68_HERMES_KEY:?set a fresh per-trial adapter key}
+      CP67_LEAN_KEY: ${CP68_LEAN_KEY:?set a fresh per-trial adapter key}
+    volumes:
+      - cp68-gpu-state:/run/cp68-state
+    networks: [cp68-gpu-model-access, cp68-gpu-egress]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 512m
+    restart: "no"
+
+  cp68-gpu-candidate-api:
+    image: hades-v3-cp68-candidate-api
+    build:
+      context: .
+      dockerfile: candidates/Candidate.Dockerfile
+    profiles: [cp68-gpu-trial]
+    environment:
+      GATEWAY_URL: http://tool-gateway:8080
+      MODEL_URL: http://cp68-gpu-inference-adapter:8098/v1
+      MODEL_NAME: gemma4:12b
+      MODEL_CONTEXT_LENGTH: "65536"
+      MODEL_REQUEST_TIMEOUT_SECONDS: "125"
+      MODEL_TEMPERATURE: "0"
+      MODEL_MAX_TOKENS: "1024"
+      MODEL_MAX_REQUESTS: "3"
+      MODEL_API_KEY: ${CP68_PYDANTIC_KEY:?set a fresh per-trial adapter key}
+      MODEL_API_KEY_LEAN: ${CP68_LEAN_KEY:?set a fresh per-trial adapter key}
+      HERMES_AMBER_ENDPOINT: http://cp68-gpu-hermes-amber:8642/v1/chat/completions
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set the existing local orchestrator secret}
+    volumes:
+      - cp68-gpu-hermes-task:/hermes/amber-task
+      - cp68-gpu-hermes-trace:/hermes/amber-trace
+    networks: [operator, cp68-gpu-model-access]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+      cp68-gpu-inference-adapter:
+        condition: service_started
+      cp68-gpu-hermes-amber:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    restart: "no"
+
+  cp68-gpu-hermes-amber:
+    image: hades-v3-cp68-hermes
+    build:
+      context: .
+      dockerfile: candidates/Hermes.Dockerfile
+    profiles: [cp68-gpu-trial]
+    environment:
+      API_SERVER_KEY: fixture-hermes-amber
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: fixture
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: fixture-dashboard-hermes
+      DASHBOARD_PASSWORD: fixture-dashboard-hermes
+      HADES_USER_TOKEN: fixture-token-amber
+      HADES_TASK_FILE: /var/hades-task/current
+      HADES_TRACE_FILE: /var/hades-trace/tool-trace.jsonl
+      MODEL_URL: http://cp68-gpu-inference-adapter:8098/v1
+      MODEL_NAME: gemma4:12b
+      MODEL_CONTEXT_LENGTH: "65536"
+      MODEL_TEMPERATURE: "0"
+      MODEL_MAX_TOKENS: "1024"
+      MODEL_API_KEY: ${CP68_HERMES_KEY:?set a fresh per-trial adapter key}
+      MODEL_REQUEST_TIMEOUT_SECONDS: "125"
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set the existing local orchestrator secret}
+    volumes:
+      - cp68-gpu-hermes-home:/home/hermes/.hermes
+      - cp68-gpu-hermes-task:/var/hades-task
+      - cp68-gpu-hermes-trace:/var/hades-trace
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    networks: [operator, cp68-gpu-model-access]
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+      cp68-gpu-inference-adapter:
+        condition: service_started
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 3g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8642/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
+    restart: "no"
+
+  cp68-gpu-trial-runner:
+    image: hades-v3-cp68-candidate-api
+    profiles: [cp68-gpu-trial]
+    entrypoint: ["python", "/app/candidates/run_trial.py"]
+    environment:
+      CANDIDATE_API_URL: http://cp68-gpu-candidate-api:8080/api/turn
+    networks: [operator]
+    depends_on:
+      cp68-gpu-candidate-api:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 512m
+    restart: "no"
+
+  cp68-gpu-verifier:
+    image: hades-v3-cp68-gpu-verifier
+    build:
+      context: .
+      dockerfile: services/Test.Dockerfile
+    profiles: [cp68-gpu-trial]
+    environment:
+      GATEWAY_URL: http://tool-gateway:8080
+      DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
+    networks: [operator, fixture-backend]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=8m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 256m
+    restart: "no"
+
+networks:
+  cp68-gpu-model-access:
+    internal: true
+  cp68-gpu-egress:
+    driver: bridge
+
+volumes:
+  cp68-gpu-state:
+  cp68-gpu-hermes-home:
+  cp68-gpu-hermes-task:
+  cp68-gpu-hermes-trace:

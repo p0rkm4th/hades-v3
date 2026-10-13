@@ -12,7 +12,7 @@ dashboard:
 
 platform_toolsets:
   api_server:
-    - mcp-hades
+    - hades
 
 platforms:
   api_server:
@@ -47,3 +47,7 @@ agent:
     - cronjob
     - session_search
     - computer_use
+
+auxiliary:
+  title_generation:
+    enabled: false

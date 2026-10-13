@@ -7,3 +7,5 @@
 !contracts/**
 !tests/
 !tests/**
+!scripts/
+!scripts/**
