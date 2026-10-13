@@ -51,3 +51,14 @@ Protocol compatibility, harness execution, model capability, durable lifecycle c
 | Harness viability | Viable for further qualification | Viable for further qualification | Viable for further qualification | Infrastructure-readiness blocker, not a candidate or model failure. This does not qualify live inference or establish a winner. |
 
 The CP70 attempt created no live route, firewall rule, candidate connection, or model request. CP67/CP68 outcomes remain unchanged. Next priority is crash recovery and durable continuation across restart, then memory continuity, exact-state compound operations, and protected-action resistance. ADR-010 remains NOT READY.
+
+## CP71 corrected preflight and live gate
+
+| Dimension | Pydantic AI (A) | Reduced Hermes (B) | Lean loop (C) | Common evidence / limit |
+|---|---|---|---|---|
+| Corrected Hypnos service preflight | Ready for a bounded context probe | Ready for a bounded context probe | Ready for a bounded context probe | The enabled `scotty` user unit and configured binding are healthy; approved model digest/quantization installed but unloaded. Effective context remains unverified. |
+| Live inference and end-to-end task | Not run | Not run | Not run | Safely stopped before route setup: host firewall rules could not be inspected or applied from this workspace. No generation or candidate result exists. |
+| Offline strict-peer integration | CP69 3/3 | CP69 3/3 | CP69 3/3 | Unchanged. CP67/CP68 live failures and CP70 false-negative record remain intact. |
+| Isolation qualification | Not re-tested | Not re-tested | Not re-tested | Internal candidate networks are configured, but the required adapter-only host egress rule and negative tests were not established for CP71. |
+
+CP71 corrects the CP70 preflight implementation and adds regression coverage. It does not qualify live GPU integration. The smallest remaining blocker is controlled root access to snapshot, install, verify, and remove the previously reviewed host firewall guard. No CP71 trial resources were created; the isolated preflight regression-test container was removed. ADR-010 remains NOT READY.
