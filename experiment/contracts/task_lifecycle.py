@@ -1,147 +1,124 @@
-"""Shared evidence rules for ending a candidate task turn."""
-
-from __future__ import annotations
-
+"""Shared task completion rules used by candidates and the trusted gateway."""
 
 READ_TOOLS = {
-    "inventory_read",
-    "shopping_list_read",
-    "infrastructure_read",
-    "memory_read",
+    "infrastructure_read", "inventory_read", "shopping_list_read", "memory_read",
     "memory_search",
-    "workspace_read",
 }
 WRITE_TOOLS = {
-    "shopping_list_change",
-    "memory_write",
-    "memory_correct",
-    "workspace_exec",
-    "commitment_submit",
-    "commitment_reconcile",
+    "shopping_list_change", "workspace_exec", "commitment_submit",
+    "commitment_reconcile", "memory_write", "memory_correct",
 }
-TERMINAL_STATES = {"COMPLETED", "FAILED", "CANCELLED"}
 
 
-def decide_turn_finalization(
-    current_state: str,
-    response_text: str | None,
-    tool_evidence: list[dict],
-    completion_claim: dict | None,
-    effect_states: list[str] | None = None,
-) -> tuple[str, str]:
-    """Return canonical state and reason without treating HTTP success as proof."""
-    if current_state in TERMINAL_STATES or current_state == "WAITING":
-        return current_state, "preserved_existing_state"
+def _verified_reads(evidence):
+    return any(item.get("tool") in READ_TOOLS and item.get("status") == "ok" for item in evidence)
 
-    if any(item.get("approval_pending") for item in tool_evidence):
-        return "WAITING", "approval_pending"
-    resolved_ids = {
-        item.get("effect_id") for item in tool_evidence
-        if item.get("tool") == "commitment_reconcile" and item.get("state") == "CONFIRMED"
-    }
-    if any(item.get("uncertain") and item.get("effect_id") not in resolved_ids for item in tool_evidence):
-        return "WAITING", "effect_outcome_uncertain"
 
-    claim = completion_claim or {}
-    pending = claim.get("pending")
-    if pending is None:
-        pending = []
-    if not isinstance(pending, list):
-        return "FAILED", "invalid_completion_claim"
-    if pending:
-        return "RUNNING", "authorized_steps_remain"
-
-    if not isinstance(response_text, str) or not response_text.strip():
-        return "FAILED", "no_final_model_response"
-
-    relevant = [item for item in tool_evidence if item.get("tool") in READ_TOOLS | WRITE_TOOLS]
-    latest_by_tool = {}
-    for item in relevant:
-        latest_by_tool[item.get("tool")] = item
-    if any(item.get("status") != "ok" for item in latest_by_tool.values()):
-        return "FAILED", "tool_error_prevents_completion"
-
-    writes = [
-        item for item in relevant
-        if item.get("tool") in WRITE_TOOLS
-        and not (item.get("uncertain") and item.get("effect_id") in resolved_ids)
-    ]
+def decide_turn_finalization(current_state, response, evidence, claim, effect_states=None, effect_records=None):
+    """Decide state from observed work, preserving externally meaningful states."""
+    if current_state != "RUNNING":
+        return current_state, "existing_state_preserved"
+    evidence = evidence or []
     effect_states = effect_states or []
-    if any(state in {"REJECTED", "FAILED", "CANCELLED"} for state in effect_states):
+    effect_records = effect_records or []
+    if any(item.get("approval_pending") for item in evidence):
+        return "WAITING", "approval_required"
+    resolved_ids = {str(item.get("effect_id")) for item in evidence
+                    if item.get("tool") == "commitment_reconcile" and item.get("state") == "CONFIRMED"}
+    unresolved = [item for item in evidence if item.get("uncertain")
+                  and str(item.get("effect_id")) not in resolved_ids]
+    if unresolved:
+        return "WAITING", "effect_outcome_uncertain"
+    states = [item.get("state") for item in effect_records] or effect_states
+    if any(state in {"REJECTED", "FAILED", "CANCELLED"} for state in states):
         return "FAILED", "effect_failed"
-    if effect_states and any(state != "CONFIRMED" for state in effect_states):
-        return "WAITING", "effect_outcome_not_confirmed"
-    if effect_states and not claim:
-        return "FAILED", "effect_completion_not_claimed"
-    if writes:
-        if not claim or not claim.get("completed"):
-            return "FAILED", "write_completion_not_claimed"
-        for item in writes:
-            if item.get("state") in {"REJECTED", "FAILED", "CANCELLED"}:
-                return "FAILED", "write_failed"
-            if item.get("state") != "CONFIRMED":
-                return "WAITING", "write_outcome_not_confirmed"
-            if item.get("tool") == "shopping_list_change" and not item.get("verified_after"):
-                return "WAITING", "write_readback_missing"
-            if item.get("tool") == "workspace_exec" and item.get("exit_code") != 0:
-                return "WAITING", "workspace_command_not_verified"
-        return "COMPLETED", "verified_write_and_explicit_completion"
-
-    successful_reads = [item for item in relevant if item.get("tool") in READ_TOOLS]
-    if successful_reads:
-        if not claim or not claim.get("completed"):
-            return "FAILED", "read_completion_not_claimed"
-        if effect_states and not claim.get("completed"):
-            return "FAILED", "effect_completion_not_claimed"
+    if any(state != "CONFIRMED" for state in states):
+        return "WAITING", "effect_outcome_uncertain"
+    progress = next((item.get("checkpoint") for item in reversed(evidence)
+                     if item.get("kind") == "progress_checkpoint"), None)
+    if progress and progress.get("pending"):
+        return "RUNNING", "authorized_steps_remain"
+    if claim and claim.get("pending"):
+        return "RUNNING", "authorized_steps_remain"
+    if not isinstance(response, str) or not response.strip():
+        return "FAILED", "no_final_model_response"
+    if any(item.get("status") == "error" and not (item.get("uncertain")
+           and str(item.get("effect_id")) in resolved_ids) for item in evidence):
+        return "FAILED", "tool_error_prevents_completion"
+    writes = [item for item in evidence if item.get("tool") in WRITE_TOOLS]
+    writes = [item for item in writes if not (item.get("uncertain")
+              and str(item.get("effect_id")) in resolved_ids)]
+    effects = [item for item in effect_states]
+    if effect_records:
+        effects = [item.get("state") for item in effect_records]
+    if not writes and not effects and _verified_reads(evidence):
         return "COMPLETED", "successful_read_response"
-    if claim and claim.get("completed"):
-        return "COMPLETED", "explicit_response_completion"
-    return "FAILED", "response_has_no_completion_evidence"
+    if not writes and not effects:
+        return "FAILED", "completion_without_verified_outcome"
+    if not claim:
+        return "FAILED", "write_completion_not_claimed"
+    if claim.get("pending") or not claim.get("completed"):
+        return "RUNNING", "authorized_steps_remain"
+    if any(item.get("status") != "ok" or item.get("state") != "CONFIRMED" for item in writes):
+        return "WAITING", "effect_outcome_uncertain"
+    return "COMPLETED", "verified_write_and_explicit_completion"
 
 
-def validate_finalization(finalization: dict, checkpoint: dict, effect_states: list[str]) -> str | None:
-    """Return a rejection reason unless an orchestrator proof justifies completion."""
-    if not isinstance(finalization, dict) or finalization.get("response_nonempty") is not True:
-        return "a nonempty final model response is required"
+def validate_finalization(proof, checkpoint, effects):
+    """Validate gateway-supplied completion against read/write evidence and DB effects."""
+    if not isinstance(proof, dict) or not isinstance(checkpoint, dict) or not isinstance(effects, list):
+        return "completion proof is malformed"
+    if not proof.get("response_nonempty"):
+        return "a nonempty final response is required"
+    evidence = proof.get("tool_evidence")
+    if not isinstance(evidence, list) or not all(isinstance(item, dict) for item in evidence):
+        return "tool evidence is required"
     if checkpoint.get("pending"):
-        return "pending work prevents task completion"
+        return "pending task steps prevent completion"
     if not checkpoint.get("completed"):
-        return "at least one completed step is required"
-    if any(state != "CONFIRMED" for state in effect_states):
-        return "every task effect must be confirmed before completion"
-
-    evidence = finalization.get("tool_evidence")
-    if not isinstance(evidence, list):
-        return "orchestrator tool evidence is required"
-    read_proof = any(
-        isinstance(item, dict)
-        and item.get("tool") in READ_TOOLS
-        and item.get("status") == "ok"
-        for item in evidence
-    )
-    resolved_ids = {
-        item.get("effect_id") for item in evidence
-        if isinstance(item, dict) and item.get("tool") == "commitment_reconcile" and item.get("state") == "CONFIRMED"
-    }
-    write_evidence = []
-    for item in evidence:
-        if (isinstance(item, dict) and item.get("tool") in WRITE_TOOLS
-                and not (item.get("uncertain") and item.get("effect_id") in resolved_ids)):
-            write_evidence.append(item)
-    if finalization.get("completion_claim") is not True:
-        return "a completion claim is required"
-    if effect_states:
-        if len(write_evidence) < len(effect_states):
-            return "each task effect requires corresponding write evidence"
-        if any(item.get("status") != "ok" or item.get("state") != "CONFIRMED" for item in write_evidence):
-            return "write evidence is not confirmed"
-        if any(item.get("tool") == "shopping_list_change" and not item.get("verified_after") for item in write_evidence):
-            return "write read-back evidence is required"
-        if any(item.get("tool") == "workspace_exec" and item.get("exit_code") != 0 for item in write_evidence):
-            return "workspace command evidence is not successful"
-        return None
-    if read_proof:
-        return None
-    if finalization.get("completion_claim"):
-        return None
-    return "a successful read or explicit completion claim is required"
+        return "completed task steps are required"
+    reads = [e for e in evidence if e.get("tool") in READ_TOOLS and e.get("status") == "ok"]
+    writes = [e for e in evidence if e.get("tool") in WRITE_TOOLS]
+    resolved_ids = {str(item.get("effect_id")) for item in evidence
+                    if item.get("tool") == "commitment_reconcile" and item.get("state") == "CONFIRMED"}
+    if any(item.get("status") == "error" and not (item.get("uncertain")
+           and str(item.get("effect_id")) in resolved_ids) for item in evidence):
+        return "tool errors prevent completion"
+    if not writes and not effects:
+        if reads and proof.get("task_type") == "READ_ONLY":
+            return None
+        return "completion requires verified read or write evidence"
+    if proof.get("task_type") != "EFFECTFUL" or proof.get("completion_claim") is not True:
+        return "effectful completion requires an explicit completion claim"
+    if not writes:
+        return "each task effect requires corresponding write evidence"
+    db_by_id = {str(e.get("effect_id")): e for e in effects if e.get("effect_id")}
+    evidence_by_id = {}
+    for item in writes:
+        effect_id = item.get("effect_id")
+        if not effect_id:
+            if item.get("tool") in {"memory_write", "memory_correct"} and not effects and item.get("state") == "CONFIRMED" and item.get("status") == "ok":
+                continue
+            return "write evidence must identify its persisted effect"
+        evidence_by_id.setdefault(str(effect_id), []).append(item)
+    if set(evidence_by_id) != set(db_by_id):
+        return "write evidence must match each persisted effect ID exactly"
+    for effect_id, db_effect in db_by_id.items():
+        if db_effect.get("state") != "CONFIRMED":
+            return "all task effects must be confirmed"
+        valid = False
+        for item in evidence_by_id[effect_id]:
+            kind = db_effect.get("effect_kind")
+            allowed = {
+                "GROCERY_LIST": {"shopping_list_change"},
+                "WORKSPACE_COMMAND": {"workspace_exec"},
+                "EXTERNAL_COMMITMENT": {"commitment_submit", "commitment_reconcile"},
+            }.get(kind, set())
+            if (item.get("tool") in allowed and item.get("status") == "ok"
+                    and item.get("state") == "CONFIRMED"
+                    and (item.get("tool") != "shopping_list_change" or item.get("verified_after") is not None)
+                    and (item.get("tool") != "workspace_exec" or item.get("exit_code") == 0)):
+                valid = True
+        if not valid:
+            return "persisted effect lacks matching verified write evidence"
+    return None

@@ -28,31 +28,28 @@ class CandidateFinalization(unittest.TestCase):
             final = api.finalize_turn("fixture-token-amber", "task-1", result)
         return final, writes
 
-    def test_read_requires_claim_and_successful_read_evidence(self):
-        initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effect_states": []}
+    def test_read_completes_from_verified_evidence_without_model_claim(self):
+        initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}
         result = {
             "text": "The source is unavailable.", "tool_calls": ["infrastructure_read"],
             "tool_evidence": [
-                {"kind": "completion_claim", "checkpoint": {"summary": "Reported source status", "completed": ["read source"], "pending": []}},
                 {"kind": "tool_evidence", "tool": "infrastructure_read", "status": "ok"},
             ],
         }
         final, writes = self.run_finalizer(initial, result)
         self.assertEqual(final["state"], "COMPLETED")
-        self.assertTrue(writes[0]["_orchestrator_finalization"]["completion_claim"])
-        result["tool_evidence"] = [{"kind": "tool_evidence", "tool": "infrastructure_read", "status": "ok"}]
-        final, _ = self.run_finalizer(initial, result)
-        self.assertEqual(final["state"], "FAILED")
+        self.assertFalse(writes[0]["_orchestrator_finalization"]["completion_claim"])
+        self.assertEqual(writes[0]["_orchestrator_finalization"]["task_type"], "READ_ONLY")
 
     def test_http_success_without_completion_evidence_fails_closed(self):
         final, _ = self.run_finalizer(
-            {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effect_states": []},
+            {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []},
             {"text": "A response exists.", "tool_calls": [], "tool_evidence": []},
         )
         self.assertEqual(final["state"], "FAILED")
 
     def test_partial_turn_stays_running_and_waiting_is_preserved(self):
-        initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effect_states": []}
+        initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}
         result = {
             "text": "First step done.", "tool_calls": ["infrastructure_read"],
             "tool_evidence": [
@@ -63,18 +60,18 @@ class CandidateFinalization(unittest.TestCase):
         final, writes = self.run_finalizer(initial, result)
         self.assertEqual(final["state"], "RUNNING")
         self.assertEqual(writes, [])
-        waiting = {"task_id": "task-1", "state": "WAITING", "checkpoint": {}, "effect_states": []}
+        waiting = {"task_id": "task-1", "state": "WAITING", "checkpoint": {}, "effects": []}
         final, writes = self.run_finalizer(waiting, result)
         self.assertEqual(final["state"], "WAITING")
         self.assertEqual(writes, [])
 
     def test_confirmed_write_needs_completion_claim(self):
-        initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effect_states": ["CONFIRMED"]}
+        initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": [{"effect_id": "fx-1", "effect_kind": "GROCERY_LIST", "state": "CONFIRMED"}]}
         result = {
             "text": "Updated and verified.", "tool_calls": ["shopping_list_change"],
             "tool_evidence": [
                 {"kind": "completion_claim", "checkpoint": {"summary": "Read-back matched", "completed": ["change"], "pending": []}},
-                {"kind": "tool_evidence", "tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED", "verified_after": [{"name": "Eggs", "amount": 2}]},
+                {"kind": "tool_evidence", "tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED", "effect_id": "fx-1", "verified_after": [{"name": "Eggs", "amount": 2}]},
             ],
         }
         final, _ = self.run_finalizer(initial, result)

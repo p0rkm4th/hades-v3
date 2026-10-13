@@ -2,113 +2,81 @@ import sys
 import unittest
 from pathlib import Path
 
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from contracts.task_lifecycle import decide_turn_finalization, validate_finalization
 
 
 class TaskLifecycleContract(unittest.TestCase):
-    def test_successful_read_response_completes_with_read_evidence(self):
-        claim = {"completed": ["read source and report result"], "pending": []}
-        state, reason = decide_turn_finalization(
-            "RUNNING", "The source reports unavailable.",
-            [{"tool": "infrastructure_read", "status": "ok"}],
-            claim,
-        )
-        self.assertEqual((state, reason), ("COMPLETED", "successful_read_response"))
-        self.assertEqual(
-            decide_turn_finalization("RUNNING", "The source reports unavailable.", [{"tool": "infrastructure_read", "status": "ok"}], None)[0],
-            "FAILED",
-        )
+    def test_read_only_response_completes_from_verified_read_without_model_claim(self):
+        evidence = [{"tool": "infrastructure_read", "status": "ok"}]
+        self.assertEqual(decide_turn_finalization("RUNNING", "Health is unknown.", evidence, None),
+                         ("COMPLETED", "successful_read_response"))
 
-    def test_successful_write_requires_claim_and_verified_write(self):
-        evidence = [{
-            "tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED",
-            "verified_after": [{"name": "Eggs", "amount": 2}],
-        }]
-        state, reason = decide_turn_finalization("RUNNING", "Updated.", evidence, None)
-        self.assertEqual((state, reason), ("FAILED", "write_completion_not_claimed"))
-        state, reason = decide_turn_finalization(
-            "RUNNING", "Updated.", evidence, {"completed": ["list change verified"], "pending": []},
-        )
-        self.assertEqual((state, reason), ("COMPLETED", "verified_write_and_explicit_completion"))
-        proof = {
-            "response_nonempty": True, "completion_claim": True,
-            "tool_evidence": evidence,
-        }
-        self.assertIsNone(validate_finalization(proof, {"completed": ["change"], "pending": []}, ["CONFIRMED"]))
-        read_only_proof = {
-            "response_nonempty": True, "completion_claim": True,
-            "tool_evidence": [{"tool": "inventory_read", "status": "ok"}],
-        }
-        self.assertIn(
-            "each task effect requires corresponding write evidence",
-            validate_finalization(read_only_proof, {"completed": ["change"], "pending": []}, ["CONFIRMED"]),
-        )
+    def test_claim_without_read_or_write_evidence_is_rejected(self):
+        claim = {"completed": ["answer"], "pending": []}
+        self.assertEqual(decide_turn_finalization("RUNNING", "Done.", [], claim),
+                         ("FAILED", "completion_without_verified_outcome"))
+        self.assertEqual(validate_finalization(
+            {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True, "tool_evidence": []},
+            claim, []), "completion requires verified read or write evidence")
 
-    def test_partial_completion_keeps_authorized_work_running(self):
-        state, reason = decide_turn_finalization(
-            "RUNNING", "The first step is done.",
-            [{"tool": "infrastructure_read", "status": "ok"}],
-            {"completed": ["read source"], "pending": ["verify second source"]},
-        )
-        self.assertEqual((state, reason), ("RUNNING", "authorized_steps_remain"))
+    def test_effectful_completion_requires_explicit_claim_and_matching_identity(self):
+        claim = {"completed": ["write verified"], "pending": []}
+        evidence = [{"tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED",
+                     "effect_id": "effect-a", "verified_after": [{"name": "Eggs", "amount": 2}]}]
+        self.assertEqual(decide_turn_finalization("RUNNING", "Updated.", evidence, None),
+                         ("FAILED", "write_completion_not_claimed"))
+        effect = {"effect_id": "effect-a", "effect_kind": "GROCERY_LIST", "state": "CONFIRMED"}
+        proof = {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True, "tool_evidence": evidence}
+        self.assertIsNone(validate_finalization(proof, claim, [effect]))
 
-    def test_tool_error_and_interruption_do_not_complete(self):
-        state, reason = decide_turn_finalization(
-            "RUNNING", "I could not read it.",
-            [{"tool": "infrastructure_read", "status": "error"}], None,
-        )
-        self.assertEqual((state, reason), ("FAILED", "tool_error_prevents_completion"))
-        self.assertEqual(
-            decide_turn_finalization("RUNNING", None, [], None),
-            ("FAILED", "no_final_model_response"),
-        )
+    def test_wrong_or_missing_effect_id_is_rejected_even_when_counts_match(self):
+        claim = {"completed": ["write"], "pending": []}
+        effect = {"effect_id": "persisted-1", "effect_kind": "GROCERY_LIST", "state": "CONFIRMED"}
+        base = {"tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED",
+                "verified_after": [{"name": "Eggs"}]}
+        for item in (dict(base, effect_id="different"), base):
+            with self.subTest(effect_id=item.get("effect_id")):
+                self.assertEqual(validate_finalization(
+                    {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
+                     "tool_evidence": [item]}, claim, [effect]),
+                    ("write evidence must identify its persisted effect" if not item.get("effect_id") else "write evidence must match each persisted effect ID exactly"))
 
-    def test_approval_and_uncertain_effects_wait_for_resolution(self):
-        self.assertEqual(
-            decide_turn_finalization("RUNNING", "Needs approval.", [{"approval_pending": True}], None)[0],
-            "WAITING",
-        )
-        self.assertEqual(
-            decide_turn_finalization("RUNNING", "Checking outcome.", [{"uncertain": True}], None)[0],
-            "WAITING",
-        )
-        self.assertEqual(
-            decide_turn_finalization("RUNNING", "Done.", [{"tool": "shopping_list_read", "status": "ok"}], None, ["QUARANTINED"])[0],
-            "WAITING",
-        )
+    def test_extra_effect_evidence_and_wrong_tool_are_rejected(self):
+        claim = {"completed": ["write"], "pending": []}
+        effect = {"effect_id": "a", "effect_kind": "GROCERY_LIST", "state": "CONFIRMED"}
+        item = {"tool": "workspace_exec", "status": "ok", "state": "CONFIRMED", "effect_id": "a", "exit_code": 0}
+        proof = {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
+                 "tool_evidence": [item, dict(item, effect_id="extra")]}
+        self.assertEqual(validate_finalization(proof, claim, [effect]), "write evidence must match each persisted effect ID exactly")
+        proof["tool_evidence"] = [item]
+        self.assertEqual(validate_finalization(proof, claim, [effect]), "persisted effect lacks matching verified write evidence")
 
-    def test_existing_terminal_and_waiting_states_are_preserved(self):
+    def test_partial_errors_interruption_and_uncertain_or_approval_states(self):
+        self.assertEqual(decide_turn_finalization("RUNNING", "First done.",
+            [{"kind": "progress_checkpoint", "checkpoint": {"pending": ["second"]}},
+             {"tool": "infrastructure_read", "status": "ok"}], None)[0], "RUNNING")
+        self.assertEqual(decide_turn_finalization("RUNNING", "Failed.", [{"tool": "infrastructure_read", "status": "error"}], None)[0], "FAILED")
+        self.assertEqual(decide_turn_finalization("RUNNING", None, [], None), ("FAILED", "no_final_model_response"))
+        self.assertEqual(decide_turn_finalization("RUNNING", "Need approval.", [{"approval_pending": True}], None)[0], "WAITING")
+        self.assertEqual(decide_turn_finalization("RUNNING", "Unsure.", [{"uncertain": True}], None)[0], "WAITING")
+        self.assertEqual(decide_turn_finalization("RUNNING", "Rejected.", [], None,
+                         effect_records=[{"state": "REJECTED"}]), ("FAILED", "effect_failed"))
+        reconciled = [
+            {"tool": "commitment_submit", "status": "error", "state": "QUARANTINED", "effect_id": "commit-1", "uncertain": True},
+            {"tool": "commitment_reconcile", "status": "ok", "state": "CONFIRMED", "effect_id": "commit-1"},
+        ]
+        self.assertEqual(decide_turn_finalization("RUNNING", "Confirmed.", reconciled,
+                         {"completed": ["commitment confirmed"], "pending": []},
+                         effect_records=[{"state": "CONFIRMED"}]),
+                         ("COMPLETED", "verified_write_and_explicit_completion"))
+
+    def test_existing_states_and_resumed_task(self):
         for state in ("WAITING", "FAILED", "COMPLETED", "CANCELLED"):
-            with self.subTest(state=state):
-                self.assertEqual(
-                    decide_turn_finalization(state, "Done.", [{"tool": "infrastructure_read", "status": "ok"}], None)[0],
-                    state,
-                )
-
-    def test_resumed_task_needs_fresh_evidence_and_completion_claim(self):
-        claim = {"completed": ["second step verified"], "pending": []}
-        self.assertEqual(
-            decide_turn_finalization("RUNNING", "Resumed and checked.", [{"tool": "infrastructure_read", "status": "ok"}], claim, ["CONFIRMED"])[0],
-            "COMPLETED",
-        )
-        self.assertEqual(
-            decide_turn_finalization("RUNNING", "Still checking.", [], claim, ["QUARANTINED"])[0],
-            "WAITING",
-        )
-
-    def test_gateway_completion_requires_orchestrator_evidence(self):
-        reason = validate_finalization(
-            {"response_nonempty": True, "tool_evidence": []},
-            {"completed": ["read"], "pending": []}, [],
-        )
-        self.assertEqual(reason, "a completion claim is required")
-        proof = {
-            "response_nonempty": True, "completion_claim": True,
-            "tool_evidence": [{"tool": "infrastructure_read", "status": "ok"}],
-        }
-        self.assertIsNone(validate_finalization(proof, {"completed": ["read"], "pending": []}, []))
+            self.assertEqual(decide_turn_finalization(state, "Done.", [{"tool": "infrastructure_read", "status": "ok"}], None)[0], state)
+        self.assertEqual(decide_turn_finalization("RUNNING", "Resumed.",
+            [{"tool": "infrastructure_read", "status": "ok"}], None), ("COMPLETED", "successful_read_response"))
+        self.assertEqual(decide_turn_finalization("RUNNING", "Done.", [], None, ["QUARANTINED"])[0], "WAITING")
 
 
 if __name__ == "__main__":

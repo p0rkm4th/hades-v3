@@ -55,6 +55,14 @@ class GatewayIntegration(unittest.TestCase):
 
         status, amber_list = call("GET", "/v1/shopping-list", AMBER)
         self.assertEqual(status, 200)
+        if {item["name"] for item in amber_list["items"]} != {"Milk", "Oats"}:
+            status, reset = call("POST", "/v1/shopping-list/changes", AMBER, {
+                "remove": [item["name"] for item in amber_list["items"]],
+                "add": [{"name": "Milk", "amount": 1}, {"name": "Oats", "amount": 1}],
+            })
+            self.assertEqual(status, 200, reset)
+            status, amber_list = call("GET", "/v1/shopping-list", AMBER)
+            self.assertEqual(status, 200)
         self.assertEqual({item["name"] for item in amber_list["items"]}, {"Milk", "Oats"})
         status, cobalt_list = call("GET", "/v1/shopping-list", COBALT)
         self.assertEqual(status, 200)
@@ -145,7 +153,7 @@ class GatewayIntegration(unittest.TestCase):
         })
         self.assertEqual(status, 403)
         proof = {
-            "response_nonempty": True, "completion_claim": True,
+            "task_type": "READ_ONLY", "response_nonempty": True, "completion_claim": False,
             "tool_evidence": [{"tool": "infrastructure_read", "status": "ok"}],
         }
         status, forged_read = call("POST", f"/v1/tasks/{read_task['task_id']}/checkpoint", AMBER, {
@@ -162,6 +170,15 @@ class GatewayIntegration(unittest.TestCase):
         }, orchestrator=True)
         self.assertEqual(status, 200, completed_read)
         self.assertEqual(completed_read["state"], "COMPLETED")
+        status, empty_proof_task = call("POST", "/v1/tasks", AMBER, {"goal": "reject unsupported completion evidence"})
+        self.assertEqual(status, 201)
+        status, rejected_empty_proof = call("POST", f"/v1/tasks/{empty_proof_task['task_id']}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": {"summary": "Unsupported", "completed": ["answer"], "pending": []},
+            "_orchestrator_finalization": {"task_type": "EFFECTFUL", "response_nonempty": True,
+                                           "completion_claim": True, "tool_evidence": []},
+        }, orchestrator=True)
+        self.assertEqual(status, 409)
+        self.assertIn("verified read or write evidence", rejected_empty_proof["error"])
         status, rejected = call("POST", f"/v1/tasks/{read_task['task_id']}/checkpoint", AMBER, {
             "state": "FAILED", "checkpoint": {
                 "summary": "Should not overwrite terminal", "completed": [], "pending": []
@@ -238,6 +255,20 @@ class GatewayIntegration(unittest.TestCase):
         expected = {"Oats": 1, "Rice": 1, "Eggs": 2}
         actual = {item["name"]: item["amount"] for item in changed["verified_after"]}
         self.assertEqual(actual, expected)
+        status, wrong_effect_proof = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": {
+                "summary": "Wrong effect proof", "completed": ["list read-back matched"], "pending": []
+            },
+            "_orchestrator_finalization": {
+                "task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
+                "tool_evidence": [{
+                    "tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED",
+                    "effect_id": "00000000-0000-0000-0000-000000000000", "verified_after": changed["verified_after"],
+                }],
+            },
+        }, orchestrator=True)
+        self.assertEqual(status, 409)
+        self.assertIn("effect ID exactly", wrong_effect_proof["error"])
         status, still_running = call("GET", f"/v1/tasks/{task_id}", AMBER)
         self.assertEqual(still_running["state"], "RUNNING")
         status, no_http_shortcut = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
@@ -249,10 +280,10 @@ class GatewayIntegration(unittest.TestCase):
                 "summary": "Compound list change verified", "completed": ["list read-back matched"], "pending": []
             },
             "_orchestrator_finalization": {
-                "response_nonempty": True, "completion_claim": True,
+                "task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
                 "tool_evidence": [{
                     "tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED",
-                    "verified_after": changed["verified_after"],
+                    "effect_id": changed["effect_id"], "verified_after": changed["verified_after"],
                 }],
             },
         }, orchestrator=True)
