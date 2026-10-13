@@ -41,6 +41,84 @@ class CandidateFinalization(unittest.TestCase):
         self.assertFalse(writes[0]["_orchestrator_finalization"]["completion_claim"])
         self.assertEqual(writes[0]["_orchestrator_finalization"]["task_type"], "READ_ONLY")
 
+    def test_read_then_provider_http_400_fails_instead_of_completing(self):
+        result = {
+            "text": "", "provider_error": "upstream_http_400", "tool_calls": ["infrastructure_read"],
+            "tool_evidence": [{"kind": "tool_evidence", "tool": "infrastructure_read", "status": "ok"}],
+        }
+        final, writes = self.run_finalizer(
+            {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}, result,
+        )
+        self.assertEqual(final["state"], "FAILED")
+        self.assertEqual(writes[0]["checkpoint"]["candidate_turn"]["error_type"], "model_generation_failed")
+
+    def test_read_then_generation_budget_exhaustion_fails(self):
+        result = {
+            "text": "I read the source.", "provider_error": "generation_budget_exhausted",
+            "tool_calls": ["infrastructure_read"],
+            "tool_evidence": [{"kind": "tool_evidence", "tool": "infrastructure_read", "status": "ok"}],
+        }
+        final, _ = self.run_finalizer(
+            {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}, result,
+        )
+        self.assertEqual(final["state"], "FAILED")
+
+    def test_memory_write_followed_by_provider_failure_stays_waiting(self):
+        result = {
+            "text": "", "provider_error": "upstream_http_400", "tool_calls": ["memory_write"],
+            "tool_evidence": [{"kind": "tool_evidence", "tool": "memory_write", "status": "ok",
+                               "state": "CONFIRMED", "memory_key": "preference"}],
+        }
+        final, writes = self.run_finalizer(
+            {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}, result,
+        )
+        self.assertEqual(final["state"], "WAITING")
+        self.assertEqual(writes[0]["_orchestrator_finalization"]["reason"],
+                         "memory_effect_evidence_unproven")
+
+    def test_hermes_provider_diagnostic_cannot_be_final_answer(self):
+        self.assertTrue(api.provider_diagnostic(
+            "⏱️ The model provider is rate-limiting requests. Please wait and try again."
+        ))
+        self.assertFalse(api.provider_diagnostic(
+            "The synthetic API returned a healthy response with a rate limit header."
+        ))
+        result = {
+            "text": "⏱️ The model provider is rate-limiting requests. Please wait and try again.",
+            "tool_calls": ["infrastructure_read"],
+            "tool_evidence": [{"kind": "tool_evidence", "tool": "infrastructure_read", "status": "ok"}],
+        }
+        final, _ = self.run_finalizer(
+            {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}, result,
+        )
+        self.assertEqual(final["state"], "FAILED")
+
+    def test_read_then_useful_answer_completes_from_trusted_read(self):
+        result = {
+            "text": "The router is fresh and healthy; backup is stale and lab health is unknown.",
+            "tool_calls": ["infrastructure_read"],
+            "tool_evidence": [{"kind": "tool_evidence", "tool": "infrastructure_read", "status": "ok"}],
+        }
+        final, _ = self.run_finalizer(
+            {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}, result,
+        )
+        self.assertEqual(final["state"], "COMPLETED")
+
+    def test_partial_effect_with_superficially_successful_answer_stays_running(self):
+        initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {},
+                   "effects": [{"effect_id": "fx-1", "effect_kind": "GROCERY_LIST", "state": "CONFIRMED"}]}
+        result = {
+            "text": "Done, everything is updated.", "tool_calls": ["shopping_list_change"],
+            "tool_evidence": [
+                {"kind": "progress_checkpoint", "checkpoint": {"completed": ["first change"], "pending": ["second change"]}},
+                {"kind": "tool_evidence", "tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED",
+                 "effect_id": "fx-1", "verified_after": [{"name": "Eggs", "amount": 2}]},
+            ],
+        }
+        final, writes = self.run_finalizer(initial, result)
+        self.assertEqual(final["state"], "RUNNING")
+        self.assertEqual(writes, [])
+
     def test_http_success_without_completion_evidence_fails_closed(self):
         final, _ = self.run_finalizer(
             {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []},

@@ -22,8 +22,9 @@ jobs:
           python -m py_compile experiment/services/gateway.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py
           python -m py_compile experiment/contracts/task_lifecycle.py
           python -m py_compile experiment/services/inference_adapter.py
+          python -m py_compile experiment/services/ollama_protocol.py
           python -m py_compile experiment/scripts/gpu_trial_firewall.py experiment/scripts/seed_cp67_trial_budget.py
-          python -m py_compile experiment/tests/scripted_ollama.py experiment/tests/run_cp68_e2e.py
+          python -m py_compile experiment/tests/scripted_ollama.py experiment/tests/run_cp68_e2e.py experiment/tests/test_ollama_protocol.py
           python -m json.tool experiment/contracts/tools.json >/dev/null
 
       - name: Create ephemeral orchestrator credential
@@ -35,6 +36,9 @@ jobs:
           echo "CP68_PYDANTIC_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
           echo "CP68_HERMES_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
           echo "CP68_LEAN_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
+          echo "CP69_PYDANTIC_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
+          echo "CP69_HERMES_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
+          echo "CP69_LEAN_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
 
       - name: Validate isolated GPU route configuration
         run: HYPNOS_INFERENCE_UPSTREAM=http://hypnos.invalid:11434 docker compose --profile gpu-trial -f experiment/compose.yaml -f experiment/compose.gpu-trial.yaml config --quiet
@@ -59,18 +63,21 @@ jobs:
       - name: Run isolated inference adapter security tests
         run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_inference_adapter.py
 
+      - name: Run native Ollama tool-history protocol tests
+        run: docker compose -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_ollama_protocol.py
+
       - name: Remove disposable services and volumes
         if: always()
         run: docker compose -f experiment/compose.yaml down --volumes --remove-orphans
 
-      - name: Validate isolated CP68 offline profile
-        run: docker compose -p cp68offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml config --quiet
+      - name: Validate isolated CP69 offline profile
+        run: docker compose -p cp69offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml config --quiet
 
-      - name: Run three-harness offline end-to-end qualification
+      - name: Run strict three-harness offline end-to-end qualification
         run: |
-          docker compose -p cp68offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway cp68-scripted-ollama cp68-inference-adapter cp68-hermes-amber cp68-candidate-api
-          docker compose -p cp68offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml run --build --rm cp68-e2e-runner --output /tmp/cp68_offline_e2e.jsonl
+          docker compose -p cp69offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway cp68-scripted-ollama cp68-inference-adapter cp68-hermes-amber cp68-candidate-api
+          docker compose -p cp69offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml run --build --rm cp68-e2e-runner --output /tmp/cp69_offline_e2e.jsonl
 
-      - name: Remove isolated CP68 fixtures and volumes
+      - name: Remove isolated CP69 fixtures and volumes
         if: always()
-        run: docker compose -p cp68offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml down --volumes --remove-orphans
+        run: docker compose -p cp69offline --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml down --volumes --remove-orphans

@@ -1,6 +1,6 @@
 # HADES v3 comparison and qualification matrix
 
-This matrix reflects evidence through CP68. Offline scripted end-to-end success establishes integration capability; the live GPU result is a separate adapter/runtime result. Neither one smoke nor offline fixtures qualify a harness or establish a winner.
+Historical rows preserve evidence through CP68. CP69 results below add strict offline protocol compatibility; they do not erase or rescore the CP67/CP68 live GPU failures. Offline scripted success establishes integration behavior under a deterministic model peer; it does not qualify a harness or establish a winner.
 
 | Capability | Pydantic AI (A) | Reduced Hermes (B) | Lean loop (C) | Evidence / remaining gap |
 |---|---|---|---|---|
@@ -21,4 +21,23 @@ This matrix reflects evidence through CP68. Offline scripted end-to-end success 
 
 CP68 proves all three real harness integrations can complete a trusted tool lifecycle offline. On the live GPU endpoint, each selected the correct tool, but a shared follow-up request incompatibility prevented useful completion. Preserve both outcomes; do not rank A, B, or C. The exact upstream compatibility defect remains unproven. Further GPU traffic requires new owner authorization. ADR-010 remains NOT READY, and production implementation remains unauthorized.
 
-The next corrective experiment is offline validation of the exact post-tool Ollama conversation schema and retry/error behavior across all three runtimes. After that gate, prioritize crash recovery, memory continuity, compound operations, and protected actions. Any live GPU requalification requires fresh authorization and the same endpoint/configuration for all candidates.
+The CP69 strict-peer gate is complete. The next proposed step is the separately authorized CP70 live requalification; after that gate, prioritize crash recovery, memory continuity, compound operations, and protected-action comparisons.
+
+## CP69 strict offline compatibility and lifecycle matrix
+
+| Dimension | Pydantic AI (A) | Reduced Hermes (B) | Lean loop (C) | Common evidence / limit |
+|---|---|---|---|---|
+| Native Ollama protocol | 3/3 strict-peer histories and tool schemas valid | 3/3 valid through actual streaming/MCP | 3/3 valid | Independent strict peer validates native argument objects, tool names/IDs, sequence, roles, and tool declarations. Reconstructed OpenAI-shaped history is rejected. |
+| Tool selection and execution | 3/3 exact `infrastructure_read` | 3/3 exact MCP `infrastructure_read`, via `tool_search` then `tool_call` | 3/3 exact `infrastructure_read` | One fixed synthetic read contract and authenticated gateway. |
+| End-to-end completion | 3/3 | 3/3 | 3/3 | Two generations A/C; three B. No unexplained or auxiliary requests. |
+| Semantic answer / independent oracle | 3/3 fixture states and uncertainty represented | 3/3 fixture states and uncertainty represented | 3/3 fixture states and uncertainty represented | Deterministic scripted peer answer is not evidence of live model semantic capability. |
+| Task/effect integrity | 3/3 durable `COMPLETED`, zero effects | 3/3 durable `COMPLETED`, zero effects | 3/3 durable `COMPLETED`, zero effects | Zero memory changes and no lingering RUNNING tasks. Provider failures and diagnostic final messages fail closed; memory writes remain WAITING absent task-linked durable effect evidence. |
+| Runtime/provider failure paths | Shared lifecycle and adapter tests | Provider diagnostic explicitly rejected as final answer | Shared lifecycle and adapter tests | HTTP 400 after read, exhausted budget, timeout, malformed output/history, invalid provider completion, retries, and partial effect state covered by tests. |
+| Latency / resource use | Local scripted peer only | Local scripted peer only | Local scripted peer only | Not comparable to GPU throughput; no Hypnos requests were made during CP69. |
+| Implementation complexity | One Pydantic profile capability override to avoid unsupported `strict` extension | Existing actual Hermes MCP/streaming integration | Existing small loop | Shared adapter performs protocol mapping. No prompt tuning. |
+
+### CP69 protocol diagnosis and limits
+
+The adapter's previous raw pass-through preserved OpenAI tool-history syntax (`type:function`, stringified arguments, and tool results without native `tool_name`) for Ollama's native `/api/chat`. CP69 reproduces the schema rejection with an independent strict local peer and verifies the common adapter translation fixes it for all actual candidates. CP68 upstream HTTP 400 bodies were not retained and a local Ollama runtime was unavailable; the compatibility fault is strongly supported by reconstructed traces and the strict peer, while the exact historical upstream diagnostic remains unconfirmed. Do not change the historical CP68 classification to a proven exact error.
+
+Protocol compatibility, harness execution, model capability, durable lifecycle correctness, and semantic answer quality remain separate axes. CP69 is a strict offline integration pass only. There has been no CP70 live requalification or new GPU authorization; ADR-010 remains NOT READY.

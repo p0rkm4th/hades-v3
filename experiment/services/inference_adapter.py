@@ -9,6 +9,10 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
+try:
+    from ollama_protocol import ProtocolError, translate_messages, translate_tools
+except ModuleNotFoundError:
+    from services.ollama_protocol import ProtocolError, translate_messages, translate_tools
 
 UPSTREAM = os.environ.get("OLLAMA_UPSTREAM", "http://ollama.invalid:11434").rstrip("/")
 MODEL = os.environ.get("MODEL_ID", "gemma4:12b")
@@ -101,26 +105,51 @@ _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedire
 
 def convert_response(value):
     message = value.get("message") or {}
+    if (not isinstance(message, dict) or message.get("role", "assistant") != "assistant"
+            or set(message) - {"role", "content", "thinking", "tool_calls"}):
+        raise ProtocolError("upstream assistant message contains unsupported native fields")
+    content = message.get("content") or ""
+    if not isinstance(content, str):
+        raise ProtocolError("upstream assistant content must be a string")
     calls = []
-    for tool in message.get("tool_calls") or []:
+    native_calls = message.get("tool_calls") or []
+    if not isinstance(native_calls, list):
+        raise ProtocolError("upstream tool_calls must be an array")
+    used_ids = set()
+    for tool in native_calls:
+        if not isinstance(tool, dict) or set(tool) - {"id", "function"}:
+            raise ProtocolError("upstream tool call contains unsupported native fields")
         function = tool.get("function") or {}
-        args = function.get("arguments") or {}
-        calls.append({"id": "call_" + uuid.uuid4().hex, "type": "function", "function": {
+        args = function.get("arguments")
+        if (not isinstance(function, dict) or set(function) - {"name", "arguments", "index"}
+                or not isinstance(function.get("name"), str) or not function["name"]
+                or not isinstance(args, dict)):
+            raise ProtocolError("upstream tool call does not match Ollama's native response schema")
+        call_id = tool.get("id") or "call_" + uuid.uuid4().hex
+        if not isinstance(call_id, str) or not call_id or call_id in used_ids:
+            raise ProtocolError("upstream tool call IDs must be unique nonempty strings")
+        used_ids.add(call_id)
+        calls.append({"id": call_id, "type": "function", "function": {
             "name": function.get("name", ""),
-            "arguments": args if isinstance(args, str) else json.dumps(args, separators=(",", ":")),
+            "arguments": json.dumps(args, separators=(",", ":")),
         }})
-    return {
+    result = {
         "id": "chatcmpl-" + uuid.uuid4().hex,
         "object": "chat.completion",
         "created": int(time.time()),
         "model": MODEL,
-        "choices": [{"index": 0, "message": {"role": "assistant", "content": message.get("content") or "",
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": content,
                       **({"tool_calls": calls} if calls else {})},
                       "finish_reason": "tool_calls" if calls else "stop"}],
         "usage": {"prompt_tokens": int(value.get("prompt_eval_count") or 0),
                   "completion_tokens": int(value.get("eval_count") or 0),
                   "total_tokens": int(value.get("prompt_eval_count") or 0) + int(value.get("eval_count") or 0)},
     }
+    if message.get("thinking"):
+        if not isinstance(message["thinking"], str):
+            raise ProtocolError("upstream thinking field must be a string")
+        result["choices"][0]["message"]["reasoning_content"] = message["thinking"]
+    return result
 
 
 def generation_metrics(value):
@@ -205,13 +234,17 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(messages, list) or not messages or any(not isinstance(m, dict) for m in messages):
             self.reject(harness, "messages")
             return self.send_json(400, {"error": "messages array required"})
-        payload = {"model": MODEL, "messages": messages, "stream": False,
+        try:
+            native_messages = translate_messages(messages)
+            native_tools = translate_tools(request.get("tools"))
+        except ProtocolError as exc:
+            _attempt_event(harness or "unknown", None, "rejected_before_reservation",
+                           reason="invalid_openai_chat_contract", diagnostic=str(exc))
+            return self.send_json(400, {"error": "invalid chat history", "detail": str(exc)})
+        payload = {"model": MODEL, "messages": native_messages, "stream": False,
                    "options": {"num_ctx": 65536, "temperature": 0, "num_predict": 1024}}
-        if request.get("tools") is not None:
-            if not isinstance(request["tools"], list):
-                self.reject(harness, "tools")
-                return self.send_json(400, {"error": "tools must be an array"})
-            payload["tools"] = request["tools"]
+        if native_tools is not None:
+            payload["tools"] = native_tools
         token = authorization.removeprefix("Bearer ")
         try:
             upstream = urlsplit(UPSTREAM)
@@ -262,13 +295,20 @@ class Handler(BaseHTTPRequestHandler):
                 _attempt_event(harness, generation_number, "invalid_upstream_response", attempt_id=attempt_id,
                                latency_ms=round((time.monotonic() - started) * 1000))
                 return self.send_json(502, {"error": "invalid upstream response"})
-            metrics = generation_metrics(value)
+            try:
+                completion = convert_response(value)
+                metrics = generation_metrics(value)
+            except (ProtocolError, TypeError, ValueError):
+                _attempt_event(harness, generation_number, "invalid_upstream_response", attempt_id=attempt_id,
+                               latency_ms=round((time.monotonic() - started) * 1000),
+                               reason="native_response_schema")
+                return self.send_json(502, {"error": "invalid upstream response"})
             _attempt_event(harness, generation_number, "generation_succeeded", attempt_id=attempt_id,
                            latency_ms=round((time.monotonic() - started) * 1000), metrics=metrics,
                            tool_names=[c.get("function", {}).get("name") for c in value["message"].get("tool_calls", [])])
             if streaming:
-                return self.send_stream(convert_response(value), request.get("stream_options"))
-            return self.send_json(200, convert_response(value))
+                return self.send_stream(completion, request.get("stream_options"))
+            return self.send_json(200, completion)
         finally:
             _slots.release()
 

@@ -39,6 +39,9 @@ class TaskLifecycleContract(unittest.TestCase):
             {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
              "tool_evidence": evidence}, claim, []),
             "memory write completion is unproven without a task-linked durable effect record")
+        self.assertEqual(decide_turn_finalization(
+            "RUNNING", "provider failed", evidence, claim, turn_error="upstream_http_400"),
+            ("WAITING", "memory_effect_evidence_unproven"))
 
     def test_wrong_or_missing_effect_id_is_rejected_even_when_counts_match(self):
         claim = {"completed": ["write"], "pending": []}
@@ -66,6 +69,10 @@ class TaskLifecycleContract(unittest.TestCase):
         self.assertEqual(decide_turn_finalization("RUNNING", "First done.",
             [{"kind": "progress_checkpoint", "checkpoint": {"pending": ["second"]}},
              {"tool": "infrastructure_read", "status": "ok"}], None)[0], "RUNNING")
+        self.assertEqual(decide_turn_finalization("RUNNING", "provider failed",
+            [{"kind": "progress_checkpoint", "checkpoint": {"pending": ["second"]}},
+             {"tool": "infrastructure_read", "status": "ok"}], None,
+            turn_error="upstream_http_400"), ("RUNNING", "authorized_steps_remain"))
         self.assertEqual(decide_turn_finalization("RUNNING", "Failed.", [{"tool": "infrastructure_read", "status": "error"}], None)[0], "FAILED")
         self.assertEqual(decide_turn_finalization("RUNNING", None, [], None), ("FAILED", "no_final_model_response"))
         self.assertEqual(decide_turn_finalization("RUNNING", "Need approval.", [{"approval_pending": True}], None)[0], "WAITING")

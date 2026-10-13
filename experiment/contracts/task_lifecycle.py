@@ -15,7 +15,8 @@ def _verified_reads(evidence):
     return any(item.get("tool") in READ_TOOLS and item.get("status") == "ok" for item in evidence)
 
 
-def decide_turn_finalization(current_state, response, evidence, claim, effect_states=None, effect_records=None):
+def decide_turn_finalization(current_state, response, evidence, claim, effect_states=None, effect_records=None,
+                            turn_error=None):
     """Decide state from observed work, preserving externally meaningful states."""
     if current_state != "RUNNING":
         return current_state, "existing_state_preserved"
@@ -41,19 +42,20 @@ def decide_turn_finalization(current_state, response, evidence, claim, effect_st
         return "RUNNING", "authorized_steps_remain"
     if claim and claim.get("pending"):
         return "RUNNING", "authorized_steps_remain"
+    writes = [item for item in evidence if item.get("tool") in WRITE_TOOLS]
+    if any(item.get("tool") in MEMORY_WRITES for item in writes):
+        # Memory effects lack a task-linked durable record, so a later provider
+        # failure cannot establish whether the requested memory change is safe to retry.
+        return "WAITING", "memory_effect_evidence_unproven"
+    if turn_error:
+        return "FAILED", "model_generation_failed"
     if not isinstance(response, str) or not response.strip():
         return "FAILED", "no_final_model_response"
     if any(item.get("status") == "error" and not (item.get("uncertain")
            and str(item.get("effect_id")) in resolved_ids) for item in evidence):
         return "FAILED", "tool_error_prevents_completion"
-    writes = [item for item in evidence if item.get("tool") in WRITE_TOOLS]
     writes = [item for item in writes if not (item.get("uncertain")
               and str(item.get("effect_id")) in resolved_ids)]
-    if any(item.get("tool") in MEMORY_WRITES for item in writes):
-        # The current memory table stores only canonical state. It has no task-linked
-        # durable effect record, so a successful HTTP response is not enough to
-        # establish which task caused the change or independently verify it later.
-        return "WAITING", "memory_effect_evidence_unproven"
     effects = [item for item in effect_states]
     if effect_records:
         effects = [item.get("state") for item in effect_records]

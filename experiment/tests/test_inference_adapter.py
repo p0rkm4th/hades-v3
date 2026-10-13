@@ -36,6 +36,11 @@ class FakeOllama(BaseHTTPRequestHandler):
             self.send_response(503); self.send_header("Content-Length", "0"); self.end_headers(); return
         if marker == "TEST_MALFORMED":
             data = b"not-json"; self.send_response(200); self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data); return
+        if marker == "TEST_INVALID_TOOL_OUTPUT":
+            value = {"message": {"role": "assistant", "content": "", "tool_calls": [
+                {"function": {"name": "inventory_read", "arguments": ["not", "an", "object"]}}
+            ]}}
+            data = json.dumps(value).encode(); self.send_response(200); self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data); return
         if marker == "TEST_TIMEOUT":
             time.sleep(0.1)
             data = b"{}"; self.send_response(200); self.send_header("Content-Length", str(len(data))); self.end_headers()
@@ -117,6 +122,51 @@ class AdapterIsolation(unittest.TestCase):
             "eval_duration": 2_000_000_000}), {
                 "prompt_tokens": 17, "completion_tokens": 4, "prompt_eval_ms": 1000.0,
                 "generation_ms": 2000.0, "generation_tokens_per_second": 2.0})
+
+    def test_complete_openai_tool_exchange_is_translated_before_native_dispatch(self):
+        history = [
+            {"role": "system", "content": "Use only authorized fixtures."},
+            {"role": "user", "content": "Read the router."},
+            {"role": "assistant", "content": None, "tool_calls": [{
+                "id": "call-native", "type": "function",
+                "function": {"name": "infrastructure_read", "arguments": "{\"scope\":\"synthetic\"}"},
+            }]},
+            {"role": "tool", "tool_call_id": "call-native", "content": "trusted gateway result"},
+        ]
+        tools = [{"type": "function", "function": {
+            "name": "infrastructure_read", "description": "read fixture",
+            "parameters": {"type": "object", "properties": {}}, "strict": False,
+        }}]
+        before = len(seen)
+        status, _ = request(self.base, "/v1/chat/completions", "POST", {
+            "model": adapter.MODEL, "messages": history, "tools": tools,
+        }, token=TEST_KEYS["lean"])
+        self.assertEqual(status, 200)
+        native = seen[before][1]
+        self.assertEqual(native["messages"][2]["tool_calls"][0]["function"]["arguments"], {"scope": "synthetic"})
+        self.assertNotIn("type", native["messages"][2]["tool_calls"][0])
+        self.assertEqual(native["messages"][3], {
+            "role": "tool", "content": "trusted gateway result",
+            "tool_call_id": "call-native", "tool_name": "infrastructure_read",
+        })
+        self.assertNotIn("strict", native["tools"][0]["function"])
+        self.assertEqual(native["messages"][1]["content"], "Read the router.")
+
+    def test_malformed_tool_history_is_rejected_before_reservation_or_dispatch(self):
+        before = len(seen)
+        body = {"model": adapter.MODEL, "messages": [
+            {"role": "user", "content": "read"},
+            {"role": "assistant", "content": "", "tool_calls": [{
+                "id": "call-bad", "type": "function",
+                "function": {"name": "infrastructure_read", "arguments": "not-json"},
+            }]},
+            {"role": "tool", "tool_call_id": "call-bad", "content": "result"},
+        ]}
+        status, response = request(self.base, "/v1/chat/completions", "POST", body, token=TEST_KEYS["lean"])
+        self.assertEqual(status, 400)
+        self.assertEqual(response["error"], "invalid chat history")
+        self.assertEqual(len(seen), before)
+        self.assertEqual(adapter._generation_counts["lean"], 0)
 
     def test_streaming_tool_call_translation(self):
         before = len(seen)
@@ -224,6 +274,20 @@ class AdapterIsolation(unittest.TestCase):
             self.assertIn("dispatch_started", statuses)
             self.assertIn(expected_event, statuses)
         self.assertEqual(adapter._generation_counts["pydantic"], 3)
+
+    def test_invalid_native_tool_output_is_not_recorded_as_a_successful_generation(self):
+        events = []
+        with patch.object(adapter, "_attempt_event",
+                          side_effect=lambda *args, **kwargs: events.append((args, kwargs))), \
+             patch.object(adapter, "MAX_GENERATIONS_PER_HARNESS", 3):
+            status, response = request(self.base, "/v1/chat/completions", "POST", {
+                "model": adapter.MODEL, "messages": [{"role": "user", "content": "TEST_INVALID_TOOL_OUTPUT"}],
+            }, token=TEST_KEYS["lean"])
+        self.assertEqual(status, 502)
+        self.assertEqual(response["error"], "invalid upstream response")
+        statuses = [event[0][2] for event in events]
+        self.assertEqual(statuses, ["reserved", "dispatch_started", "invalid_upstream_response"])
+        self.assertEqual(adapter._generation_counts["lean"], 1)
 
     def test_generation_budget_survives_adapter_process_reload(self):
         old_path, old_counts, old_deadline = adapter._state_path, adapter._generation_counts, adapter._deadline_epoch

@@ -1,4 +1,4 @@
-"""Run three repeated full-runtime CP68 trials against the scripted Ollama peer."""
+"""Run three repeated full-runtime CP69 trials against the strict Ollama peer."""
 from __future__ import annotations
 
 import hashlib
@@ -101,7 +101,8 @@ def main():
             own = [attempt for attempt in attempts if attempt["harness"] == harness]
             expected_stages = (["tool_search", "tool_dispatch", "answer"] if candidate == "hermes"
                                else ["tool_request", "answer"])
-            check(1 <= len(own) <= 3, f"{candidate} trial {repetition} used {len(own)} model generations")
+            check(len(own) == len(expected_stages),
+                  f"{candidate} trial {repetition} used unexplained model generations: {len(own)}")
             check([attempt["stage"] for attempt in own] == expected_stages,
                   f"{candidate} trial {repetition} generation stages were {[a['stage'] for a in own]!r}")
             first_tools = own[0]["available_tools"]
@@ -110,6 +111,10 @@ def main():
                   f"{candidate} trial {repetition} model lacked the expected tool")
             check(all(attempt.get("configuration_matches") is True for attempt in own),
                   f"{candidate} trial {repetition} inference configuration drifted")
+            check(all(attempt.get("native_history_valid") is True for attempt in own),
+                  f"{candidate} trial {repetition} emitted non-native Ollama tool history")
+            check(all(attempt.get("native_tools_valid") is True for attempt in own),
+                  f"{candidate} trial {repetition} emitted non-native Ollama tool declarations")
             observation_generation = own[-1]
             check(observation_generation["genuine_observation_received"] is True,
                   f"{candidate} trial {repetition} final generation did not receive the gateway observation")
@@ -128,12 +133,16 @@ def main():
                 "model": "cp68-scripted-model", "effective_context": 65536,
                 "temperature": 0, "max_output_tokens": 1024,
                 "usage": response.get("usage"),
+                "protocol_peer": "strict-native-ollama",
+                "native_history_valid": all(attempt.get("native_history_valid") is True for attempt in own),
+                "native_tools_valid": all(attempt.get("native_tools_valid") is True for attempt in own),
+                "stages": [attempt["stage"] for attempt in own],
             })
             print(json.dumps(results[-1], sort_keys=True), flush=True)
 
     check(memory_counts() == memory_before, "synthetic memory rows changed during read-only trials")
     check(len(results) == args.repetitions * len(cases), "not all requested trial records completed")
-    print(json.dumps({"checkpoint": "CP68_OFFLINE_E2E", "trials": len(results),
+    print(json.dumps({"checkpoint": "CP69_OFFLINE_E2E", "trials": len(results),
                       "candidates": {candidate: args.repetitions for candidate, _ in cases},
                       "all_completed": True, "memory_rows_unchanged": True}, sort_keys=True), flush=True)
     if args.output:
@@ -141,7 +150,7 @@ def main():
         with args.output.open("w", encoding="utf-8") as output:
             for result in results:
                 output.write(json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n")
-            output.write(json.dumps({"checkpoint": "CP68_OFFLINE_E2E", "trials": len(results),
+            output.write(json.dumps({"checkpoint": "CP69_OFFLINE_E2E", "trials": len(results),
                                      "candidates": {candidate: args.repetitions for candidate, _ in cases},
                                      "all_completed": True, "memory_rows_unchanged": True},
                                     sort_keys=True, separators=(",", ":")) + "\n")
