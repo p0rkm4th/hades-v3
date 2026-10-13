@@ -20,7 +20,11 @@ jobs:
       - name: Validate Python and tool contract
         run: |
           python -m py_compile experiment/services/gateway.py experiment/candidates/api.py
+          python -m py_compile experiment/contracts/task_lifecycle.py
           python -m json.tool experiment/contracts/tools.json >/dev/null
+
+      - name: Create ephemeral orchestrator credential
+        run: echo "ORCHESTRATOR_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" >> "$GITHUB_ENV"
 
       - name: Start disposable fixtures
         run: docker compose -f experiment/compose.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway
