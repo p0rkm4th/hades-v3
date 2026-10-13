@@ -8,8 +8,11 @@ import uuid
 from pathlib import Path
 
 
+from compose_scope import compose_command
+
+
 ROOT = Path(__file__).resolve().parents[2]
-COMPOSE = ["docker", "compose", "-f", "experiment/compose.yaml"]
+COMPOSE = compose_command("experiment/compose.yaml")
 KEY = "deployment_note_heading_order"
 SEED = "service name, change, rollout status"
 UPDATED = "change, service name, rollout status"
