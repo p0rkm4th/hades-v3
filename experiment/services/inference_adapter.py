@@ -27,11 +27,11 @@ if any(_harness_keys.values()) and (any(not value for value in _harness_keys.val
     raise RuntimeError("CP67 harness keys must all be set and unique")
 _harness_tokens = {key: harness for harness, key in _harness_keys.items() if key}
 _generation_counts = {name: 0 for name in _harness_tokens.values()}
-TRIAL_SECONDS = 900
+TRIAL_SECONDS = int(os.environ.get("TRIAL_SECONDS", "900"))
 _state_path = os.environ.get("TRIAL_STATE_FILE")
 _deadline_epoch = time.time() + TRIAL_SECONDS
-MAX_GENERATIONS_PER_HARNESS = 2
-MAX_GENERATIONS_TOTAL = 6
+MAX_GENERATIONS_PER_HARNESS = int(os.environ.get("MAX_GENERATIONS_PER_HARNESS", "2"))
+MAX_GENERATIONS_TOTAL = int(os.environ.get("MAX_GENERATIONS_TOTAL", "6"))
 
 
 def _load_budget():
@@ -83,6 +83,12 @@ def _reserve_generation(token):
             _generation_counts[harness] -= 1
             return None
         return harness, _generation_counts[harness]
+
+
+def _attempt_event(harness, generation, status, **details):
+    """Emit sanitized lifecycle evidence; never include prompts, arguments, or answers."""
+    event = {"harness": harness, "generation": generation, "status": status, **details}
+    print("inference_attempt " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -145,73 +151,121 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def reject(self, harness, reason):
+        _attempt_event(harness or "unknown", None, "rejected_before_reservation", reason=reason)
+
+    def do_PUT(self):
+        self.reject(_harness_tokens.get(self.headers.get("Authorization", "").removeprefix("Bearer ")), "method")
+        self.send_json(405, {"error": "method not allowed"})
+
+    do_PATCH = do_PUT
+    do_DELETE = do_PUT
+    do_OPTIONS = do_PUT
+
     def do_GET(self):
         if self.path != "/v1/models":
+            self.reject(_harness_tokens.get(self.headers.get("Authorization", "").removeprefix("Bearer ")), "route")
             return self.send_json(404, {"error": "route not allowed"})
         authorization = self.headers.get("Authorization", "")
         token = authorization.removeprefix("Bearer ") if authorization.startswith("Bearer ") else ""
         if token not in _harness_tokens:
+            self.reject("unknown", "authorization")
             return self.send_json(401, {"error": "trial authorization required"})
         return self.send_json(200, {"object": "list", "data": [{"id": MODEL, "object": "model", "owned_by": "ollama"}]})
 
     def do_POST(self):
         if self.path != "/v1/chat/completions":
+            self.reject(_harness_tokens.get(self.headers.get("Authorization", "").removeprefix("Bearer ")), "route")
             return self.send_json(404, {"error": "route not allowed"})
         authorization = self.headers.get("Authorization", "")
         if authorization not in {"Bearer " + token for token in _harness_tokens}:
+            self.reject("unknown", "authorization")
             return self.send_json(401, {"error": "trial authorization required"})
+        harness = _harness_tokens[authorization.removeprefix("Bearer ")]
         length = self.headers.get("Content-Length", "")
         if not length.isdigit() or int(length) > MAX_BODY:
+            self.reject(harness, "body_size")
             return self.send_json(413, {"error": "request body too large or invalid"})
         try:
             request = json.loads(self.rfile.read(int(length)))
         except (json.JSONDecodeError, UnicodeDecodeError):
+            self.reject(harness, "request_json")
             return self.send_json(400, {"error": "invalid JSON"})
         if not isinstance(request, dict) or request.get("model") != MODEL:
+            self.reject(harness, "model")
             return self.send_json(400, {"error": "configured model required"})
         streaming = request.get("stream", False)
         if not isinstance(streaming, bool):
+            self.reject(harness, "stream_flag")
             return self.send_json(400, {"error": "stream must be a boolean"})
         if "upstream" in request or "url" in request or "base_url" in request:
+            self.reject(harness, "destination_override")
             return self.send_json(400, {"error": "destination override is not allowed"})
         messages = request.get("messages")
         if not isinstance(messages, list) or not messages or any(not isinstance(m, dict) for m in messages):
+            self.reject(harness, "messages")
             return self.send_json(400, {"error": "messages array required"})
         payload = {"model": MODEL, "messages": messages, "stream": False,
                    "options": {"num_ctx": 65536, "temperature": 0, "num_predict": 1024}}
         if request.get("tools") is not None:
             if not isinstance(request["tools"], list):
+                self.reject(harness, "tools")
                 return self.send_json(400, {"error": "tools must be an array"})
             payload["tools"] = request["tools"]
         token = authorization.removeprefix("Bearer ")
+        try:
+            upstream = urlsplit(UPSTREAM)
+            valid_upstream = (upstream.scheme == "http" and upstream.hostname and not upstream.username
+                              and not upstream.password and not upstream.query and not upstream.fragment
+                              and upstream.path in ("", "/"))
+        except ValueError:
+            valid_upstream = False
+        if not valid_upstream:
+            self.reject(harness, "fixed_upstream_configuration")
+            return self.send_json(502, {"error": "invalid fixed upstream configuration"})
+        if not _slots.acquire(blocking=False):
+            _attempt_event(harness or "unknown", None, "rejected_before_reservation", reason="capacity")
+            return self.send_json(429, {"error": "inference capacity reached"})
         reservation = _reserve_generation(token)
         if reservation is None:
+            _slots.release()
+            _attempt_event(harness or "unknown", None, "rejected_before_upstream", reason="authorization_time_or_budget")
             return self.send_json(429, {"error": "trial authorization, time, or generation budget exhausted"})
-        harness, generation_number = reservation
-        if not _slots.acquire(blocking=False):
-            return self.send_json(429, {"error": "inference capacity reached"})
         started = time.monotonic()
+        harness, generation_number = reservation
+        attempt_id = uuid.uuid4().hex
+        _attempt_event(harness, generation_number, "reserved", attempt_id=attempt_id)
         try:
-            url = urlsplit(UPSTREAM)
-            if url.scheme != "http" or not url.hostname or url.username or url.password or url.query or url.fragment or url.path not in ("", "/"):
-                return self.send_json(502, {"error": "invalid fixed upstream configuration"})
             req = urllib.request.Request(UPSTREAM + "/api/chat", data=json.dumps(payload).encode(),
-                                         headers={"Content-Type": "application/json"}, method="POST")
+                                         headers={"Content-Type": "application/json",
+                                                  "X-Experiment-Harness": harness}, method="POST")
+            _attempt_event(harness, generation_number, "dispatch_started", attempt_id=attempt_id)
             try:
                 with _opener.open(req, timeout=TIMEOUT) as response:
                     raw = response.read(MAX_BODY + 1)
                     if len(raw) > MAX_BODY:
+                        _attempt_event(harness, generation_number, "upstream_response_rejected",
+                                       attempt_id=attempt_id, reason="response_size",
+                                       latency_ms=round((time.monotonic() - started) * 1000))
                         return self.send_json(502, {"error": "inference response too large"})
                     value = json.loads(raw)
             except urllib.error.HTTPError as exc:
+                _attempt_event(harness, generation_number, "upstream_http_error", attempt_id=attempt_id,
+                               upstream_status=exc.code, latency_ms=round((time.monotonic() - started) * 1000))
                 exc.close()
                 return self.send_json(502, {"error": "fixed inference upstream failed"})
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+                _attempt_event(harness, generation_number, "upstream_outcome_uncertain", attempt_id=attempt_id,
+                               latency_ms=round((time.monotonic() - started) * 1000))
                 return self.send_json(502, {"error": "fixed inference upstream failed"})
             if not isinstance(value, dict) or not isinstance(value.get("message"), dict):
+                _attempt_event(harness, generation_number, "invalid_upstream_response", attempt_id=attempt_id,
+                               latency_ms=round((time.monotonic() - started) * 1000))
                 return self.send_json(502, {"error": "invalid upstream response"})
             metrics = generation_metrics(value)
-            print(f"inference_generation harness={harness} generation={generation_number} status=ok elapsed_ms={round((time.monotonic() - started) * 1000)} metrics={json.dumps(metrics, sort_keys=True, separators=(',', ':'))}", flush=True)
+            _attempt_event(harness, generation_number, "generation_succeeded", attempt_id=attempt_id,
+                           latency_ms=round((time.monotonic() - started) * 1000), metrics=metrics,
+                           tool_names=[c.get("function", {}).get("name") for c in value["message"].get("tool_calls", [])])
             if streaming:
                 return self.send_stream(convert_response(value), request.get("stream_options"))
             return self.send_json(200, convert_response(value))
@@ -251,16 +305,6 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             pass
-
-    def do_PUT(self):
-        self.send_json(405, {"error": "method not allowed"})
-
-    def do_DELETE(self):
-        self.send_json(405, {"error": "method not allowed"})
-
-    def do_PATCH(self):
-        self.send_json(405, {"error": "method not allowed"})
-
 
 def main():
     ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("PORT", "8098"))), Handler).serve_forever()

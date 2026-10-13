@@ -247,6 +247,16 @@ services:
       tool-gateway:
         condition: service_healthy
     networks: [operator]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
     restart: "no"
 
   hermes-amber:
@@ -277,6 +287,11 @@ services:
       tool-gateway:
         condition: service_healthy
     networks: [operator]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8642/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
     restart: "no"
 
   hermes-cobalt:
@@ -307,6 +322,11 @@ services:
       tool-gateway:
         condition: service_healthy
     networks: [operator]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8642/health', timeout=2)"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
     restart: "no"
 
   candidate-runner:

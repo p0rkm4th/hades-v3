@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "services"))
@@ -30,7 +31,20 @@ class FakeOllama(BaseHTTPRequestHandler):
         seen.append((self.path, body))
         if self.path != "/api/chat":
             self.send_response(404); self.end_headers(); return
-        if body["messages"][-1].get("content") == "TEST_REDIRECT":
+        marker = body["messages"][-1].get("content")
+        if marker == "TEST_HTTP_503":
+            self.send_response(503); self.send_header("Content-Length", "0"); self.end_headers(); return
+        if marker == "TEST_MALFORMED":
+            data = b"not-json"; self.send_response(200); self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data); return
+        if marker == "TEST_TIMEOUT":
+            time.sleep(0.1)
+            data = b"{}"; self.send_response(200); self.send_header("Content-Length", str(len(data))); self.end_headers()
+            try:
+                self.wfile.write(data)
+            except BrokenPipeError:
+                pass
+            return
+        if marker == "TEST_REDIRECT":
             self.send_response(307); self.send_header("Location", f"http://127.0.0.1:{sink.server_port}/collect"); self.end_headers(); return
         value = {"message": {"role": "assistant", "content": "", "tool_calls": [
             {"function": {"name": "inventory_read", "arguments": {"query": "x"}}}]},
@@ -74,6 +88,9 @@ class AdapterIsolation(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         for server in (cls.server, fake, sink): server.shutdown(); server.server_close()
+
+    def setUp(self):
+        adapter._generation_counts = {harness: 0 for harness in TEST_KEYS}
 
     def test_tool_call_translation_and_forced_inference_configuration(self):
         upstream_before = len(seen)
@@ -138,6 +155,75 @@ class AdapterIsolation(unittest.TestCase):
         for _ in range(2):
             self.assertEqual(adapter._reserve_generation(TEST_KEYS["pydantic"]) is not None, True)
         self.assertIsNone(adapter._reserve_generation(TEST_KEYS["pydantic"]))
+
+    def test_capacity_rejection_does_not_reserve_or_dispatch(self):
+        before_seen = len(seen)
+        with patch.object(adapter._slots, "acquire", return_value=False):
+            status, _ = request(self.base, "/v1/chat/completions", "POST", {
+                "model": adapter.MODEL, "messages": [{"role": "user", "content": "capacity"}],
+            }, token=TEST_KEYS["lean"])
+        self.assertEqual(status, 429)
+        self.assertEqual(adapter._generation_counts["lean"], 0)
+        self.assertEqual(len(seen), before_seen)
+
+    def test_rejections_are_logged_without_reservation_or_request_content(self):
+        before_seen = len(seen)
+        events = []
+        body = {"model": adapter.MODEL, "messages": [{"role": "user", "content": "private prompt"}]}
+        with patch.object(adapter, "_attempt_event",
+                          side_effect=lambda *args, **kwargs: events.append((args, kwargs))):
+            self.assertEqual(request(self.base, "/v1/chat/completions", "POST", body, token="wrong")[0], 401)
+            self.assertEqual(request(self.base, "/api/ps", "GET", token=TEST_KEYS["lean"])[0], 404)
+            self.assertEqual(request(self.base, "/v1/chat/completions", "PUT", body, token=TEST_KEYS["lean"])[0], 405)
+            self.assertEqual(request(self.base, "/v1/chat/completions", "POST",
+                                     {**body, "upstream": "http://invalid"}, token=TEST_KEYS["lean"])[0], 400)
+            old_upstream = adapter.UPSTREAM
+            adapter.UPSTREAM = "http://127.0.0.1:1/not-an-upstream"
+            try:
+                self.assertEqual(request(self.base, "/v1/chat/completions", "POST", body,
+                                         token=TEST_KEYS["lean"])[0], 502)
+            finally:
+                adapter.UPSTREAM = old_upstream
+        events_only = [(event[0][2], event[1].get("reason")) for event in events]
+        self.assertEqual(events_only, [
+            ("rejected_before_reservation", "authorization"),
+            ("rejected_before_reservation", "route"),
+            ("rejected_before_reservation", "method"),
+            ("rejected_before_reservation", "destination_override"),
+            ("rejected_before_reservation", "fixed_upstream_configuration"),
+        ])
+        self.assertEqual(adapter._generation_counts["lean"], 0)
+        self.assertEqual(len(seen), before_seen)
+        self.assertTrue(all("private prompt" not in json.dumps(event) for event in events))
+
+    def test_budget_rejection_does_not_dispatch_upstream(self):
+        before_seen = len(seen)
+        adapter._generation_counts["lean"] = adapter.MAX_GENERATIONS_PER_HARNESS
+        status, _ = request(self.base, "/v1/chat/completions", "POST", {
+            "model": adapter.MODEL, "messages": [{"role": "user", "content": "budget"}],
+        }, token=TEST_KEYS["lean"])
+        self.assertEqual(status, 429)
+        self.assertEqual(len(seen), before_seen)
+
+    def test_dispatched_http_malformed_and_timeout_outcomes_are_distinct(self):
+        for marker, expected_event, timeout in (
+            ("TEST_HTTP_503", "upstream_http_error", None),
+            ("TEST_MALFORMED", "upstream_outcome_uncertain", None),
+            ("TEST_TIMEOUT", "upstream_outcome_uncertain", 0.01),
+        ):
+            events = []
+            with patch.object(adapter, "_attempt_event", side_effect=lambda *args, **kwargs: events.append((args, kwargs))), \
+                 patch.object(adapter, "TIMEOUT", timeout or adapter.TIMEOUT), \
+                 patch.object(adapter, "MAX_GENERATIONS_PER_HARNESS", 3):
+                status, _ = request(self.base, "/v1/chat/completions", "POST", {
+                    "model": adapter.MODEL, "messages": [{"role": "user", "content": marker}],
+                }, token=TEST_KEYS["pydantic"])
+            self.assertEqual(status, 502)
+            statuses = [event[0][2] for event in events]
+            self.assertIn("reserved", statuses)
+            self.assertIn("dispatch_started", statuses)
+            self.assertIn(expected_event, statuses)
+        self.assertEqual(adapter._generation_counts["pydantic"], 3)
 
     def test_generation_budget_survives_adapter_process_reload(self):
         old_path, old_counts, old_deadline = adapter._state_path, adapter._generation_counts, adapter._deadline_epoch

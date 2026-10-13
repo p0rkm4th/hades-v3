@@ -361,7 +361,12 @@ def start_task(token: str, goal: str):
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req, timeout=10) as response:
-        return json.loads(response.read())
+        result = json.loads(response.read())
+    print("task_transition " + json.dumps({
+        "task_id": result.get("task_id"), "state": result.get("state", "RUNNING"),
+        "reason": "task_created",
+    }, sort_keys=True, separators=(",", ":")), flush=True)
+    return result
 
 
 def transition_task(
@@ -392,6 +397,12 @@ def transition_task(
     updated = gateway_call("task_checkpoint", arguments, token, task_id)
     if updated.get("http_status") or updated.get("state") != state:
         raise RuntimeError("task state could not be saved")
+    transition = {"task_id": task_id, "state": state, "resume": resume}
+    if isinstance(finalization, dict) and finalization.get("reason"):
+        transition["reason"] = finalization["reason"]
+    elif error_type:
+        transition["reason"] = error_type
+    print("task_transition " + json.dumps(transition, sort_keys=True, separators=(",", ":")), flush=True)
     return updated
 
 
