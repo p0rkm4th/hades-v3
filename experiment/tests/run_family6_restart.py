@@ -7,8 +7,11 @@ import subprocess
 import time
 from pathlib import Path
 
+from compose_scope import compose_command
+
+
 ROOT = Path(__file__).resolve().parents[2]
-COMPOSE = ["docker", "compose", "-f", "experiment/compose.yaml"]
+COMPOSE = compose_command("experiment/compose.yaml")
 CASES = {"discount": ("discount.py", "1 + percent / 100"),
          "tax_addition": ("tax.py", "1 - rate_percent / 100")}
 

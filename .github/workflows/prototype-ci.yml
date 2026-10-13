@@ -27,7 +27,7 @@ jobs:
           python -m py_compile experiment/services/ollama_protocol.py
           python -m py_compile experiment/scripts/gpu_trial_firewall.py experiment/scripts/seed_cp67_trial_budget.py experiment/tests/test_gpu_trial_firewall.py experiment/tests/test_seed_trial_budget.py
           python -m py_compile experiment/scripts/hypnos_gpu_preflight.py experiment/tests/test_hypnos_gpu_preflight.py
-          python -m py_compile experiment/tests/scripted_ollama.py experiment/tests/run_cp68_e2e.py experiment/tests/test_ollama_protocol.py
+          python -m py_compile experiment/tests/scripted_ollama.py experiment/tests/run_cp68_e2e.py experiment/tests/test_ollama_protocol.py experiment/tests/compose_scope.py experiment/tests/test_compose_scope.py experiment/tests/run_family2_eggs_oats_screen.py experiment/tests/run_family3_cp64_unavailable.py experiment/tests/run_family4_cp60_screen.py experiment/tests/run_family5_workspace_screen.py experiment/tests/run_family6_restart.py experiment/tests/run_family7_denial_screen.py experiment/tests/run_family8_ack_loss_pilot.py
           python -m json.tool experiment/contracts/tools.json >/dev/null
 
       - name: Create ephemeral orchestrator credential
@@ -76,6 +76,9 @@ jobs:
 
       - name: Run native Ollama tool-history protocol tests
         run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_ollama_protocol.py
+
+      - name: Run isolated Compose project-scope tests
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm --no-deps test-runner python /app/tests/test_compose_scope.py
 
       - name: Remove disposable services and volumes
         if: always()

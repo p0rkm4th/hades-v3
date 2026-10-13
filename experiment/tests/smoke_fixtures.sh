@@ -1,7 +1,15 @@
 #!/bin/sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-COMPOSE="docker compose -f $ROOT/experiment/compose.yaml"
+HADES_COMPOSE_PROJECT=${HADES_COMPOSE_PROJECT:-}
+case "$HADES_COMPOSE_PROJECT" in
+  hades-v3-exp-[a-z0-9]*) ;;
+  *) echo "Set HADES_COMPOSE_PROJECT to a unique hades-v3-exp-* project name" >&2; exit 2 ;;
+esac
+case "$HADES_COMPOSE_PROJECT" in
+  *[!a-z0-9-]*) echo "HADES_COMPOSE_PROJECT contains invalid characters" >&2; exit 2 ;;
+esac
+COMPOSE="docker compose -p $HADES_COMPOSE_PROJECT -f $ROOT/experiment/compose.yaml"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 

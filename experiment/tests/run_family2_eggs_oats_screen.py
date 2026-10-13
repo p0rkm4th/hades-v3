@@ -7,8 +7,11 @@ import subprocess
 from pathlib import Path
 
 
+from compose_scope import compose_command
+
+
 ROOT = Path(__file__).resolve().parents[2]
-COMPOSE = ["docker", "compose", "-f", "experiment/compose.yaml"]
+COMPOSE = compose_command("experiment/compose.yaml")
 TOKEN = "fixture-token-amber"
 GATEWAY = "http://tool-gateway:8080"
 PROMPT = "Take Oats off my shopping list, and add two Eggs. What will the list show?"

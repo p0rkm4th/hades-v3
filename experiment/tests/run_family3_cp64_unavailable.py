@@ -7,8 +7,11 @@ import uuid
 import urllib.request
 from pathlib import Path
 
+from compose_scope import compose_command
+
+
 ROOT = Path(__file__).resolve().parents[2]
-COMPOSE = ["docker", "compose", "-p", "hades-v3-lab", "-f", "experiment/compose.yaml"]
+COMPOSE = compose_command("experiment/compose.yaml")
 TOKEN = "fixture-token-amber"
 PROMPT = (
     "Can you report whether synthetic-monitor is healthy right now? "

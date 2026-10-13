@@ -7,8 +7,11 @@ import subprocess
 from pathlib import Path
 
 
+from compose_scope import compose_command
+
+
 ROOT = Path(__file__).resolve().parents[2]
-COMPOSE = ["docker", "compose", "-f", "experiment/compose.yaml"]
+COMPOSE = compose_command("experiment/compose.yaml")
 DETAILS = "Reserve the synthetic appointment slot for Amber at 16:00"
 PROMPT = "Please reserve the appointment slot for tomorrow at 16:00."
 OUTPUT = Path("experiment/results/family8_ack_loss_pilot.jsonl")
