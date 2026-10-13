@@ -1,6 +1,6 @@
-# CP70 — Proposed bounded live GPU requalification
+# CP70 — Bounded live GPU requalification protocol
 
-**Status: proposal only. No live route or inference is authorized by this document.** CP68's live authorization is exhausted. Obtain separate explicit owner authorization before recreating any Hypnos route or sending candidate traffic.
+**Status: owner-authorized single trial attempted; stopped before inference at the runtime-readiness gate.** The owner explicitly authorized this bounded CP70 attempt. The Hypnos Ollama API and approved model could not be verified as available, so no route was created and no model request was sent. This authorization is now exhausted; another live trial requires new owner authorization.
 
 ## Objective
 
