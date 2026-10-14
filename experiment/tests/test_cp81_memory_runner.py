@@ -1,6 +1,6 @@
 import unittest
 
-from run_cp81_memory_case import CASES, answer_matches
+from run_cp81_memory_case import CASES, answer_matches, candidate_error_category
 
 
 class Cp81MemoryAnswerOracleTests(unittest.TestCase):
@@ -16,6 +16,13 @@ class Cp81MemoryAnswerOracleTests(unittest.TestCase):
 
     def test_partial_list_answer_fails(self):
         self.assertFalse(answer_matches("Late afternoon, but not weekdays.", CASES["reminder_list"]))
+
+    def test_candidate_failures_are_sanitized_and_classified(self):
+        self.assertEqual(candidate_error_category(0, {"transport_error_type": "TimeoutError"}), "transport_error")
+        self.assertEqual(candidate_error_category(400, {"error": "private provider detail"}), "http_400")
+        self.assertEqual(candidate_error_category(502, {"error": "provider rejected request"}), "http_502")
+        self.assertEqual(candidate_error_category(200, {"error": "candidate failure"}), "candidate_reported_error")
+        self.assertEqual(candidate_error_category(200, {"invalid_json_response": True}), "invalid_json_response")
 
 
 if __name__ == "__main__":

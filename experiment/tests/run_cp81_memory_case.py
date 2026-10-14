@@ -66,13 +66,18 @@ def request_json(url, token=None, body=None, orchestrator=False, timeout=600):
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.status, json.loads(response.read())
+            try:
+                return response.status, json.loads(response.read())
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return response.status, {"invalid_json_response": True}
     except urllib.error.HTTPError as exc:
         try:
             value = json.loads(exc.read())
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             value = {"error": "non-json error response"}
         return exc.code, value
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return 0, {"transport_error_type": type(exc).__name__}
 
 
 def canonical_row(memory_key):
@@ -102,6 +107,18 @@ def answer_matches(answer, case):
     normalized = answer.casefold()
     return (all(phrase in normalized for phrase in case["answer_phrases"])
             and not any(re.search(pattern, normalized) for pattern in case["answer_negations"]))
+
+
+def candidate_error_category(status, payload):
+    if status == 0:
+        return "transport_error"
+    if payload.get("invalid_json_response"):
+        return "invalid_json_response"
+    if status >= 400:
+        return f"http_{status}"
+    if payload.get("error"):
+        return "candidate_reported_error"
+    return None
 
 
 def run_candidate(candidate, case_name, phase, replicate, task_id=None):
@@ -158,24 +175,26 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
         "messages": [{"role": "user", "content": message}],
         "task_id": task_id,
     })
-    if status != 200:
-        raise RuntimeError(f"candidate turn failed with HTTP {status}")
-    status, final_task = request_json(f"{GATEWAY}/v1/tasks/{task_id}", TOKEN)
-    if status != 200:
-        raise RuntimeError("durable task readback failed")
-    tools = (final_task.get("checkpoint", {}).get("candidate_turn", {}).get("tools", []))
     durable_task, effects = durable_task_and_effects(task_id)
     if durable_task is None:
         raise RuntimeError("independent durable task read failed")
+    checkpoint = durable_task.get("checkpoint") or {}
+    candidate_turn = checkpoint.get("candidate_turn") or {}
+    tools = candidate_turn.get("tools", [])
     output = {
         "candidate": candidate, "case": case_name, "phase": phase,
         "replicate": replicate, "task_id": task_id, "task_state": durable_task.get("state"),
         "source_task_id": source_task_id,
+        "candidate_http_status": status,
+        "candidate_error_category": candidate_error_category(status, result),
+        "task_error_type": candidate_turn.get("error_type"),
+        "task_finalization_reason": (checkpoint.get("task_finalization") or {}).get("reason"),
         "tools": tools, "effect_count": len(effects),
         "effect_ids": [str(effect.get("effect_id")) for effect in effects],
         "canonical_value": None, "canonical_revision": None,
         "model_generations": result.get("model_generations"),
-        "duration_ms": result.get("duration_ms"), "answer": result.get("text", ""),
+        "duration_ms": result.get("duration_ms"),
+        "answer": result.get("text", "") if status == 200 else "",
         "retry_behavior": "gateway exact/changed retry covered separately by database integration test",
     }
     if phase == "correct":
