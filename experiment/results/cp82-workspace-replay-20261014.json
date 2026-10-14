@@ -99,6 +99,7 @@
       "blocks_wrong_task_or_terminal_task": true,
       "blocks_waiting_owner_action_state": true,
       "repeated_resume_no_duplicate": true,
+      "enforced_inside_restarted_test_worker_before_continue_run": true,
       "task_state": "RUNNING",
       "step_persistence_original_row": "started; test-only coordinator rechecks canonical HADES state each time",
       "general_runtime_integration": false
