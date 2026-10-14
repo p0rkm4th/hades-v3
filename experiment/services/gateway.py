@@ -572,7 +572,7 @@ class Handler(BaseHTTPRequestHandler):
                                     continue
                                 cur.execute(
                                     "SELECT memory_key,value,revision FROM scoped_memory "
-                                    "WHERE user_id=%s AND domain_id=%s AND memory_key=%s",
+                                    "WHERE user_id=%s AND domain_id=%s AND memory_key=%s FOR UPDATE",
                                     (current["user_id"], current["domain_id"], memory_key),
                                 )
                                 canonical = cur.fetchone()
