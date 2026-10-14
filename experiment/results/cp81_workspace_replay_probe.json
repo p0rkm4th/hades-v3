@@ -1,0 +1,35 @@
+{
+  "experiment": "CP81 synthetic workspace command replay probe",
+  "classification": "LIVE EXPERIMENT on an isolated synthetic workspace",
+  "source_revision": "268e34babfc18e543dee9f93fdd5b7ba9a2243de",
+  "compose_project": "hades-v3-cp81-day-20261014",
+  "task_id": "f0b07ef0-a9e5-427b-845e-11bd04867ac4",
+  "request": {
+    "operation_id_sent": "cp81-stable-probe-id",
+    "command": "append one x marker to a newly named file in the synthetic workspace and print its contents",
+    "same_task_and_command_retried_after": [
+      "candidate API restart",
+      "tool gateway restart"
+    ],
+    "filename": "cp81-replay-15e653d584af43fca2553c02b9aac248.txt"
+  },
+  "attempts": [
+    {
+      "effect_id": "a270788e-813f-4d33-84b5-85d34af41c9e",
+      "state": "CONFIRMED",
+      "stdout": "x\\n"
+    },
+    {
+      "effect_id": "62ed9515-29ad-434f-9c3c-6b6340eed074",
+      "state": "CONFIRMED",
+      "stdout": "xx\\n"
+    }
+  ],
+  "independent_final_state": {
+    "marker_count": 2,
+    "workspace_file_read_directly": true
+  },
+  "result": "The gateway ignored the supplied operation_id and created a second confirmed effect after restart.",
+  "scope": "No HADES v2, CP75, CP80, production, or external resource was touched.",
+  "limitation": "The result proves current synthetic gateway behavior; it does not establish exactly-once behavior for arbitrary shell commands or real workspaces."
+}
