@@ -246,7 +246,7 @@ The keyed CAS gateway integration passed: same-task exact retry returned the ori
 | Regression suites | N/A | N/A | N/A | Gateway integration 9/9; task lifecycle 16/16; candidate finalization 24/24. |
 | Remaining recovery risk | Unqualified | Unqualified | Unqualified | Concurrent same-task turns are not serialized; a distinct identity after confirmation cannot be distinguished from a legitimate next command without durable invocation identity. Arbitrary uncertain shell results remain quarantined. |
 
-CP90 closes a direct gateway bypass of the sequential CP88 review park for new operations. It does not establish cross-restart general shell continuation, exactly-once execution, or candidate qualification. See [CP90 report](CP90_WORKSPACE_REVIEW_GATE.md). ADR-010 remains **NOT READY**.
+CP90 closes a direct gateway bypass of the sequential CP88 review park for new operations. Follow-up exact-SHA CI passed at `f2728511bc577d0bf5bcab673eb35aeb62b3a64d` (run [38612272186](https://github.com/p0rkm4th/hades-v3/actions/runs/38612272186)); the earlier fixture-start failure at `fa5451f` remains preserved. It does not establish cross-restart general shell continuation, exactly-once execution, or candidate qualification. See [CP90 report](CP90_WORKSPACE_REVIEW_GATE.md). ADR-010 remains **NOT READY**.
 
 ## CP91 — Orchestrator argument boundary
 
@@ -256,4 +256,4 @@ CP90 closes a direct gateway bypass of the sequential CP88 review park for new o
 | Trusted internal finalization/resume | Shared explicit internal flag | Same shared path | Same shared path | `transition_task` opts in only when it adds trusted metadata; cached-image identity regression passed without network. |
 | Qualification scope | Contract/security regression | Contract/security regression | Contract/security regression | No live model call or full gateway exploit was executed. Independent gateway evidence validation remains required. |
 
-The pre-fix source reproduced the credential-attachment behavior with a synthetic request-capture stub and no network. The new proxy regression passed before `urlopen`; Candidate A/C/B comparative scores are unchanged. See [CP91 report](CP91_ORCHESTRATOR_ARGUMENT_BOUNDARY.md). ADR-010 remains **NOT READY**.
+The pre-fix source reproduced the credential-attachment behavior for both reserved fields with a synthetic request-capture stub and no network. The new proxy regression passed before `urlopen`; exact-SHA CI passed at `b747762dc0e3789abd577e86c0e716d8df165a65` (run [38612829657]). Candidate A/C/B comparative scores are unchanged. See [CP91 report](CP91_ORCHESTRATOR_ARGUMENT_BOUNDARY.md). ADR-010 remains **NOT READY**.

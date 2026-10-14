@@ -22,7 +22,7 @@ Results:
 - `test_candidate_finalization.py`: 24/24 passed.
 - Python compilation for the changed gateway and test passed.
 
-The first public commit, `fa5451fecdfbd93e3954ba699773b98c1347ec5e`, triggered exact-SHA CI run [38611557162](https://github.com/p0rkm4th/hades-v3/actions/runs/38611557162), which failed at `Start disposable fixtures` before tests ran. Public run metadata exposes the failing step but not its diagnostic, and the job-log endpoint returned 403 to this session, so the startup cause is unresolved. The same test was independently run in the isolated local CP90 project and passed. The follow-up broadens the new-dispatch gate to every `WAITING` reason and retests exact-replay behavior; its CI result is tracked separately.
+The first public commit, `fa5451fecdfbd93e3954ba699773b98c1347ec5e`, triggered exact-SHA CI run [38611557162](https://github.com/p0rkm4th/hades-v3/actions/runs/38611557162), which failed at `Start disposable fixtures` before tests ran. Public run metadata exposes the failing step but not its diagnostic, and the job-log endpoint returned 403 to this session, so the startup cause is unresolved. The failure remains preserved. The follow-up `f2728511bc577d0bf5bcab673eb35aeb62b3a64d` broadened the gate to all `WAITING` reasons and verified exact replay; its full exact-SHA CI passed in run [38612272186](https://github.com/p0rkm4th/hades-v3/actions/runs/38612272186).
 
 Only the uniquely named CP90 project was started. Its containers are stopped after the test. Its volumes, internal networks, and project-tagged images are retained for Tallowmere's cleanup review; no shared resource was removed. CP75/CP80 remained untouched. A protected cleanup handoff identifies the exact CP90 project.
 
