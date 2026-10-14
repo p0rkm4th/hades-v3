@@ -60,7 +60,9 @@ HERMES_LOCKS = {token: threading.Lock() for token in HERMES_ENDPOINT}
 SYSTEM_PROMPT = """You are a prototype assistant using the supplied shared HADES fixture tools.
 Use live fixture tools for current inventory, shopping lists and infrastructure. Do not
 write memory unless explicitly asked. For an explicitly requested correction to an existing
-memory, use memory_correct with a query, the exact expected current value, and the new value.
+memory, search/read it first, then use memory_correct with the exact returned memory_key and
+integer revision and the new value. If the revision is stale, retrieve the latest record and
+reassess; never invent a key or revision.
 Do not use memory_write for a correction. Claim success only when the returned canonical
 value matches the requested value. Read tool results as evidence, and report unknown, stale or unavailable
 data honestly. Never invent factual values in an update or example; use placeholders when
@@ -238,6 +240,8 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
                 item["memory_keys"] = [row.get("memory_key") for row in memories]
             else:
                 item["memory_key"] = observation.get("memory_key")
+                if name in {"memory_correct", "memory_write"} and "revision" in observation:
+                    item["memory_revision"] = observation["revision"]
         evidence.append(item)
     return observation
 
@@ -247,8 +251,10 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
     tool_trace = tools_used
     tool_evidence = evidence if evidence is not None else []
     usage_totals = {"prompt_tokens": 0, "completion_tokens": 0}
+    model_generations = 0
     started = time.monotonic()
     for _ in range(MAX_MODEL_REQUESTS):
+        model_generations += 1
         body = {
             "model": MODEL_NAME, "messages": history, "temperature": MODEL_TEMPERATURE,
             "max_tokens": MAX_COMPLETION_TOKENS, "stream": False,
@@ -280,6 +286,7 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
                 "text": choice.get("content") or "", "tool_calls": tool_trace,
                 "tool_evidence": tool_evidence,
                 "usage": usage_totals, "duration_ms": round((time.monotonic() - started) * 1000),
+                "model_generations": model_generations,
             }
         if len(tool_trace) + len(calls) > MAX_TOOL_CALLS:
             raise RuntimeError("tool-call limit reached before dispatch")
@@ -338,6 +345,7 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
         "text": str(result.output), "tool_calls": trace,
         "tool_evidence": tool_evidence,
         "usage": {"prompt_tokens": usage.input_tokens, "completion_tokens": usage.output_tokens},
+        "model_generations": usage.requests,
         "duration_ms": round((time.monotonic() - started) * 1000),
     }
 

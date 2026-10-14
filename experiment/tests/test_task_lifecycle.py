@@ -57,18 +57,22 @@ class TaskLifecycleContract(unittest.TestCase):
             "domain_id": "domain-a", "effect_kind": "MEMORY_MUTATION", "resource_key": "memory:answer_style",
             "state": "CONFIRMED", "request": {
                 "operation": "memory_correct", "memory_key": "answer_style",
-                "expected_value": {"style": "paragraphs"}, "value": {"style": "short bullets"},
-            }, "result": {"memory_key": "answer_style", "value": {"style": "short bullets"}},
+                "expected_revision": 3, "expected_value": {"style": "paragraphs"},
+                "value": {"style": "short bullets"},
+            }, "result": {"memory_key": "answer_style", "value": {"style": "short bullets"}, "revision": 4},
         }
         proof = {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
                  "tool_evidence": [{"tool": "memory_correct", "status": "ok", "state": "CONFIRMED",
-                                    "effect_id": "memory-effect-1", "memory_key": "answer_style"}]}
-        canonical = {"memory-effect-1": {"memory_key": "answer_style", "value": {"style": "short bullets"}}}
+                                    "effect_id": "memory-effect-1", "memory_key": "answer_style",
+                                    "memory_revision": 4}]}
+        canonical = {"memory-effect-1": {"memory_key": "answer_style", "value": {"style": "short bullets"},
+                                         "revision": 4}}
         self.assertIsNone(validate_finalization(proof, claim, [effect], task, canonical))
         wrong_identity = {**effect, "user_id": "user-b"}
         self.assertEqual(validate_finalization(proof, claim, [wrong_identity], task, canonical),
                          "persisted effect lacks matching verified write evidence")
-        wrong_value = {"memory-effect-1": {"memory_key": "answer_style", "value": {"style": "paragraphs"}}}
+        wrong_value = {"memory-effect-1": {"memory_key": "answer_style", "value": {"style": "paragraphs"},
+                                            "revision": 4}}
         self.assertEqual(validate_finalization(proof, claim, [effect], task, wrong_value),
                          "persisted effect lacks matching verified write evidence")
 
@@ -81,13 +85,14 @@ class TaskLifecycleContract(unittest.TestCase):
             "resource_key": "memory:answer_style", "state": "CONFIRMED",
             "request": {"operation": "memory_write", "memory_key": "answer_style",
                         "value": {"style": "short bullets"}},
-            "result": {"memory_key": "answer_style", "value": {"style": "short bullets"}},
+            "result": {"memory_key": "answer_style", "value": {"style": "short bullets"}, "revision": 1},
         }
         proof = {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
                  "tool_evidence": [{"tool": "memory_write", "status": "ok", "state": "CONFIRMED",
-                                    "effect_id": "memory-effect-write", "memory_key": "answer_style"}]}
+                                    "effect_id": "memory-effect-write", "memory_key": "answer_style",
+                                    "memory_revision": 1}]}
         canonical = {"memory-effect-write": {"memory_key": "answer_style",
-                                              "value": {"style": "short bullets"}}}
+                                              "value": {"style": "short bullets"}, "revision": 1}}
         self.assertIsNone(validate_finalization(proof, claim, [effect], task, canonical))
         self.assertEqual(validate_finalization(proof, claim, [effect], task, {}),
                          "persisted effect lacks matching verified write evidence")

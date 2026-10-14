@@ -102,3 +102,15 @@ CP73 fixes a narrow orchestrator lifecycle defect: exact trusted criteria let th
 | Repetition and recovery | One scored correction/retrieval observation | No eligible model-equivalent profile | One scored correction/retrieval observation | Not qualified: require at least three matched repetitions, restart between mutation and recall, and stronger persisted diagnostics for correction request matching. |
 
 CP74 shows a shared durability contract improvement and a candidate/model correction failure, while both A and C demonstrated initial and fresh-context reads once. It does not qualify memory continuity: the candidates failed the actual correction request and the sample is one pair. Hermes is not scored on the 40,960 context profile because it is below its 64,000 minimum. See [CP74 report](CP74_MEMORY_DURABILITY_REPORT.md) and [trial records](../experiment/results/cp74_memory_continuity.jsonl). ADR-010 remains NOT READY.
+
+## CP75 — stable-key memory CAS
+
+| Dimension | Pydantic AI (A) | Reduced Hermes (B) | Lean loop (C) | Common evidence / remaining gap |
+|---|---|---|---|---|
+| CAS contract | Passed gateway regressions | Offline contract only | Passed gateway regressions | Exact key+revision update, stale rejection, cross-domain rejection, exact-retry identity, changed-retry rejection, atomic mutation/effect, old-schema migration. |
+| Held-out scalar/list correction | Both mutations reached canonical state with one confirmed task-linked effect; both tasks remained `WAITING` | Not run; deterministic peer remains planned | Same as A | Both generated accurate answers but omitted completion checkpoint. Three correction prompts per candidate included structured JSON; see trial JSONL. |
+| Structured correction | No tool call; unsupported success answer; task `FAILED`, no mutation | Not run | Same as A | Gateway preserved canonical value and rejected completion. |
+| Same-task recovery | Resume read original confirmed effect; no duplicate; task still `WAITING` | Not run | Not run | Model described a checkpoint without invoking it. |
+| Fresh-context read after restart | Scalar correct and `COMPLETED` | Not run | Scalar correct and `COMPLETED`; list recall later made no tool call and failed | Retrieval is inconsistent; successful corrections do not establish the full workflow. |
+
+CP75 establishes that stable-key CAS fixes the brittle old-value serialization boundary and that the existing effect ledger can prove atomic, scoped memory changes. It does not qualify candidate memory continuity: A and C each had two safe persisted mutations and one failed no-tool structured attempt, while completion and recall remained inconsistent. CP74's 404 failures remain unchanged. Hermes is unassessed; 40,960 context is below its 64,000 minimum. See [CP75 report](CP75_MEMORY_CAS_REPORT.md) and [sanitized records](../experiment/results/cp75_memory_cas.jsonl). ADR-010 remains NOT READY.

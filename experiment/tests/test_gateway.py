@@ -5,6 +5,8 @@ import urllib.error
 import urllib.request
 import uuid
 import psycopg
+from memory_diagnostics import correction_diagnostic_class, json_shape
+from memory_schema import ensure_memory_revision
 
 
 BASE = os.environ.get("GATEWAY_URL", "http://tool-gateway:8080")
@@ -27,90 +29,201 @@ def call(method, path, token=None, body=None, orchestrator=False):
         return exc.code, json.loads(exc.read())
 
 
+def seed_memory_fixture(token, key, value):
+    identity = {
+        AMBER: ("user-amber", "domain-home-amber"),
+        COBALT: ("user-cobalt", "domain-home-cobalt"),
+    }[token]
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO scoped_memory (user_id,domain_id,memory_key,value) VALUES (%s,%s,%s,%s) "
+            "ON CONFLICT (user_id,domain_id,memory_key) DO UPDATE SET value=EXCLUDED.value, "
+            "revision=scoped_memory.revision+1,updated_at=now() RETURNING revision",
+            (*identity, key, psycopg.types.json.Jsonb(value)),
+        )
+        return cur.fetchone()[0]
+
+
 class GatewayIntegration(unittest.TestCase):
-    def test_task_linked_memory_correction_is_atomic_idempotent_and_recoverable(self):
-        key = "cp74-memory-" + uuid.uuid4().hex[:12]
+    def test_memory_correction_diagnostics_are_structural_and_distinguish_mismatch(self):
+        self.assertEqual(json_shape({"private-key-name": ["secret value"]}), "object:1:[array:1:[string]]")
+        self.assertEqual(json_shape(True), "boolean")
+        self.assertEqual(correction_diagnostic_class(0, 1, 0), "query_no_match")
+        self.assertEqual(correction_diagnostic_class(1, 0, 0), "expected_value_no_match")
+        self.assertEqual(correction_diagnostic_class(1, 1, 0), "query_and_value_match_different_rows")
+        self.assertEqual(correction_diagnostic_class(1, 1, 1), "unique_match")
+        self.assertEqual(correction_diagnostic_class(2, 2, 2), "ambiguous_intersection")
+
+    def test_memory_revision_migration_upgrades_existing_and_fresh_schemas(self):
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute("CREATE TEMP TABLE scoped_memory (memory_key text, value jsonb)")
+            cur.execute("INSERT INTO scoped_memory VALUES ('legacy-key', '{\"v\":1}')")
+            ensure_memory_revision(cur)
+            ensure_memory_revision(cur)
+            cur.execute("SELECT revision FROM scoped_memory WHERE memory_key='legacy-key'")
+            self.assertEqual(cur.fetchone()[0], 1)
+
+    def test_memory_write_requires_task_and_records_atomic_effect(self):
+        key = "cp75-write-" + uuid.uuid4().hex[:12]
+        task_id = None
+        self.addCleanup(self._cleanup_memory_write, key, lambda: task_id)
+        body = {"key": key, "value": {"format": "brief"}}
+        self.assertEqual(call("POST", "/v1/memory", AMBER, body)[0], 400)
+        self.assertEqual(call("GET", f"/v1/memory/{key}", AMBER)[0], 404)
+
+        status, task = call("POST", "/v1/tasks", AMBER, {"goal": "Write a requested synthetic preference"})
+        self.assertEqual(status, 201)
+        task_id = task["task_id"]
+        mutation = {**body, "task_id": task_id}
+        status, result = call("POST", "/v1/memory", AMBER, mutation)
+        self.assertEqual(status, 200, result)
+        self.assertEqual((result["state"], result["revision"]), ("CONFIRMED", 1))
+        effect_id = result["effect_id"]
+        status, replay = call("POST", "/v1/memory", AMBER, mutation)
+        self.assertEqual((status, replay["effect_id"], replay["already_recorded"]),
+                         (200, effect_id, True))
+        self.assertEqual(call("POST", "/v1/memory", AMBER,
+                              {**mutation, "value": {"format": "changed"}})[0], 409)
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM effects WHERE task_id=%s AND effect_id=%s AND state='CONFIRMED'",
+                        (task_id, effect_id))
+            self.assertEqual(cur.fetchone()[0], 1)
+
+    def _cleanup_memory_write(self, key, task_id_getter):
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            task_id = task_id_getter()
+            if task_id:
+                cur.execute("DELETE FROM effects WHERE task_id=%s", (task_id,))
+                cur.execute("DELETE FROM tasks WHERE task_id=%s", (task_id,))
+            cur.execute("DELETE FROM scoped_memory WHERE user_id='user-amber' AND memory_key=%s", (key,))
+
+    def test_keyed_memory_correction_is_atomic_idempotent_scoped_and_recoverable(self):
+        key = "cp75-memory-" + uuid.uuid4().hex[:12]
         task_ids = []
+        original = {"format": "weekly summary in paragraphs"}
+        corrected = {"format": "short weekly summary bullets"}
+        other_value = {"format": "cobalt private preference"}
 
         def cleanup():
             with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
                 for task_id in task_ids:
                     cur.execute("DELETE FROM effects WHERE task_id=%s", (task_id,))
                     cur.execute("DELETE FROM tasks WHERE task_id=%s", (task_id,))
-                cur.execute(
-                    "DELETE FROM scoped_memory WHERE user_id='user-amber' AND memory_key=%s",
-                    (key,),
-                )
+                cur.execute("DELETE FROM scoped_memory WHERE memory_key=%s", (key,))
 
         self.addCleanup(cleanup)
-        original = {"format": "weekly summary in paragraphs"}
-        corrected = {"format": "short weekly summary bullets"}
-        status, seeded = call("POST", "/v1/memory", AMBER, {"key": key, "value": original})
-        self.assertEqual(status, 200, seeded)
+        self.assertEqual(seed_memory_fixture(AMBER, key, original), 1)
+        self.assertEqual(seed_memory_fixture(COBALT, key, other_value), 1)
 
-        status, task = call("POST", "/v1/tasks", AMBER, {
-            "goal": "Correct the stored weekly summary preference and verify it in a fresh context"
-        })
+        status, task = call("POST", "/v1/tasks", AMBER, {"goal": "Correct and verify the weekly summary preference"})
         self.assertEqual(status, 201, task)
         task_id = task["task_id"]
         task_ids.append(task_id)
-        mutation = {
-            "task_id": task_id, "query": key.replace("-", " ") + " weekly summary",
-            "expected_value": original, "value": corrected,
-        }
-        status, changed = call("POST", "/v1/memory/correct", AMBER, mutation)
+        status, search = call("GET", "/v1/memory/search?q=weekly+summary", AMBER)
+        self.assertEqual(status, 200, search)
+        match = next(row for row in search["memories"] if row["memory_key"] == key)
+        self.assertEqual((match["value"], match["revision"]), (original, 1))
+        mutation = {"task_id": task_id, "memory_key": match["memory_key"],
+                    "expected_revision": match["revision"], "value": corrected}
+
+        # A missing task cannot create an untracked canonical mutation.
+        no_task = {k: v for k, v in mutation.items() if k != "task_id"}
+        self.assertEqual(call("POST", "/v1/memory/correct-by-key", AMBER, no_task)[0], 400)
+
+        status, changed = call("POST", "/v1/memory/correct-by-key", AMBER, mutation)
         self.assertEqual(status, 200, changed)
         self.assertEqual(changed["state"], "CONFIRMED")
-        self.assertEqual(changed["task_id"], task_id)
-        self.assertTrue(changed.get("effect_id"))
+        self.assertEqual((changed["memory_key"], changed["revision"], changed["task_id"]),
+                         (key, 2, task_id))
+        effect_id = changed["effect_id"]
 
-        status, repeated = call("POST", "/v1/memory/correct", AMBER, mutation)
+        # Canonical row and effect are independently read from PostgreSQL.
+        with psycopg.connect(os.environ["DATABASE_URL"], row_factory=psycopg.rows.dict_row) as conn, conn.cursor() as cur:
+            cur.execute("SELECT user_id,domain_id,value,revision FROM scoped_memory WHERE memory_key=%s AND user_id='user-amber'", (key,))
+            canonical = cur.fetchone()
+            cur.execute("SELECT task_id,user_id,domain_id,effect_kind,resource_key,state,request,result FROM effects WHERE effect_id=%s", (effect_id,))
+            effect = cur.fetchone()
+        self.assertEqual((canonical["value"], canonical["revision"]), (corrected, 2))
+        self.assertEqual((effect["task_id"], effect["user_id"], effect["domain_id"]),
+                         (uuid.UUID(task_id), "user-amber", "domain-home-amber"))
+        self.assertEqual((effect["effect_kind"], effect["resource_key"], effect["state"]),
+                         ("MEMORY_MUTATION", f"memory:{key}", "CONFIRMED"))
+        self.assertEqual(effect["request"], {"operation": "memory_correct", "memory_key": key,
+                                              "expected_revision": 1, "value": corrected})
+        self.assertEqual(effect["result"]["revision"], canonical["revision"])
+
+        # Exact retries return the original durable effect; changed retries conflict.
+        status, repeated = call("POST", "/v1/memory/correct-by-key", AMBER, mutation)
         self.assertEqual(status, 200, repeated)
-        self.assertEqual(repeated["effect_id"], changed["effect_id"])
+        self.assertEqual(repeated["effect_id"], effect_id)
         self.assertTrue(repeated["already_recorded"])
-        status, task_row = call("GET", f"/v1/tasks/{task_id}", AMBER)
-        self.assertEqual(status, 200)
-        self.assertEqual(len(task_row["effects"]), 1)
+        self.assertEqual(call("POST", "/v1/memory/correct-by-key", AMBER,
+                              {**mutation, "value": {"format": "changed retry"}})[0], 409)
 
-        status, mismatch = call("POST", "/v1/memory/correct", AMBER, {
-            **mutation, "value": {"format": "changed retry must not apply"},
-        })
-        self.assertEqual(status, 409)
-        status, saved = call("GET", f"/v1/memory/{key}", AMBER)
+        # A stale revision on another task cannot mutate or create an effect.
+        status, stale_task = call("POST", "/v1/tasks", AMBER, {"goal": "Retry a stale memory correction"})
+        self.assertEqual(status, 201)
+        task_ids.append(stale_task["task_id"])
+        stale = {**mutation, "task_id": stale_task["task_id"]}
+        self.assertEqual(call("POST", "/v1/memory/correct-by-key", AMBER, stale)[0], 409)
+        status, stale_row = call("GET", f"/v1/memory/{key}", AMBER)
+        self.assertEqual((status, stale_row["value"], stale_row["revision"]), (200, corrected, 2))
+        status, stale_task_row = call("GET", f"/v1/tasks/{stale_task['task_id']}", AMBER)
         self.assertEqual(status, 200)
-        self.assertEqual(saved["value"], corrected)
+        self.assertEqual(stale_task_row["effects"], [])
 
-        proof = {
-            "task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
-            "tool_evidence": [{
-                "tool": "memory_correct", "status": "ok", "state": "CONFIRMED",
-                "effect_id": changed["effect_id"], "memory_key": key,
-            }],
-        }
+        # A different authenticated user cannot use the amber task or its record.
+        self.assertEqual(call("POST", "/v1/memory/correct-by-key", COBALT,
+                              {**mutation, "value": {"format": "cross-user attack"}})[0], 404)
+        status, cobalt_row = call("GET", f"/v1/memory/{key}", COBALT)
+        self.assertEqual((status, cobalt_row["value"], cobalt_row["revision"]), (200, other_value, 1))
+
+        proof = {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
+                 "tool_evidence": [{"tool": "memory_correct", "status": "ok", "state": "CONFIRMED",
+                                    "effect_id": effect_id, "memory_key": key, "memory_revision": 2}]}
         status, complete = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
-            "state": "COMPLETED", "checkpoint": {
-                "summary": "The memory correction was verified", "completed": ["preference corrected"],
-                "pending": [],
-            }, "_orchestrator_finalization": proof,
+            "state": "COMPLETED", "checkpoint": {"summary": "Preference corrected and verified",
+                "completed": ["preference corrected"], "pending": []},
+            "_orchestrator_finalization": proof,
         }, orchestrator=True)
         self.assertEqual(status, 200, complete)
         self.assertEqual(complete["state"], "COMPLETED")
 
-        # A separate task simulates a fresh conversational context after restart.
-        status, fresh_task = call("POST", "/v1/tasks", AMBER, {
-            "goal": "Recall the corrected weekly summary preference"
-        })
+        # A new task represents a fresh model context after candidate/gateway restart.
+        status, fresh_task = call("POST", "/v1/tasks", AMBER, {"goal": "Recall the corrected preference in a fresh context"})
         self.assertEqual(status, 201)
         task_ids.append(fresh_task["task_id"])
         status, recalled = call("GET", f"/v1/memory/{key}", AMBER)
+        self.assertEqual((status, recalled["value"], recalled["revision"]), (200, corrected, 2))
+
+    def test_memory_effect_and_value_rollback_together_on_confirmation_failure(self):
+        key = "cp75-atomic-" + uuid.uuid4().hex[:12]
+        task_id = None
+        constraint = "cp75_reject_confirm_" + uuid.uuid4().hex[:10]
+        self.addCleanup(self._cleanup_memory_atomic, key, constraint, lambda: task_id)
+        self.assertEqual(seed_memory_fixture(AMBER, key, "before"), 1)
+        status, task = call("POST", "/v1/tasks", AMBER, {"goal": "Atomic correction fault injection"})
+        self.assertEqual(status, 201)
+        task_id = task["task_id"]
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute(f"ALTER TABLE effects ADD CONSTRAINT {constraint} CHECK (NOT (effect_kind='MEMORY_MUTATION' AND resource_key='memory:{key}' AND state='CONFIRMED'))")
+        status, _ = call("POST", "/v1/memory/correct-by-key", AMBER,
+                         {"task_id": task_id, "memory_key": key, "expected_revision": 1, "value": "after"})
+        self.assertEqual(status, 502)
+        status, canonical = call("GET", f"/v1/memory/{key}", AMBER)
+        self.assertEqual((status, canonical["value"], canonical["revision"]), (200, "before", 1))
+        status, task_row = call("GET", f"/v1/tasks/{task_id}", AMBER)
         self.assertEqual(status, 200)
-        self.assertEqual(recalled["value"], corrected)
-        status, invalid_owner = call("POST", "/v1/memory", COBALT, {
-            "task_id": fresh_task["task_id"], "key": key, "value": {"format": "cross-domain"},
-        })
-        self.assertEqual(status, 404)
-        status, still_correct = call("GET", f"/v1/memory/{key}", AMBER)
-        self.assertEqual(still_correct["value"], corrected)
+        self.assertEqual(task_row["effects"], [])
+
+    def _cleanup_memory_atomic(self, key, constraint, task_id_getter):
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute(f"ALTER TABLE effects DROP CONSTRAINT IF EXISTS {constraint}")
+            task_id = task_id_getter()
+            if task_id:
+                cur.execute("DELETE FROM effects WHERE task_id=%s", (task_id,))
+                cur.execute("DELETE FROM tasks WHERE task_id=%s", (task_id,))
+            cur.execute("DELETE FROM scoped_memory WHERE user_id='user-amber' AND memory_key=%s", (key,))
 
     def test_scoped_reads_memory_tasks_and_verified_compound_edit(self):
         status, _ = call("GET", "/health")
@@ -123,10 +236,7 @@ class GatewayIntegration(unittest.TestCase):
         self.assertEqual(contract["version"], 1)
         self.assertIn("inventory_read", {tool["name"] for tool in contract["tools"]})
 
-        status, _ = call("POST", "/v1/memory", AMBER, {
-            "key": "fixture-read-only-probe", "value": {"sentinel": "unchanged"}
-        })
-        self.assertEqual(status, 200)
+        seed_memory_fixture(AMBER, "fixture-read-only-probe", {"sentinel": "unchanged"})
 
         status, amber_inventory = call("GET", "/v1/inventory", AMBER)
         self.assertEqual(status, 200)
@@ -173,55 +283,51 @@ class GatewayIntegration(unittest.TestCase):
         status, _ = call("GET", "/v1/memory/fixture-read-only-probe", COBALT)
         self.assertEqual(status, 404)
 
+        status, correction_task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "correct the disposable read-only probe"
+        })
+        self.assertEqual(status, 201)
+        correction_task_id = correction_task["task_id"]
         try:
-            status, corrected = call("POST", "/v1/memory/correct", AMBER, {
+            status, legacy = call("POST", "/v1/memory/correct", AMBER, {
                 "query": "fixture read only probe",
                 "expected_value": {"sentinel": "unchanged"},
+                "value": {"sentinel": "legacy route must not mutate"},
+            })
+            self.assertEqual(status, 410)
+
+            status, fresh = call("GET", "/v1/memory/fixture-read-only-probe", AMBER)
+            self.assertEqual(status, 200)
+            status, corrected = call("POST", "/v1/memory/correct-by-key", AMBER, {
+                "task_id": correction_task_id,
+                "memory_key": fresh["memory_key"],
+                "expected_revision": fresh["revision"],
                 "value": {"sentinel": "corrected"},
             })
-            self.assertEqual(status, 200)
+            self.assertEqual(status, 200, corrected)
             self.assertEqual(corrected["memory_key"], "fixture-read-only-probe")
             self.assertEqual(corrected["value"], {"sentinel": "corrected"})
-            status, saved = call("GET", "/v1/memory/fixture-read-only-probe", AMBER)
-            self.assertEqual(status, 200)
-            self.assertEqual(saved["value"], {"sentinel": "corrected"})
 
-            status, missing = call("POST", "/v1/memory/correct", AMBER, {
-                "query": "missing disposable preference",
-                "expected_value": {"format": "brief prose"},
-                "value": {"format": "short bullets"},
-            })
-            self.assertEqual(status, 404)
-            self.assertIn("no existing memory", missing["error"])
+            status, selected = call("GET", "/v1/memory/fixture-read-only-probe", AMBER)
+            status2, other = call("GET", "/v1/memory/answer_style", AMBER)
+            self.assertEqual(status, 200)
+            self.assertEqual(status2, 200)
+            self.assertEqual(selected["value"], {"sentinel": "corrected"})
+            self.assertEqual(other["value"], {"scope": "synthetic lab status updates", "style": "brief prose"})
 
-            status, canonical = call("GET", "/v1/memory/answer_style", AMBER)
-            self.assertEqual(status, 200)
-            shared_value = canonical["value"]
-            status, _ = call("POST", "/v1/memory", AMBER, {
-                "key": "fixture-read-only-probe", "value": shared_value
-            })
-            self.assertEqual(status, 200)
-            status, ambiguous = call("POST", "/v1/memory/correct", AMBER, {
-                "query": "synthetic lab status updates answer style",
-                "expected_value": shared_value,
-                "value": {"scope": "synthetic lab status updates", "style": "short bullets"},
-            })
-            self.assertEqual(status, 409)
-            self.assertIn("ambiguous", ambiguous["error"])
-            status, unchanged = call("GET", "/v1/memory/answer_style", AMBER)
-            self.assertEqual(status, 200)
-            self.assertEqual(unchanged["value"], shared_value)
-
-            status, cross_user = call("POST", "/v1/memory/correct", COBALT, {
-                "query": "fixture read only probe",
-                "expected_value": {"sentinel": "corrected"},
+            status, cross_user = call("POST", "/v1/memory/correct-by-key", COBALT, {
+                "task_id": correction_task_id,
+                "memory_key": "fixture-read-only-probe",
+                "expected_revision": selected["revision"],
                 "value": {"sentinel": "cross user"},
             })
             self.assertEqual(status, 404)
         finally:
-            status, restored = call("POST", "/v1/memory", AMBER, {
-                "key": "fixture-read-only-probe", "value": {"sentinel": "unchanged"}
-            })
+            with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+                cur.execute("DELETE FROM effects WHERE task_id=%s", (correction_task_id,))
+                cur.execute("DELETE FROM tasks WHERE task_id=%s", (correction_task_id,))
+            seed_memory_fixture(AMBER, "fixture-read-only-probe", {"sentinel": "unchanged"})
+            status, restored = call("GET", "/v1/memory/fixture-read-only-probe", AMBER)
             self.assertEqual(status, 200)
             self.assertEqual(restored["value"], {"sentinel": "unchanged"})
 

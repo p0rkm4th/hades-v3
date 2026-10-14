@@ -12,6 +12,8 @@ COPY services/inference_adapter.py /app/services/inference_adapter.py
 COPY services/ollama_protocol.py /app/services/ollama_protocol.py
 COPY contracts/tools.json /app/tools.json
 COPY contracts/task_lifecycle.py /app/contracts/task_lifecycle.py
+COPY contracts/memory_diagnostics.py /app/tests/memory_diagnostics.py
+COPY contracts/memory_schema.py /app/tests/memory_schema.py
 COPY contracts/tools.json /app/contracts/tools.json
 COPY contracts/task_lifecycle.py /app/candidates/task_lifecycle.py
 COPY candidates/api.py /app/candidates/api.py
