@@ -335,7 +335,6 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
 def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: list[str], evidence: list[dict] | None = None):
     from pydantic_ai import Agent, FunctionToolset, RunContext, Tool, UsageLimits
     from pydantic_ai.models.openai import OpenAIChatModel
-    from pydantic_ai.providers.openai import OpenAIProvider
 
     started = time.monotonic()
     trace = tools_used
@@ -353,7 +352,7 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
             function=invoke, name=name, description=spec["description"],
             json_schema=spec["parameters"], takes_ctx=True,
         ))
-    provider = OpenAIProvider(base_url=MODEL_URL, api_key=MODEL_API_KEY)
+    provider = pydantic_provider()
     # Ollama's native /api/chat tool schema has no OpenAI `strict` extension.
     # Pydantic AI otherwise advertises strict tool definitions by default.
     # Tool arguments remain validated by the declared JSON schemas and gateway.
@@ -384,6 +383,20 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
         "model_generations": usage.requests,
         "duration_ms": round((time.monotonic() - started) * 1000),
     }
+
+
+def pydantic_provider():
+    """Create a provider that does not hide HTTP retries from generation budgets."""
+    from openai import AsyncOpenAI
+    from pydantic_ai.providers.openai import OpenAIProvider
+
+    client = AsyncOpenAI(
+        base_url=MODEL_URL,
+        api_key=MODEL_API_KEY,
+        max_retries=0,
+        timeout=MODEL_REQUEST_TIMEOUT_SECONDS,
+    )
+    return OpenAIProvider(openai_client=client)
 
 
 def chat_hermes(messages: list[dict], token: str, task_id: str, tools_used: list[str]):

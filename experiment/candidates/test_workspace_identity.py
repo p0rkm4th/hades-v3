@@ -37,6 +37,9 @@ def _assert_identity(requests: list[dict], call_id: str) -> None:
 
 
 def main() -> None:
+    provider = api.pydantic_provider()
+    assert provider.client.max_retries == 0, provider.client.max_retries
+
     captured: list[dict] = []
 
     def fake_urlopen(request, timeout=30):
@@ -91,7 +94,7 @@ def main() -> None:
         assert result.output == "command observation received", result.output
         _assert_identity(captured, CALL_ID)
 
-    print("PASS Pydantic tool context and lean adapter bind workspace effects to the same persisted call ID")
+    print("PASS Pydantic provider has no hidden HTTP retries; tool context and lean adapter bind workspace effects to the same persisted call ID")
 
 
 if __name__ == "__main__":
