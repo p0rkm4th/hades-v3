@@ -1,6 +1,6 @@
 # HADES v3 autonomous engineering day — progress handoff
 
-**Date:** 2026-10-14, in progress (11:16 AM CDT)
+**Date:** 2026-10-14, in progress (11:30 AM CDT)
 **Authority:** frozen PRD and Bounded Operator architecture
 **ADR-010:** NOT READY
 **Next update:** before 6:00 PM CDT
@@ -79,3 +79,6 @@ ADR-010 remains **NOT READY**. CP84 closes the deterministic candidate-finalizer
 - Ran 44 pure task-lifecycle, candidate-finalization, and CP81 answer-oracle tests from a cached runner image with `--network none`, read-only repository mount, and a temporary filesystem. All 44 passed; no shared fixture or service was accessed. Initial invocation omitted the answer-oracle module path and failed to import that module; rerunning with `PYTHONPATH=/repo/experiment/tests` passed the complete set.
 - Rechecked public v2 `main` read-only at `eccaf8a4eec9802341cc31261496b98fe50856be`; exact-SHA Public CI [38522183010](https://github.com/p0rkm4th/hades/actions/runs/38522183010) passed. Current public records report the authorized Open WebUI 0.12.0 promotion and PASS + PERSISTENCE owner-workflow slices for conversation, memory, bounded operator delegation, and household; direct owner dogfood remains active. This is materially stronger current owner-acceptance evidence than v3 has, but not a matched v2/v3 task. Added the pinned observation to [v2 control baseline](V2_CONTROL_BASELINE.md) and ADR readiness assessment.
 - A direct Codex thread-list attempt again failed at the local TUI MCP transport; no Cinder or Tallowmere response is claimed. CP75/CP80 and all other shared resources remain untouched. CP71 remains externally blocked; no model inference, GPU, privileged host action, or v2 runtime access occurred.
+- Updated Tallowmere's existing mode-0600 protected HADES v3 cleanup handoff with CP85's exact unused image tags/digests and project-scoped cleanup verification. No image or shared resource was removed, and no release/cleanup authorization is inferred from silence.
+- Appended a source-only v2 update to the existing HADES-infra Cinder handoff: current public `main`/CI, published owner-workflow status, and the CP71 blocker superseding the stale firewall-access question. Cinder's direct thread was unavailable; this is a shared-file handoff, not a claimed response. The HADES-infra checkout remains uncommitted and was not otherwise changed.
+- The documentation/source checkpoint is public at `d47433a1550d007b29e84879df2dc1a2f5534cac`; exact-SHA CI run [38596642984](https://github.com/p0rkm4th/hades-v3/actions/runs/38596642984) passed. All 45 workflow steps and post-job cleanup completed successfully. The local worktree is clean and remote `main` matched at verification.
