@@ -75,6 +75,10 @@ The selected DBOS hypothesis now has a real HADES gateway/simulator contract res
 
 In four local deterministic repetitions per profile, Pydantic AI Harness `Shell` alone completed the same synthetic source correction and tests with three candidate gateway effects, versus 18 for `Shell` plus `FileSystem`. Both used four model turns and passed the same independent source/test oracle; each profile also passed three matched CI repetitions. This makes Shell-only the simpler A2 workspace profile for bounded repo work. It remains a **CONTRACT TEST** using a deterministic peer; no live model qualification, task finalization, uncertain-command recovery, or general shell security guarantee follows. Keep HADES's gateway/workspace boundary; do not use Harness's local workspace backend.
 
+## CP81 A2 uncertain workspace outcome
+
+The separate pinned Harness `Shell` regression passed one synthetic quarantined workspace response to the runtime; `WorkspaceUnavailableError` aborted the turn after one model request and one gateway request. This preserves the no-blind-repeat invariant but yields no final answer or recovery, so it does not qualify task continuation. The current upstream Shell documentation (checked 2026-10-14) distinguishes recoverable command/tool errors, which are returned as `ModelRetry`, from a gone workspace, which aborts the run; timeouts return captured output. This current documentation is not evidence that the later API semantics match the experiment's pinned `0.56.0`, whose observed result is recorded separately. Neither the documentation nor the abort result settles the HADES adapter contract for a quarantined external effect. Keep this path unqualified and avoid candidate prompt tuning. See the [upstream Shell failure semantics](https://pydantic.dev/docs/ai/harness/shell/) and [CP81 report](CP81_MEMORY_COMPLETION_REPORT.md).
+
 ## Build-versus-reuse justification
 
 | Problem | Existing solution evaluated | HADES-specific remainder | New custom subsystem? |
