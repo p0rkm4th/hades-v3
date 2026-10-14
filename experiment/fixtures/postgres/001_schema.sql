@@ -45,6 +45,7 @@ CREATE TABLE scoped_memory (
     domain_id text NOT NULL,
     memory_key text NOT NULL,
     value jsonb NOT NULL,
+    revision integer NOT NULL DEFAULT 1 CHECK (revision >= 1),
     updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (user_id, domain_id, memory_key)
 );

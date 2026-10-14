@@ -284,6 +284,13 @@ def validate_finalization(proof, checkpoint, effects, task_identity=None, canoni
                     and canonical.get("memory_key") == request.get("memory_key")
                     and canonical.get("value") == request.get("value")
                     and result.get("value") == canonical.get("value")
+                    and type(result.get("revision")) is int
+                    and canonical.get("revision") == result.get("revision")
+                    and item.get("memory_revision") == result.get("revision")
+                    and ("expected_revision" not in request or (
+                        type(request.get("expected_revision")) is int
+                        and result.get("revision") == request["expected_revision"] + 1
+                    ))
                 )
             if (item.get("tool") in allowed and item.get("status") == "ok"
                     and item.get("state") == "CONFIRMED"
