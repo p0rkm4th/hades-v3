@@ -45,6 +45,35 @@
     "workspace_flow_integration": {
       "passed": true,
       "tests": 1
+    },
+    "same_run_id_resume": {
+      "accepted": false,
+      "observed": "Pinned StepPersistence rejects reused run_id as single-shot; caller must create a new run.",
+      "implication": "Old started effect requires reconciliation against HADES ledger."
+    },
+    "candidate_adapter_identity": {
+      "classification": "CONTRACT_TEST",
+      "network": "none",
+      "pydantic_context_call_id": true,
+      "lean_loop_tool_call_id": true,
+      "missing_identity_dispatched": false,
+      "hermes_adapter": "not implemented; workspace remains fail-closed"
+    },
+    "initial_exact_sha_ci": {
+      "run_id": 38579378273,
+      "conclusion": "failure",
+      "cause": "A2 shell_filesystem used one operation identity for multiple internal backend commands; gateway rejected changed digest with HTTP 409.",
+      "preserved": true
+    },
+    "post_ordinal_fix_a2_profiles": {
+      "classification": "CONTRACT_TEST",
+      "shell_only_runs": 3,
+      "shell_filesystem_runs": 3,
+      "all_passed": true,
+      "shell_only_candidate_effects_each": 3,
+      "shell_filesystem_candidate_effects_each": 18,
+      "model_calls_each": 4,
+      "independent_test_and_source_check": "passed"
     }
   },
   "limitations": [

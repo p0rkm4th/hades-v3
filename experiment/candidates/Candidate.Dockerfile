@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
 COPY candidates/requirements.lock.txt /app/requirements.lock.txt
 RUN pip install --no-cache-dir -r /app/requirements.lock.txt
-COPY candidates/api.py candidates/index.html candidates/run_trial.py /app/candidates/
+COPY candidates/api.py candidates/index.html candidates/run_trial.py candidates/test_workspace_identity.py /app/candidates/
 COPY contracts/tools.json /app/contracts/tools.json
 COPY contracts/task_lifecycle.py /app/candidates/task_lifecycle.py
 RUN mkdir -p /hermes/amber-task /hermes/amber-trace /hermes/cobalt-task /hermes/cobalt-trace \

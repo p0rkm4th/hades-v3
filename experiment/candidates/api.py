@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -146,7 +147,16 @@ def tool_contracts():
 VISIBLE_TOOLS = tool_contracts()
 
 
-def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence: list | None = None):
+def workspace_operation_id(task_id: str, tool_call_id: str | None) -> str:
+    if not isinstance(tool_call_id, str) or not tool_call_id.strip():
+        raise ValueError("workspace execution requires a persisted tool-call identity")
+    return hashlib.sha256(f"{task_id}:{tool_call_id}".encode("utf-8")).hexdigest()
+
+
+def gateway_call(
+    name: str, arguments: dict, token: str, task_id: str,
+    evidence: list | None = None, tool_call_id: str | None = None,
+):
     contract = next((item for item in TOOLS if item["name"] == name), None)
     if contract is None:
         raise ValueError("unknown shared tool")
@@ -177,6 +187,8 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
     if name in {"workspace_exec", "commitment_submit", "shopping_list_change",
                 "memory_write", "memory_correct"}:
         payload["task_id"] = task_id
+    if name == "workspace_exec":
+        payload["operation_id"] = workspace_operation_id(task_id, tool_call_id)
     if name in {"task_checkpoint", "commitment_reconcile"}:
         payload = {} if name == "commitment_reconcile" else payload
     data = json.dumps(payload).encode() if contract["method"] == "POST" else None
@@ -294,13 +306,16 @@ def chat_openai(messages: list[dict], tools_enabled: bool, token: str, task_id: 
             function = call["function"]
             args = json.loads(function.get("arguments") or "{}")
             tool_trace.append(function["name"])
-            observation = gateway_call(function["name"], args, token, task_id, tool_evidence)
+            observation = gateway_call(
+                function["name"], args, token, task_id, tool_evidence,
+                tool_call_id=call.get("id"),
+            )
             history.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(observation)})
     raise RuntimeError("model request limit reached before a final response")
 
 
 def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: list[str], evidence: list[dict] | None = None):
-    from pydantic_ai import Agent, FunctionToolset, Tool, UsageLimits
+    from pydantic_ai import Agent, FunctionToolset, RunContext, Tool, UsageLimits
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -310,12 +325,15 @@ def chat_pydantic(messages: list[dict], token: str, task_id: str, tools_used: li
     toolset = FunctionToolset()
     for spec in VISIBLE_TOOLS:
         name = spec["name"]
-        def invoke(_name=name, **kwargs):
+        def invoke(ctx: RunContext[None], _name=name, **kwargs):
             trace.append(_name)
-            return gateway_call(_name, kwargs, token, task_id, tool_evidence)
+            return gateway_call(
+                _name, kwargs, token, task_id, tool_evidence,
+                tool_call_id=ctx.tool_call_id,
+            )
         toolset.add_tool(Tool.from_schema(
             function=invoke, name=name, description=spec["description"],
-            json_schema=spec["parameters"],
+            json_schema=spec["parameters"], takes_ctx=True,
         ))
     provider = OpenAIProvider(base_url=MODEL_URL, api_key=MODEL_API_KEY)
     # Ollama's native /api/chat tool schema has no OpenAI `strict` extension.
