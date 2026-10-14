@@ -1,6 +1,6 @@
 # HADES v3 autonomous engineering report — 2026-10-14
 
-**Status:** In progress; final owner handoff due by 18:00 CDT.  
+**Status:** Closeout prepared at 17:30 CDT; no new experiments planned before the 18:00 cutoff.
 **Authority:** Frozen HADES v3 PRD and Bounded Operator architecture.  
 **ADR-010:** NOT READY; owner ratification remains required.
 
@@ -69,3 +69,20 @@ No harness is selected. A and C have narrow scalar/list positives and repeated s
 The smallest decision-changing work is: (1) define how the existing protected grant/policy authority binds an explicit memory request to the exact proposed mutation or requires clarification/approval; (2) obtain a resource-adequate matched A/C memory correction, restart, and fresh-context campaign without tuning CP89; (3) qualify same-task concurrent workspace turns and unknown-effect reconciliation; and (4) measure A2/DBOS maintenance reduction. Current Cinder v2 runtime/owner-acceptance evidence is also needed before a fair architecture decision. Production implementation and ADR ratification remain out of scope.
 
 **Closeout update required:** refresh exact remote SHA and Actions outcome for this report's commit, worktree state, latest protected-note replies, and any change in owned-resource status before 18:00 CDT.
+
+## 16:47 CDT continuation — concurrent workspace replay
+
+- Added a focused gateway integration regression that sends two concurrent requests with the same task and operation identity. The oracle checks for one confirmed effect ID, one marker write, and a competing response that is either quarantined while the first dispatch is unresolved or returns the prior confirmed result. This exercises existing task-row serialization; it does not claim arbitrary shell commands are exactly-once or resolve unknown effects.
+- The regression is published at `b55a3169bb4983e23867db76cc58dc85fcf67649`. Python compilation, `git diff --check`, and targeted Gitleaks passed. Exact-SHA [GitHub Actions check](https://github.com/p0rkm4th/hades-v3/commit/b55a3169bb4983e23867db76cc58dc85fcf67649/checks) was still queued/“Starting job” at 17:24 CDT; no CI pass is claimed yet. The remote `main` read-only check matched `b55a316`.
+- The one-time local resource snapshot showed 39 GB available and existing CP75/CP80 services still running. The CP81 Compose configuration is project-scoped, internal-only, and has no published ports or fixed container names, but its full model-server profile was not started: no owner budget/window was received for competing model inference. No CP81 candidate generations or project resources were created. A separate unique CP92 gateway-only dry-run planned six disposable fixture services, four internal project networks, and project-prefixed volumes; no model server, host ports, fixed names, or privileged mounts were in that selection. I deferred local deployment to avoid duplicating those builds/volumes while the same regression is pending in GitHub's isolated CI.
+- No new message was observed from Cinder or Tallowmere in this continuation; their earlier ownership and release limits remain unchanged. No shared resource was stopped, deleted, or reconfigured.
+
+## End-of-day handoff (prepared 17:30 CDT)
+
+- The source checkpoint is publicly synchronized at `b55a3169bb4983e23867db76cc58dc85fcf67649`; a read-only `git ls-remote` agreed with local `main`. Its exact-SHA check still showed “Starting job” at 17:30; no success is claimed. The exact check is [here](https://github.com/p0rkm4th/hades-v3/commit/b55a3169bb4983e23867db76cc58dc85fcf67649/checks). The earlier `2e0e702` check also remained in “Starting job”; `03ea5f8` remained in progress, while descendant `7b13d21` had passed. The recorded `4e1d5f7` strict offline E2E failure remains unchanged.
+- Documentation and source checks at this checkpoint: Python compilation of the new test passed; `git diff --check` passed; targeted Gitleaks scans of docs and the test passed. After final documentation publication, verify clean synchronized worktree and exact CI again.
+- CP81 memory model trials were not run. Tallowmere confirmed the CP75 model stack is active and declined approval for a competing model workload without an owner/architecture budget and window; no owner decision arrived. CP81 remains incomplete. No Hypnos request, privileged firewall operation, or memory mutation was performed.
+- The CP92 project was only inspected using read-only Compose config and dry-run; no CP92 containers, networks, volumes, or images were created. The CP81 deployment was also not created. The single host snapshot showed 39 GB free and 15 GB available memory; CP75/CP80 resources remained present and untouched. No cleanup was performed.
+- The protected notes were checked once at closeout: Tallowmere's latest relevant reply remains the 15:57 resource warning; no fixture release or cleanup permission was granted. Cinder's latest note still contains Tern's evidence request, with no reply. No v2 source, CI, runtime, or ownership state was changed.
+
+**Continuation:** first resolve CI for `b55a316` and this closeout commit. Keep CP81 deferred until safe independent model capacity and owner budget are explicit. Next work that can change ADR-010 is trusted memory request-to-effect binding plus matched A/C correction, restart, and fresh-context recall; then task-turn concurrency and unknown shell-result reconciliation. Keep model-turn concurrency, arbitrary shell exactly-once/reconciliation, and Hermes model-equivalent memory behavior unqualified. ADR-010 remains NOT READY; HADES v2 remains Cinder's control.

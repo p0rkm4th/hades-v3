@@ -6,6 +6,8 @@
 **Next steps:** (1) preserve CP89 timeouts; CP81's corrected dry-run passes but deployment waits for safe independent model capacity without interfering with CP75; first bind memory intent to the existing protected policy before candidate mutation trials; (2) test same-task concurrency and unknown shell-result reconciliation using the existing gateway/effect ledger; (3) measure A2/DBOS net maintenance reduction rather than adding another recovery subsystem; (4) obtain fresh, classified Cinder v2 runtime/owner-acceptance evidence. Existing ownership boundaries remain unchanged. ADR-010 is NOT READY.
 **ADR-010:** NOT READY; owner ratification required
 
+**Continuation update (2026-10-14 16:47 CDT):** CP81 remains deferred pending owner-approved independent CPU model capacity; no generation or deployment occurred. A unique gateway integration regression for concurrent exact workspace-operation retries is published at `b55a3169bb4983e23867db76cc58dc85fcf67649`; Python compilation, diff check, and targeted secret scan passed, while exact-SHA CI is pending. Existing CP75/CP80 services remain untouched. Next: resolve that CI result, finish today's CP92 handoff, and only resume matched memory mutation/recall after explicit resource budgeting and protected request-to-mutation binding. Preserve model-turn concurrency and arbitrary shell reconciliation as unqualified.
+
 ## Objectives and order
 
 | Order | Workstream | State | Dependency / exit evidence |
