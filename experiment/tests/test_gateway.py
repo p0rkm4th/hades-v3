@@ -46,7 +46,7 @@ def seed_memory_fixture(token, key, value):
 
 
 class GatewayIntegration(unittest.TestCase):
-    def test_workspace_gateway_enforces_operator_review_waiting_state(self):
+    def test_workspace_gateway_blocks_new_operations_for_waiting_tasks(self):
         status, task = call("POST", "/v1/tasks", AMBER, {
             "goal": "Park workspace execution for operator review",
         })
@@ -70,6 +70,12 @@ class GatewayIntegration(unittest.TestCase):
         }, orchestrator=True)
         self.assertEqual((status, parked["state"]), (200, "WAITING"), parked)
 
+        status, replay = call("POST", "/v1/workspace/exec", AMBER, {
+            "task_id": task_id, "command": "pwd", "operation_id": first_id,
+        })
+        self.assertEqual((status, replay.get("effect_id"), replay.get("already_recorded")),
+                         (200, first["effect_id"], True))
+
         second_id = hashlib.sha256(f"{task_id}:new-after-review-park".encode()).hexdigest()
         status, rejected = call("POST", "/v1/workspace/exec", AMBER, {
             "task_id": task_id,
@@ -77,7 +83,7 @@ class GatewayIntegration(unittest.TestCase):
             "operation_id": second_id,
         })
         self.assertEqual(status, 409, rejected)
-        self.assertIn("operator review", rejected["error"])
+        self.assertIn("running task", rejected["error"])
         with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
             cur.execute(
                 "SELECT effect_id,state FROM effects WHERE task_id=%s AND effect_kind='WORKSPACE_COMMAND' ORDER BY created_at",
@@ -86,6 +92,36 @@ class GatewayIntegration(unittest.TestCase):
             rows = cur.fetchall()
         self.assertEqual(len(rows), 1, rows)
         self.assertEqual((str(rows[0][0]), rows[0][1]), (first["effect_id"], "CONFIRMED"))
+
+        status, approval_task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Do not run workspace operations while approval is pending",
+        })
+        self.assertEqual(status, 201, approval_task)
+        approval_task_id = approval_task["task_id"]
+        status, parked = call("POST", f"/v1/tasks/{approval_task_id}/checkpoint", AMBER, {
+            "state": "WAITING",
+            "checkpoint": {
+                "summary": "An approval is pending",
+                "completed": [],
+                "pending": ["operator approval"],
+                "approval_pending": True,
+            },
+            "_orchestrator_finalization": {"reason": "approval_pending"},
+        }, orchestrator=True)
+        self.assertEqual((status, parked["state"]), (200, "WAITING"), parked)
+        approval_op = hashlib.sha256(f"{approval_task_id}:unapproved".encode()).hexdigest()
+        status, rejected = call("POST", "/v1/workspace/exec", AMBER, {
+            "task_id": approval_task_id,
+            "command": "python -c \"from pathlib import Path; Path('.cp90-approval-bypass').write_text('x')\"",
+            "operation_id": approval_op,
+        })
+        self.assertEqual(status, 409, rejected)
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM effects WHERE task_id=%s AND effect_kind='WORKSPACE_COMMAND'",
+                (approval_task_id,),
+            )
+            self.assertEqual(cur.fetchone()[0], 0)
 
     def test_workspace_operation_retry_is_bound_to_identity_and_quarantines_unknown(self):
         status, task = call("POST", "/v1/tasks", AMBER, {

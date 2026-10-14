@@ -1,6 +1,6 @@
 # Current state
 
-**Campaign status:** CP90 added gateway enforcement for `operator_review_required` workspace tasks. The direct gateway regression passed after a confirmed command: a new operation identity was rejected and no second effect was recorded. Lifecycle (16/16) and candidate finalization (24/24) suites also passed. CP89's four matched structured-memory attempts and one scalar A attempt timed out before tool selection under the available CPU profiles; canonical memory and effect state were unchanged. CP89 did not change CP81 or CP85 scores. ADR-010 remains NOT READY.
+**Campaign status:** CP90 added gateway enforcement requiring tasks to be `RUNNING` before new workspace dispatch. It preserves exact confirmed-result replay and quarantines unresolved effects; direct tests confirmed new operations are rejected for both operator-review and pending-approval `WAITING` tasks. CP89's four matched structured-memory attempts and one scalar A attempt timed out before tool selection under available CPU profiles; canonical memory and effect state were unchanged. CP89 did not change CP81 or CP85 scores. ADR-010 remains NOT READY.
 
 **Current unscored source correction:** CP86 reproduced Pydantic A's pinned OpenAI SDK retry default with an offline strict mock and disabled hidden HTTP retries (`max_retries=0`) for future runs. A source-level regression passes. CP85 results remain unchanged; no inference was repeated. See [CP86 report](CP86_PROVIDER_RETRY_ACCOUNTING.md).
 

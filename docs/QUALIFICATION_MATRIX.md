@@ -242,8 +242,8 @@ The keyed CAS gateway integration passed: same-task exact retry returned the ori
 | Property | A | B | C | Evidence / remaining gap |
 |---|---|---|---|---|
 | Candidate behavior | Not scored | Not scored | Not scored | Gateway contract test only; no model/harness comparison. |
-| Parked-task enforcement | Pass | Shared gateway boundary | Shared gateway boundary | A `WAITING` task marked `operator_review_required` rejected a distinct workspace operation with HTTP 409. Independent ledger inspection found only the original confirmed effect. |
+| Parked-task enforcement | Pass | Shared gateway boundary | Shared gateway boundary | New operations on `WAITING` tasks are rejected with HTTP 409, including operator-review and pending-approval states. Exact confirmed replay returns the prior result; no second effect is created. |
 | Regression suites | N/A | N/A | N/A | Gateway integration 9/9; task lifecycle 16/16; candidate finalization 24/24. |
 | Remaining recovery risk | Unqualified | Unqualified | Unqualified | Concurrent same-task turns are not serialized; a distinct identity after confirmation cannot be distinguished from a legitimate next command without durable invocation identity. Arbitrary uncertain shell results remain quarantined. |
 
-CP90 closes a direct gateway bypass of the sequential CP88 review park. It does not establish cross-restart general shell continuation, exactly-once execution, or candidate qualification. See [CP90 report](CP90_WORKSPACE_REVIEW_GATE.md). ADR-010 remains **NOT READY**.
+CP90 closes a direct gateway bypass of the sequential CP88 review park for new operations. It does not establish cross-restart general shell continuation, exactly-once execution, or candidate qualification. See [CP90 report](CP90_WORKSPACE_REVIEW_GATE.md). ADR-010 remains **NOT READY**.

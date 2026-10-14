@@ -988,9 +988,6 @@ class Handler(BaseHTTPRequestHandler):
                 raise ClientError(404, "task not found")
             if task["state"] not in {"RUNNING", "WAITING"}:
                 raise ClientError(409, "task is not active")
-            if (task["state"] == "WAITING"
-                    and (task.get("checkpoint") or {}).get("operator_review_required")):
-                raise ClientError(409, "workspace operation requires operator review")
             cur.execute(
                 "SELECT effect_id,state,request,result FROM effects "
                 "WHERE task_id=%s AND user_id=%s AND domain_id=%s "
@@ -1046,6 +1043,8 @@ class Handler(BaseHTTPRequestHandler):
                     "state": "QUARANTINED",
                     "inspection_required": True,
                 })
+            if task["state"] != "RUNNING":
+                raise ClientError(409, "new workspace operation requires a running task")
             request_value = {
                 "command": command,
                 "operation_id": operation_id,
