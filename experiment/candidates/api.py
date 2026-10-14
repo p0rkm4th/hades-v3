@@ -49,6 +49,24 @@ def provider_diagnostic(text: str) -> bool:
     return isinstance(text, str) and any(pattern.search(text) for pattern in _PROVIDER_DIAGNOSTICS)
 
 
+def classify_turn_exception(current: dict, turn_evidence: list[dict]):
+    """Choose a safe durable state after a failed model/tool turn."""
+    if not isinstance(current, dict) or current.get("state") != "RUNNING":
+        return None
+    effect_states = [item.get("state") for item in current.get("effects", [])]
+    if any(item.get("tool") in {"memory_write", "memory_correct"} for item in turn_evidence):
+        return "WAITING", "memory_effect_evidence_unproven"
+    if any(item.get("approval_pending") for item in turn_evidence):
+        return "WAITING", "approval_pending_after_error"
+    if (any(state in {"INTENDED", "DISPATCHED", "QUARANTINED", "UNRESOLVED"}
+            for state in effect_states)
+            or any(item.get("uncertain") for item in turn_evidence)):
+        return "WAITING", "effect_outcome_uncertain_after_error"
+    if effect_states and all(state == "CONFIRMED" for state in effect_states):
+        return "WAITING", "final_response_pending"
+    return "FAILED", "candidate_runtime_error"
+
+
 HERMES_ENDPOINT = {
     "fixture-token-amber": (os.environ.get("HERMES_AMBER_ENDPOINT", "http://hermes-amber:8642/v1/chat/completions"), "fixture-hermes-amber"),
     "fixture-token-cobalt": (os.environ.get("HERMES_COBALT_ENDPOINT", "http://hermes-cobalt:8642/v1/chat/completions"), "fixture-hermes-cobalt"),
@@ -646,42 +664,34 @@ class Handler(BaseHTTPRequestHandler):
             if active_token and active_task_id:
                 try:
                     current = gateway_call("task_resume", {}, active_token, active_task_id)
-                    if current.get("state") == "RUNNING":
-                        approval_pending = any(item.get("approval_pending") for item in turn_evidence)
-                        effect_states = [item.get("state") for item in current.get("effects", [])]
-                        uncertain = any(state in {"INTENDED", "DISPATCHED", "QUARANTINED", "UNRESOLVED"}
-                                        for state in effect_states) or any(
-                                            item.get("uncertain") for item in turn_evidence
-                                        )
-                        if any(item.get("tool") in {"memory_write", "memory_correct"}
-                               for item in turn_evidence):
+                    decision = classify_turn_exception(current, turn_evidence)
+                    if decision is not None:
+                        state, reason = decision
+                        if state == "FAILED":
                             transition_task(
-                                active_token, active_task_id, "WAITING", tools_used,
-                                finalization={"response_nonempty": False, "tool_evidence": turn_evidence},
-                                annotations={"memory_effect_evidence_unproven": True,
-                                             "task_finalization": {"reason": "memory_effect_evidence_unproven"}},
-                            )
-                        elif approval_pending:
-                            transition_task(
-                                active_token, active_task_id, "WAITING", tools_used,
-                                finalization={"response_nonempty": False, "tool_evidence": turn_evidence},
-                                annotations={"approval_pending": True, "task_finalization": {"reason": "approval_pending_after_error"}},
-                            )
-                        elif uncertain:
-                            transition_task(
-                                active_token, active_task_id, "WAITING", tools_used,
-                                finalization={"response_nonempty": False, "tool_evidence": []},
-                                annotations={"effect_outcome_uncertain": True, "task_finalization": {"reason": "effect_outcome_uncertain_after_error"}},
-                            )
-                        elif effect_states and all(state == "CONFIRMED" for state in effect_states):
-                            transition_task(
-                                active_token, active_task_id, "WAITING", tools_used,
-                                finalization={"response_nonempty": False, "tool_evidence": turn_evidence},
-                                annotations={"final_response_pending": True,
-                                             "task_finalization": {"reason": "final_response_pending"}},
+                                active_token, active_task_id, state, tools_used, type(exc).__name__
                             )
                         else:
-                            transition_task(active_token, active_task_id, "FAILED", tools_used, type(exc).__name__)
+                            if reason == "memory_effect_evidence_unproven":
+                                annotations = {reason: True, "task_finalization": {"reason": reason}}
+                                evidence = turn_evidence
+                            elif reason == "approval_pending_after_error":
+                                annotations = {"approval_pending": True,
+                                               "task_finalization": {"reason": reason}}
+                                evidence = turn_evidence
+                            elif reason == "effect_outcome_uncertain_after_error":
+                                annotations = {"effect_outcome_uncertain": True,
+                                               "task_finalization": {"reason": reason}}
+                                evidence = []
+                            else:
+                                annotations = {"final_response_pending": True,
+                                               "task_finalization": {"reason": reason}}
+                                evidence = turn_evidence
+                            transition_task(
+                                active_token, active_task_id, state, tools_used,
+                                finalization={"response_nonempty": False, "tool_evidence": evidence},
+                                annotations=annotations,
+                            )
                 except Exception as checkpoint_exc:
                     print(f"Could not close failed task: {type(checkpoint_exc).__name__}")
             print(f"Candidate request rejected: {type(exc).__name__}: {exc}")

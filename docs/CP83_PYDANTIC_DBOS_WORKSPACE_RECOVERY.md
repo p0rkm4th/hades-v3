@@ -45,6 +45,8 @@ A second isolated run exercised an actual uncertain command: the synthetic shell
 
 A separate observer task read the workspace and found exactly one marker. Repeating the failed resume produced no additional model generation or HADES effect. The observer then removed the synthetic marker. This proves fail-closed replay behavior and no duplicate execution for this timeout path, but it does **not** reconcile or complete the original task. An initial test assertion expected a model-generated uncertainty response; the observed runtime exception showed that was not the actual behavior, so acceptance was corrected to preserve the exception as failure evidence rather than treating it as a product pass.
 
+The isolated DBOS runner intentionally bypasses the HADES candidate API orchestrator, so that task remained `RUNNING`. The existing API exception path classifies a quarantined effect as `WAITING` for reconciliation and a confirmed effect with lost response as `WAITING` for response recovery. This classification was extracted without changing its decisions and now has direct regression coverage; the Pydantic/Harness/DBOS flow has **not** yet been run through that API path end to end. The candidate finalization suite passed 24 tests after the addition.
+
 The quarantine case is a distinct single contract trial, not part of the 3/3 confirmed-result repetition count. Both unique CP83 projects were removed by project-scoped cleanup; CP75/CP80 remained at 14 running containers and disk remained at 39 GB. The quarantined effect is retained only in the disposable experiment database, which was removed with its project.
 
 ## Next decision-changing test
