@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import time
 import uuid
 import urllib.error
 import urllib.request
@@ -136,6 +137,12 @@ def candidate_error_category(status, payload):
     return None
 
 
+def elapsed_ms(started_at, finished_at=None):
+    """Wall time from the test runner, including HTTP failures and timeouts."""
+    finished_at = time.monotonic() if finished_at is None else finished_at
+    return max(0, round((finished_at - started_at) * 1000))
+
+
 def run_candidate(candidate, case_name, phase, replicate, task_id=None):
     case = CASES[case_name]
     source_task_id = None
@@ -185,11 +192,13 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
         task_id = recall_task["task_id"]
         message = case["recall"]
 
+    request_started_at = time.monotonic()
     status, result = request_json(CANDIDATE_API + "/api/turn", body={
         "candidate": candidate, "user_token": TOKEN,
         "messages": [{"role": "user", "content": message}],
         "task_id": task_id,
     })
+    request_wall_ms = elapsed_ms(request_started_at)
     durable_task, effects = durable_task_and_effects(task_id)
     if durable_task is None:
         raise RuntimeError("independent durable task read failed")
@@ -215,6 +224,7 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
         "canonical_value": None, "canonical_revision": None,
         "model_generations": result.get("model_generations"),
         "duration_ms": result.get("duration_ms"),
+        "request_wall_ms": request_wall_ms,
         "answer": result.get("text", "") if status == 200 else "",
         "retry_behavior": "gateway exact/changed retry covered separately by database integration test",
     }

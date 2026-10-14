@@ -1,6 +1,6 @@
 import unittest
 
-from run_cp81_memory_case import CASES, answer_matches, candidate_error_category
+from run_cp81_memory_case import CASES, answer_matches, candidate_error_category, elapsed_ms
 
 
 class Cp81MemoryAnswerOracleTests(unittest.TestCase):
@@ -29,6 +29,10 @@ class Cp81MemoryAnswerOracleTests(unittest.TestCase):
         self.assertEqual(candidate_error_category(502, {"error": "provider rejected request"}), "http_502")
         self.assertEqual(candidate_error_category(200, {"error": "candidate failure"}), "candidate_reported_error")
         self.assertEqual(candidate_error_category(200, {"invalid_json_response": True}), "invalid_json_response")
+
+    def test_runner_wall_time_is_available_for_provider_failure_records(self):
+        self.assertEqual(elapsed_ms(10.0, 10.275), 275)
+        self.assertEqual(elapsed_ms(10.275, 10.0), 0)
 
 
 if __name__ == "__main__":
