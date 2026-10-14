@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP86 disabled Candidate A's hidden OpenAI HTTP retries for future runs; CP87 tested the existing A2 identity recovery boundary; CP88 now parks stateless task resumes after confirmed workspace effects rather than risk a new operation identity. The offline regression passed; no model inference or live infrastructure was used. CP85's timed-out result remains unchanged. Next: continue the CP81 CAS memory contract qualification and source-level ADR-010 simplification analysis; do not rerun inference until adequate isolated CPU capacity is available.
+**Current workstream:** CP86 disabled Candidate A's hidden OpenAI HTTP retries; CP87 reviewed workspace replay identities; CP88 adds a sequential fail-closed resume guard, with database-backed exact-SHA CI passing. CP89 repeated CP81's existing structured A/C memory case and timed out before tools under matched 4- and 8-CPU profiles; no canonical memory changed and no CAS effect was created. The isolated CP89 containers are stopped, with their volumes/networks awaiting Tallowmere's cleanup review. CP81 historical results and CP85 negative evidence are unchanged. Next: advance deterministic recovery/authorization and assess whether A2/DBOS reduces real maintenance cost; do not repeat the timed-out prompt with a larger CPU cap or timeout.
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -38,11 +38,12 @@ Research and bounded disposable integrations continue without live GPU access. S
 
 ## Current next steps
 
-1. Preserve CP81's mixed A/C outcomes and CP85's matched pre-tool timeouts. Do not raise the CP85 CPU cap or repeat inference while host load is near capacity; resume model-equivalent memory correction/recall only with reserved CPU/memory, then use a fresh held-out task.
+1. Preserve CP81's mixed A/C outcomes and CP85/CP89 pre-tool timeouts. CP89 used an independently named project and matched A/C profiles up to eight CPUs; further attempts on the same memory wording/profile are not decision-useful. Memory qualification remains incomplete; a future held-out model comparison needs a separately qualified latency/resource profile.
 2. Keep CP83/84 guarantees bounded: same confirmed effect is replayed, unknown outcomes quarantine and block; neither DBOS nor a stable command ID proves exactly-once arbitrary shell effects. CP84 reuses HADES `gateway_call` and `finalize_turn` but does not run the candidate HTTP Handler or Harness Shell.
 3. Compare the minimum CP84 DBOS integration against A2 StepPersistence for uncertain outcomes, delivery recovery, history privacy, cancellation/retry bounds, and operations burden before adoption.
 4. Advance deterministic CAS, stale-revision, cross-domain, replay, compound-operation, and protected-action contracts with independent postconditions; refresh Cinder's v2 evidence only from an agreed read-only snapshot.
-5. Keep CP71 `BLOCKED_EXTERNAL_DEPENDENCY`; no Hypnos, privileged firewall, HADES v2, frozen-document, or production work. CP75/CP80 remain untouched.
+5. Review the newly identified concurrent `/api/turn` resume boundary: CP88 protects sequential resumes after a confirmed workspace effect but does not serialize concurrent turns. Investigate durable turn identity/history within existing task authority before claiming automatic recovery.
+6. Keep CP71 `BLOCKED_EXTERNAL_DEPENDENCY`; no Hypnos, privileged firewall, HADES v2, frozen-document, or production work. CP75/CP80 remain untouched.
 
 ## CP81 checkpoint — bounded memory completion contract
 
