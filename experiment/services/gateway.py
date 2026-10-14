@@ -980,7 +980,7 @@ class Handler(BaseHTTPRequestHandler):
             # Serialize command identity checks and effect creation through the
             # existing task row; a duplicate caller cannot race the first insert.
             cur.execute(
-                "SELECT state FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s FOR UPDATE",
+                "SELECT state,checkpoint FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s FOR UPDATE",
                 (task_uuid, user_id, domain_id),
             )
             task = cur.fetchone()
@@ -988,6 +988,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise ClientError(404, "task not found")
             if task["state"] not in {"RUNNING", "WAITING"}:
                 raise ClientError(409, "task is not active")
+            if (task["state"] == "WAITING"
+                    and (task.get("checkpoint") or {}).get("operator_review_required")):
+                raise ClientError(409, "workspace operation requires operator review")
             cur.execute(
                 "SELECT effect_id,state,request,result FROM effects "
                 "WHERE task_id=%s AND user_id=%s AND domain_id=%s "

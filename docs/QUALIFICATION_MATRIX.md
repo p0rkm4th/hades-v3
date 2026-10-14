@@ -236,3 +236,14 @@ CP88 adds a fail-closed guard to the stateless shared candidate API: a task with
 The source revision was `33ab8587f43272f8bc482c6ccfa92ab1457ba0f9`; A used Pydantic AI 2.55.0/OpenAI 3.29.0 with transport retries disabled. Both model profiles used Qwen3-8B Q4_K_M, 40,960 context, temperature 0, 1,024 output-token ceiling, and 50-second request timeout. The structured case repeats CP81's existing `weekly_structured` wording; this was not a held-out prompt. Each candidate attempt made one upstream request and returned no successful generation. These results support a provider/runtime timeout classification; they do not score memory selection or CAS behavior. CP81's prior scalar/list outcomes and CP85's held-out lab-report case remain unchanged. No successful CP89 mutation means no CP89 fresh-context recall. See [CP89 report](CP89_MEMORY_SCREEN_REPORT.md) and [sanitized records](../experiment/results/cp89-memory-screen-20261014.jsonl).
 
 The keyed CAS gateway integration passed: same-task exact retry returned the original effect; changed retry, stale revision, wrong user, and wrong domain rejected without canonical mutation. The candidate finalization suite passed 24/24 offline tests, including false completion claims and provider-failure behavior. CP89 does not establish candidate memory qualification because all current model attempts timed out before tools.
+
+## CP90 — Workspace review-gate enforcement
+
+| Property | A | B | C | Evidence / remaining gap |
+|---|---|---|---|---|
+| Candidate behavior | Not scored | Not scored | Not scored | Gateway contract test only; no model/harness comparison. |
+| Parked-task enforcement | Pass | Shared gateway boundary | Shared gateway boundary | A `WAITING` task marked `operator_review_required` rejected a distinct workspace operation with HTTP 409. Independent ledger inspection found only the original confirmed effect. |
+| Regression suites | N/A | N/A | N/A | Gateway integration 9/9; task lifecycle 16/16; candidate finalization 24/24. |
+| Remaining recovery risk | Unqualified | Unqualified | Unqualified | Concurrent same-task turns are not serialized; a distinct identity after confirmation cannot be distinguished from a legitimate next command without durable invocation identity. Arbitrary uncertain shell results remain quarantined. |
+
+CP90 closes a direct gateway bypass of the sequential CP88 review park. It does not establish cross-restart general shell continuation, exactly-once execution, or candidate qualification. See [CP90 report](CP90_WORKSPACE_REVIEW_GATE.md). ADR-010 remains **NOT READY**.

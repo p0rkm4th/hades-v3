@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP86 disabled Candidate A's hidden OpenAI HTTP retries; CP87 reviewed workspace replay identities; CP88 adds a sequential fail-closed resume guard, with database-backed exact-SHA CI passing. CP89 repeated CP81's existing structured A/C memory case and timed out before tools under matched 4- and 8-CPU profiles; no canonical memory changed and no CAS effect was created. The isolated CP89 containers are stopped, with their volumes/networks awaiting Tallowmere's cleanup review. CP81 historical results and CP85 negative evidence are unchanged. Next: advance deterministic recovery/authorization and assess whether A2/DBOS reduces real maintenance cost; do not repeat the timed-out prompt with a larger CPU cap or timeout.
+**Current workstream:** CP90 now enforces at the gateway that a task parked `WAITING` with `operator_review_required` cannot accept a distinct workspace operation. The isolated gateway regression passed and its own test project is stopped; resources are retained for Tallowmere's cleanup review. CP89's A/C model attempts timed out before tool selection at matched 4/8 CPU profiles; no mutation occurred and CP81/CP85 evidence remains unchanged. CP71 is blocked and no Hypnos traffic is authorized. Next: finish the bounded A2/DBOS recovery-versus-complexity assessment and run decision-relevant offline authorization or compound-operation checks. Preserve the unresolved concurrent-turn boundary; do not claim arbitrary shell exactly-once behavior.
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -15,6 +15,7 @@
 | 4 | Durable-engine integration spike | CP84 crossed process death after confirmed effect and before finalization, then completed through HADES finalizer 3/3 | Unknown outcomes, container/host restart, history privacy, cancellation/retry, and net maintenance burden remain |
 | 5 | Compound work, general-purpose agency, recovery, protected actions | Planned | Held-out matched trials and independent final-state/security verification |
 | 6 | Deletion-oriented simplification and ADR-010 evidence review | Planned | Replacement parity, reduced maintenance surface, decision-readiness table |
+| 7 | CP90 parked workspace review-gate enforcement | Passed gateway contract; source-level concurrent-turn risk remains | New distinct workspace operation blocked with 409 while review marker is set; no second effect. See CP90 report. |
 
 ## Verified baseline
 

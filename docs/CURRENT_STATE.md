@@ -1,6 +1,6 @@
 # Current state
 
-**Campaign status:** CP89 repeated CP81's structured-memory case for A and C under matched four- and eight-CPU profiles; all four attempts timed out before tool selection with canonical memory unchanged and zero effects. One scalar A attempt also timed out. CP89 did not change CP81 or CP85 scores and does not rank the harnesses. The exact-key CAS database contract passed, candidate finalization passed 24/24 offline tests, and the CP88 database-backed resume guard passed exact-SHA CI. ADR-010 remains NOT READY.
+**Campaign status:** CP90 added gateway enforcement for `operator_review_required` workspace tasks. The direct gateway regression passed after a confirmed command: a new operation identity was rejected and no second effect was recorded. Lifecycle (16/16) and candidate finalization (24/24) suites also passed. CP89's four matched structured-memory attempts and one scalar A attempt timed out before tool selection under the available CPU profiles; canonical memory and effect state were unchanged. CP89 did not change CP81 or CP85 scores. ADR-010 remains NOT READY.
 
 **Current unscored source correction:** CP86 reproduced Pydantic A's pinned OpenAI SDK retry default with an offline strict mock and disabled hidden HTTP retries (`max_retries=0`) for future runs. A source-level regression passes. CP85 results remain unchanged; no inference was repeated. See [CP86 report](CP86_PROVIDER_RETRY_ACCOUNTING.md).
 

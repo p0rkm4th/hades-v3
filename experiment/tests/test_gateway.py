@@ -46,6 +46,47 @@ def seed_memory_fixture(token, key, value):
 
 
 class GatewayIntegration(unittest.TestCase):
+    def test_workspace_gateway_enforces_operator_review_waiting_state(self):
+        status, task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Park workspace execution for operator review",
+        })
+        self.assertEqual(status, 201, task)
+        task_id = task["task_id"]
+        first_id = hashlib.sha256(f"{task_id}:confirmed-before-review".encode()).hexdigest()
+        status, first = call("POST", "/v1/workspace/exec", AMBER, {
+            "task_id": task_id, "command": "pwd", "operation_id": first_id,
+        })
+        self.assertEqual((status, first["state"]), (200, "CONFIRMED"), first)
+
+        status, parked = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "WAITING",
+            "checkpoint": {
+                "summary": "Confirmed workspace operation needs review before continuation",
+                "completed": ["original workspace operation"],
+                "pending": ["operator review"],
+                "operator_review_required": True,
+            },
+            "_orchestrator_finalization": {"reason": "workspace_resume_requires_persisted_identity"},
+        }, orchestrator=True)
+        self.assertEqual((status, parked["state"]), (200, "WAITING"), parked)
+
+        second_id = hashlib.sha256(f"{task_id}:new-after-review-park".encode()).hexdigest()
+        status, rejected = call("POST", "/v1/workspace/exec", AMBER, {
+            "task_id": task_id,
+            "command": "python -c \"from pathlib import Path; Path('.cp90-should-not-run').write_text('x')\"",
+            "operation_id": second_id,
+        })
+        self.assertEqual(status, 409, rejected)
+        self.assertIn("operator review", rejected["error"])
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT effect_id,state FROM effects WHERE task_id=%s AND effect_kind='WORKSPACE_COMMAND' ORDER BY created_at",
+                (task_id,),
+            )
+            rows = cur.fetchall()
+        self.assertEqual(len(rows), 1, rows)
+        self.assertEqual((str(rows[0][0]), rows[0][1]), (first["effect_id"], "CONFIRMED"))
+
     def test_workspace_operation_retry_is_bound_to_identity_and_quarantines_unknown(self):
         status, task = call("POST", "/v1/tasks", AMBER, {
             "goal": "Write one synthetic workspace marker exactly once",
