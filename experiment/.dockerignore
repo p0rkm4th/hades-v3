@@ -9,3 +9,6 @@
 !tests/**
 !scripts/
 !scripts/**
+!spikes/
+!spikes/a2_gateway_workspace/
+!spikes/a2_gateway_workspace/**

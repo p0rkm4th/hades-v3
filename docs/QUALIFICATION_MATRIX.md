@@ -114,3 +114,15 @@ CP74 shows a shared durability contract improvement and a candidate/model correc
 | Fresh-context read after restart | Scalar correct and `COMPLETED` | Not run | Scalar correct and `COMPLETED`; list recall later made no tool call and failed | Retrieval is inconsistent; successful corrections do not establish the full workflow. |
 
 CP75 establishes that stable-key CAS fixes the brittle old-value serialization boundary and that the existing effect ledger can prove atomic, scoped memory changes. It does not qualify candidate memory continuity: A and C each had two safe persisted mutations and one failed no-tool structured attempt, while completion and recall remained inconsistent. CP74's 404 failures remain unchanged. Hermes is unassessed; 40,960 context is below its 64,000 minimum. See [CP75 report](CP75_MEMORY_CAS_REPORT.md) and [sanitized records](../experiment/results/cp75_memory_cas.jsonl). ADR-010 remains NOT READY.
+
+## CP78 — separate Pydantic AI Harness A2 workspace integration
+
+| Dimension | Historical A | A2 Harness proof | B | C | Evidence / limit |
+|---|---|---|---|---|---|
+| Scope and model | Unchanged | Separate pinned integration candidate; deterministic `FunctionModel` | Not run | Not part of this comparison | A2 does not replace or rescore A. No live inference or model-quality evidence. |
+| Gateway-backed workspace task | Historical evidence unchanged | 3/3 clean repetitions | Not run | Not run | `Shell` + `FileSystem` used a command-only supported backend routed through authenticated `workspace_exec`. |
+| Independent outcome | — | 3/3 source and tests passed | — | — | Independent oracle reran tests, checked source, and inspected task/effect records. Task intentionally remained `RUNNING`. |
+| Effects and overhead | — | 18 candidate commands + 1 oracle command per run; 19 confirmed workspace effects | — | — | No memory or other effects. High overhead for the small synthetic task; compare Shell-only. |
+| Isolation / recovery | — | Bounded operator-only internal network check; no workspace/database DNS resolution | — | — | Not a complete adversarial egress test. Uncertain command recovery, background execution, task finalization, and live model behavior remain unqualified. |
+
+CP78 establishes that upstream Harness workspace tools can compose with the existing HADES gateway and effect ledger in a deterministic synthetic repository task. It does not qualify A2 as an agent or compare A/B/C. See [CP78 report](CP78_A2_HARNESS_WORKSPACE_REPORT.md). Historical CP67–CP74 scores and failures remain unchanged. CP71 remains blocked on host firewall privilege; no GPU was used. ADR-010 remains NOT READY.

@@ -145,6 +145,12 @@ The CP77 DBOS subprocess probe passed exact-SHA CI, but it remains a SQLite cont
 
 These are the only selected spikes for this assessment. Temporal, Restate, Prefect, Testcontainers, and OTel remain alternatives or targeted utilities, not parallel deployments. DBOS should be tested first; the A2 spike can proceed independently and must not alter scored A/B/C.
 
+### CP78 A2 integration evidence
+
+The separate A2 proof now exercises the pinned Harness `Shell` and `FileSystem` with a command-only `WorkspaceBackend` routed through HADES `workspace_exec`. Three deterministic repetitions completed a synthetic read/edit/test task, and an independent oracle verified source, tests, and all task-linked workspace effects. This validates the supported extension point and HADES composition, not model capability or historical Candidate A. The task was deliberately left `RUNNING` to exclude finalization from the experiment.
+
+The combined Shell/FileSystem configuration generated 18 candidate-side workspace commands per small task. This is a concrete efficiency cost and argues for a controlled Shell-only comparison before adopting both capabilities. The adapter also must preserve the gateway's fixed environment and 20-second timeout and has no retry for uncertain command outcomes. `Coder` remains untested. Retain the narrow adapter as a viable composition hypothesis; do not add direct filesystem authority or score A2 as a harness win. See [CP78 report](CP78_A2_HARNESS_WORKSPACE_REPORT.md) and [reproducible probe](../experiment/spikes/a2_gateway_workspace/README.md).
+
 ## Updated decision path
 
 CP75 materially improved the trusted memory mutation boundary but did not qualify candidate correction: successful scalar/list mutations still stayed `WAITING`, structured corrections got no tool call, and fresh-context recall was inconsistent. This is a candidate/model interaction gap, not evidence to build another memory engine. Next decision-changing evidence is (a) the two bounded reuse spikes above, (b) repeated held-out memory correction/resume with the established CAS contract and task-finalization behavior, and (c) held-out compound/protected-action tasks. No further live Hypnos generation is authorized. CP71 remains `BLOCKED_EXTERNAL_DEPENDENCY`.

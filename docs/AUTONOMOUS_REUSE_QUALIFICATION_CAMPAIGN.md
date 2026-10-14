@@ -38,8 +38,9 @@ Research and bounded disposable integrations continue without live GPU access. S
 
 ## Current next steps
 
-1. Build the A2 proof around Pydantic AI's supported `WorkspaceBackend` protocol, with its command runner calling the authenticated HADES `workspace_exec` gateway. Never attach `LocalWorkspaceBackend`, direct SSH, or the Harness's default local shell to an untrusted candidate. Run a synthetic repository task in a unique disposable project and independently inspect the task/effect ledger and repository state. If the adapter needs to bypass gateway effects, stop the hypothesis.
-2. Then integrate DBOS with the real HADES gateway and commitment simulator in a different unique disposable project. The existing SQLite probe only established DBOS step replay plus target-side idempotency.
+1. Run the bounded DBOS integration against the real HADES gateway and commitment simulator in a separate unique disposable project. The CP77 SQLite probe established only step replay plus target-side idempotency; stop if DBOS requires a second task/effect authority.
+2. Compare A2 Shell-only against Shell plus FileSystem using the same synthetic task and independent oracle. Keep it separate from scored Candidate A. Investigate uncertain workspace-command recovery using existing gateway mechanisms before adding custom recovery code.
+3. Continue task-linked memory correction/retrieval only after recording the known CP75 outcomes; CP71 remains blocked and no Hypnos generations are authorized.
 
 The CP77 DBOS probe is published and exact-SHA CI passed: run `38508417305` for `88d1017e7a27b87324ead831dcf4dd61f9720c75`. This is still contract evidence only. Do not introduce persistent services or change A/B/C scores. CP71 stays `BLOCKED_EXTERNAL_DEPENDENCY`; no firewall checks or Hypnos inference.
 
@@ -68,3 +69,11 @@ The CP77 DBOS probe is published and exact-SHA CI passed: run `38508417305` for 
 - **Security finding:** upstream explicitly documents that Shell allowlists and FileSystem root checks are guardrails, not isolation. `LocalWorkspaceBackend` would execute on the agent host and bypass HADES effect records. `Coder` includes unrestricted shell by default. A2 must use only the HADES-backed workspace, with no local workspace, SSH, host mount, or direct candidate access to other services.
 - **Fit and limitation:** a command-only adapter appears sufficient for foreground commands and shell-derived file operations. The existing gateway does not pass per-call env/timeout controls, and its runner has a fixed command timeout; these semantics need explicit tests. Do not claim background/persistent shell compatibility until measured. The adapter is HADES-specific glue, while command and file-agent capabilities remain upstream.
 - **Decision:** A2 is feasible enough for one disposable proof, not yet qualified. If `WorkspaceBackend` needs direct filesystem or shell access that evades gateway records, reject the composition. Keep historical Candidate A and all prior scores unchanged.
+
+## CP78 checkpoint (2026-10-14): A2 gateway workspace contract
+
+- A separate A2 proof used pinned Pydantic AI Harness `0.56.0` and Pydantic AI `2.56.0` with the supported command-only `WorkspaceBackend`. Every operation passed through authenticated HADES `workspace_exec`; no local shell, host mount, SSH, or live model was used.
+- Three clean deterministic repetitions each used four scripted model calls, 18 candidate workspace commands and one independent oracle command. All 19 effects per run were confirmed; the independent test/source oracle passed. Task state intentionally remained `RUNNING`, so this does not test finalization or score historical Candidate A. See [CP78 report](CP78_A2_HARNESS_WORKSPACE_REPORT.md) and [pinned probe](../experiment/spikes/a2_gateway_workspace/README.md).
+- The combined Shell/FileSystem route has high command/effect overhead for this small task. Compare a Shell-only route before accepting extra capability. Fixed gateway environment/timeout and uncertain-command recovery remain limitations; upstream `Coder` is not qualified.
+- The previous exact-SHA CI failure at fixture startup remains unexplained. Local equivalent startup and uncached build passed; do not infer the hosted failure's cause. The A2 CI route now uses its own unique project and unconditional cleanup; verify the newly published exact-SHA result.
+- All CP78 resources were removed. No HADES v2, Hypnos, firewall, or persistent service changed. CP71 remains `BLOCKED_EXTERNAL_DEPENDENCY`; ADR-010 remains NOT READY.
