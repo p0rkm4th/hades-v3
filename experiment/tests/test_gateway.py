@@ -257,6 +257,17 @@ class GatewayIntegration(unittest.TestCase):
             "value": after,
         })
         self.assertEqual(status, 200, changed)
+        effect_id = changed["effect_id"]
+        status, retry = call("POST", "/v1/memory/correct-by-key", AMBER, {
+            "task_id": task_id, "memory_key": key, "expected_revision": 1,
+            "value": after,
+        })
+        self.assertEqual((status, retry["effect_id"], retry["already_recorded"]),
+                         (200, effect_id, True))
+        self.assertEqual(call("POST", "/v1/memory/correct-by-key", AMBER, {
+            "task_id": task_id, "memory_key": key, "expected_revision": 1,
+            "value": {"format": "changed retry"},
+        })[0], 409)
         proof = {**false_claim, "reason": "trusted_success_criteria_satisfied"}
         status, complete = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
             "state": "COMPLETED", "checkpoint": checkpoint,
@@ -265,6 +276,8 @@ class GatewayIntegration(unittest.TestCase):
         self.assertEqual(status, 200, complete)
         self.assertEqual(complete["state"], "COMPLETED")
         self.assertEqual(complete["checkpoint"]["response_delivery"], "PERSISTED_PENDING_DELIVERY")
+        self.assertEqual(len(complete["effects"]), 1)
+        self.assertEqual(complete["effects"][0]["effect_id"], effect_id)
         status, canonical = call("GET", f"/v1/memory/{key}", AMBER)
         self.assertEqual((status, canonical["value"], canonical["revision"]), (200, after, 2))
 
