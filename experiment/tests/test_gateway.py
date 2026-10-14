@@ -276,6 +276,7 @@ class GatewayIntegration(unittest.TestCase):
         self.assertEqual(status, 200, complete)
         self.assertEqual(complete["state"], "COMPLETED")
         self.assertEqual(complete["checkpoint"]["response_delivery"], "PERSISTED_PENDING_DELIVERY")
+        self.assertEqual(complete["checkpoint"]["final_response"], proof["response"])
         status, completed_task = call("GET", f"/v1/tasks/{task_id}", AMBER)
         self.assertEqual(status, 200, completed_task)
         self.assertEqual(len(completed_task["effects"]), 1)
