@@ -57,7 +57,7 @@ def _test_stateless_resume_route() -> None:
             "messages": [{"role": "user", "content": "Continue the synthetic task"}],
         })
         with (
-            patch.object(api, "gateway_call", return_value=current),
+            patch.object(api, "gateway_call", return_value=current) as gateway,
             patch.object(api, "transition_task") as transition,
             patch.object(api, "chat_openai") as model,
         ):
@@ -70,6 +70,7 @@ def _test_stateless_resume_route() -> None:
             assert response.status == 409, (response.status, result)
             assert result["task_state"] == "WAITING" and result["operator_review_required"], result
             transition.assert_called_once()
+            gateway.assert_called_once_with("task_resume", {}, "fixture-token-amber", TASK_ID)
             model.assert_not_called()
     finally:
         server.shutdown()
@@ -94,6 +95,7 @@ def main() -> None:
             "fixture-token-amber", TASK_ID, "WAITING", [],
         ), transition.call_args
         assert transition.call_args.kwargs["error_type"] == "workspace_resume_requires_persisted_identity"
+        assert transition.call_args.kwargs["annotations"]["effect_outcome_uncertain"] is False
     with patch.object(api, "transition_task") as transition:
         guarded = api.workspace_resume_guard("fixture-token-amber", TASK_ID, {
             "state": "WAITING",
@@ -111,6 +113,7 @@ def main() -> None:
         guarded = api.workspace_resume_guard("fixture-token-amber", TASK_ID, {"state": "RUNNING"})
         assert guarded is not None and guarded["task_state"] == "WAITING", guarded
         assert transition.call_args.kwargs["error_type"] == "workspace_effect_snapshot_unavailable"
+        assert "effect_outcome_uncertain" not in transition.call_args.kwargs["annotations"]
     _test_stateless_resume_route()
 
     captured: list[dict] = []

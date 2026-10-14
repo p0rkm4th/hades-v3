@@ -532,13 +532,20 @@ def workspace_resume_guard(token: str, task_id: str, current: dict) -> dict | No
         return None
 
     if current.get("state") == "RUNNING":
+        annotations = {"operator_review_required": True, reason: True}
+        if effects and all(
+            isinstance(effect, dict)
+            and effect.get("state") in {"CONFIRMED", "REJECTED", "FAILED"}
+            for effect in effects
+        ):
+            annotations["effect_outcome_uncertain"] = False
         transition_task(
             token,
             task_id,
             "WAITING",
             [],
             error_type=reason,
-            annotations={"operator_review_required": True, reason: True},
+            annotations=annotations,
         )
     return {
         "error": "workspace continuation requires the original durable invocation identity",
