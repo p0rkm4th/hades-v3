@@ -12,7 +12,7 @@ The uncertain-effect path remains fail-closed: `DISPATCHED`/`QUARANTINED` effect
 
 ## Correction
 
-The candidate API now inspects the authenticated task/effect snapshot before resuming an active task. If any confirmed workspace command exists, it does not start a new model turn. A `RUNNING` task is sent through `transition_task` to `WAITING` with `operator_review_required`; an already `WAITING` task remains there. If the task response omits its effect list, resume is also parked because absence of effects cannot be assumed. The endpoint returns HTTP 409 with a sanitized explanation. No effect is reissued and no claim of completion or delivery is made.
+The candidate API now inspects the authenticated task/effect snapshot before resuming an active task. If any confirmed workspace command exists, it does not start a new model turn. A `RUNNING` task is sent through `transition_task` to `WAITING` with `operator_review_required`; when all recorded effects are terminal, stale uncertainty annotation is cleared without changing their effect records. An already `WAITING` task remains there. If the task response omits its effect list, resume is also parked because absence of effects cannot be assumed. The endpoint returns HTTP 409 with a sanitized explanation. No effect is reissued and no claim of completion or delivery is made.
 
 This is a conservative stopgap for the stateless A/B/C API. It intentionally sacrifices automatic continuation after a confirmed workspace effect until a runtime persists and authenticates the original invocation history and reconciles it against the HADES ledger. The separate A2 StepPersistence probe shows a path for preserving the call ID, but its HADES-aware resume gate remains test-only. This change does not claim exactly-once arbitrary shell execution or add another ledger.
 
@@ -26,6 +26,7 @@ This is a conservative stopgap for the stateless A/B/C API. It intentionally sac
 - A missing effect snapshot is parked fail-closed.
 - Pydantic A retains `max_retries=0`, and A/C workspace dispatch still binds to the persisted call identity.
 - A route-level `/api/turn` request with a confirmed workspace effect returns HTTP 409, requests the `WAITING` transition, and makes no candidate model call. The route test stubs gateway persistence; existing database-backed gateway CI separately exercises task/effect transitions.
+- A settled confirmed effect clears only the task's stale `effect_outcome_uncertain` annotation while parking; an incomplete/missing effect snapshot does not clear it.
 
 The regression passed in the cached pinned candidate image with current source mounted read-only, `--network none`, no capabilities, and no fixture service. It sent no model/provider request. The earlier CP85 and CP81 outcomes are unchanged. The full exact-SHA CI run is pending.
 
