@@ -36,6 +36,10 @@ def request_json(url: str, *, token: str | None = None, body: dict | None = None
 
 def main() -> None:
     attempts_before = request_json(SCRIPTED_STATE)[1]["attempts"]
+    with psycopg.connect(DATABASE_URL) as conn:
+        memory_before = conn.execute(
+            "SELECT user_id,count(*) FROM scoped_memory GROUP BY user_id ORDER BY user_id"
+        ).fetchall()
     status, task = request_json(GATEWAY + "/v1/tasks", token=TOKEN, body={
         "goal": "CP88 synthetic confirmed workspace resume guard",
     })
@@ -71,6 +75,7 @@ def main() -> None:
     effect_id = effect["effect_id"]
     effects = durable_task.get("effects", [])
     assert len(effects) == 1 and effects[0]["effect_id"] == effect_id, effects
+    assert effects[0]["effect_kind"] == "WORKSPACE_COMMAND", effects[0]
     assert effects[0]["state"] == "CONFIRMED", effects[0]
     assert effects[0].get("operation_id") == operation_id, effects[0]
 
@@ -84,6 +89,11 @@ def main() -> None:
     assert (str(rows[0][0]), rows[0][1], rows[0][2]) == (
         effect_id, "CONFIRMED", operation_id,
     ), rows
+    with psycopg.connect(DATABASE_URL) as conn:
+        memory_after = conn.execute(
+            "SELECT user_id,count(*) FROM scoped_memory GROUP BY user_id ORDER BY user_id"
+        ).fetchall()
+    assert memory_after == memory_before, (memory_before, memory_after)
     attempts_after = request_json(SCRIPTED_STATE)[1]["attempts"]
     assert attempts_after == attempts_before, (attempts_before, attempts_after)
     print("PASS CP88: one confirmed synthetic effect; durable task WAITING for review; no model retry")

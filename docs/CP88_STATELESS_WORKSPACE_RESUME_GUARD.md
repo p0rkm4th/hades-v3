@@ -31,7 +31,7 @@ This is a conservative stopgap for the stateless A/B/C API. It intentionally sac
 
 The regression passed in the cached pinned candidate image with current source mounted read-only, `--network none`, no capabilities, and no fixture service. It sent no model/provider request. The earlier CP85 and CP81 outcomes are unchanged. The full exact-SHA CI run is pending.
 
-A database-backed integration test is also added to the existing CP69 strict-offline CI fixture. It creates one synthetic task, runs a harmless `pwd` workspace command to produce a confirmed effect, resumes through the candidate HTTP route, then independently checks the persisted `WAITING` checkpoint, unchanged single effect ID/operation ID, and unchanged scripted-model request count. The test uses the existing project-scoped CI services and adds no local persistent infrastructure. Its exact-SHA result is pending.
+A database-backed integration test is also added to the existing CP69 strict-offline CI fixture. It creates one synthetic task, runs a harmless `pwd` workspace command to produce a confirmed effect, resumes through the candidate HTTP route, then independently checks the persisted `WAITING` checkpoint, unchanged single workspace effect ID/operation ID, unchanged memory row counts, and unchanged scripted-model request count. The test uses the existing project-scoped CI services and adds no local persistent infrastructure. Its exact-SHA result is pending.
 
 ## Limitations
 
