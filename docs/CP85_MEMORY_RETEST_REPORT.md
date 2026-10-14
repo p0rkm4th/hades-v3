@@ -37,3 +37,7 @@ Five uniquely tagged CP85 images remain for the cleanup lead to review; they wer
 CP85 does not complete the requested held-out correction/recall qualification. The resource cap was chosen to protect concurrent work; removing it after observing a timeout would risk saturating the host and alter the test condition. Do not repeat this task under a larger cap during this run. Continue with deterministic CAS, stale-revision, cross-domain, exact-retry, changed-retry, and lifecycle tests; revisit model-equivalent memory trials only when an isolated endpoint has adequate reserved CPU/memory capacity.
 
 ADR-010 remains **NOT READY**. CP71 remains `BLOCKED_EXTERNAL_DEPENDENCY`; no GPU, privileged host, HADES v2, production, or frozen-document activity occurred.
+
+## Publication and CI
+
+CP85 was published at `998cdc9fc61fd833b4a551d6f8ee8b638a233650`, and remote `main` matched. Exact-SHA CI run [38594357498](https://github.com/p0rkm4th/hades-v3/actions/runs/38594357498) failed at the pre-existing fixture startup step before tests ran: Docker Hub returned `toomanyrequests` while pulling Postgres/Grocy. The new CP85 Compose configuration step was not reached. An attempt to rerun only the failed GitHub Actions job was rejected with HTTP 403 because the connected GitHub integration lacks Actions write access. This is an external CI dependency; it is preserved as failure evidence and is not evidence of a CP85 test failure.
