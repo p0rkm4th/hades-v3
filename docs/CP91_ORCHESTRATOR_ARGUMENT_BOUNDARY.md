@@ -20,6 +20,7 @@ Model-facing calls now use `trusted_internal=False`. The proxy rejects either re
 - `test_candidate_finalization.py`: 25/25 passed locally; new regression checks forged `_orchestrator_resume` and forged `_orchestrator_finalization` both raise before `urlopen`.
 - `test_workspace_identity.py` passed in a cached candidate container with `--network none`, read-only filesystem/source, all capabilities dropped, and no-new-privileges. It confirms the trusted resume path explicitly marks its internal call.
 - Python compilation passed for the changed candidate and tests.
+- Full exact-SHA CI passed on `b747762dc0e3789abd577e86c0e716d8df165a65` in run [38612829657](https://github.com/p0rkm4th/hades-v3/actions/runs/38612829657), including the strict three-harness offline lifecycle and recovery suites.
 
 The regression proves the proxy no longer forwards model-supplied reserved fields. It is not a full adversarial live-model test or a claim that arbitrary code execution inside the candidate service could not access that service's configured secret. Keep the candidate service's tool-argument boundary and the gateway's independent evidence validation in place.
 
