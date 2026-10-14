@@ -1,17 +1,24 @@
 # A2 Harness workspace integration probe
 
-This probe uses Pydantic AI Harness `Shell` and `FileSystem` with a command-only
-`WorkspaceBackend` that sends each operation to the authenticated HADES
-`workspace_exec` route. It does not attach `LocalWorkspaceBackend` or execute
-model-provided commands on the agent host. The model is a deterministic
-Pydantic `FunctionModel` peer; this is protocol/integration evidence, not
-candidate-model qualification.
+This probe compares two profiles of pinned Pydantic AI Harness `0.56.0` and
+Pydantic AI `2.56.0`: `shell_filesystem` exposes `Shell` and `FileSystem`, while
+`shell_only` exposes only `Shell`. Both use the same command-only
+`WorkspaceBackend` that sends every operation to authenticated HADES
+`workspace_exec`. Neither attaches `LocalWorkspaceBackend` or executes a
+command on the agent host. The peer is a deterministic Pydantic `FunctionModel`,
+so results are contract evidence, not candidate-model qualification.
 
-The scripted Harness reads the current file and hash through `FileSystem`,
-conditionally writes the correction through `FileSystem`, then runs the tests
-through `Shell`. An independent check reruns the tests and verifies the source,
-then reads the task/effect ledger through the gateway. The task intentionally
-remains `RUNNING`: this probe tests workspace composition, not task finalization.
+Both profiles use identical task wording and fixture data. `shell_filesystem`
+reads and hashes the file through `FileSystem`, conditionally writes through
+`FileSystem`, then tests through `Shell`. `shell_only` reads/hashes, conditionally
+updates against the observed hash, and tests using three ordinary shell
+commands. An independent oracle reruns tests, verifies source and reads the
+task/effect ledger. The task intentionally remains `RUNNING`: this probe tests
+workspace composition, not task finalization.
+
+Three matched pairs are counterbalanced in CI. CP80 also has one earlier
+exploratory run per profile; all eight local tasks have preserved task IDs and
+independent outcome summaries in [`cp80_a2_workspace_profiles.jsonl`](../../results/cp80_a2_workspace_profiles.jsonl).
 
 Limitations: the gateway runner fixes its environment and a 20-second command
 timeout. The adapter rejects unsupported environment or timeout settings and

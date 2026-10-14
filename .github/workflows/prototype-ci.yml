@@ -98,7 +98,12 @@ jobs:
         run: docker compose -p "$A2_COMPOSE_PROJECT_NAME" --profile a2-harness -f experiment/compose.yaml -f experiment/compose.a2-harness.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway
 
       - name: Run Pydantic Harness gateway workspace contract probe
-        run: docker compose -p "$A2_COMPOSE_PROJECT_NAME" --profile a2-harness -f experiment/compose.yaml -f experiment/compose.a2-harness.yaml run --build --rm --no-deps a2-harness-runner
+        run: |
+          docker compose -p "$A2_COMPOSE_PROJECT_NAME" --profile a2-harness -f experiment/compose.yaml -f experiment/compose.a2-harness.yaml build a2-harness-runner
+          for profile in shell_filesystem shell_only shell_only shell_filesystem shell_filesystem shell_only; do
+            docker compose -p "$A2_COMPOSE_PROJECT_NAME" --profile a2-harness -f experiment/compose.yaml -f experiment/compose.a2-harness.yaml run --rm --no-deps -e "A2_TOOL_PROFILE=$profile" a2-harness-runner
+            docker compose -p "$A2_COMPOSE_PROJECT_NAME" --profile a2-harness -f experiment/compose.yaml -f experiment/compose.a2-harness.yaml run --rm --no-deps -e WORKSPACE_RESET=1 workspace-amber
+          done
 
       - name: Remove isolated A2 workspace fixtures
         if: always()
