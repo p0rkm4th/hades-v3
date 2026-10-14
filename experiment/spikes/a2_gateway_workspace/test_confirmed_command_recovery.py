@@ -98,6 +98,13 @@ def _worker(mode: str, task_id: str, store_path: Path) -> None:
     if mode == "crash":
         agent.run_sync("Write exactly one synthetic marker", workspace=workspace)
         raise AssertionError("fault-injected worker unexpectedly returned")
+    status, task_state = _call("GET", f"/v1/tasks/{task_id}")
+    if status != 200:
+        raise RuntimeError("recovery coordinator could not read canonical HADES task state")
+    pending = asyncio.run(store.list_unresolved_tool_effects(run_id=_RUN_ID))
+    decision = inspect_resume(task_id, pending, task_state)
+    if not decision["allow"]:
+        raise RuntimeError(f"recovery coordinator refused continuation: {decision['reason']}")
     history = asyncio.run(continue_run(store, run_id=_RUN_ID, include_interrupted=True))
     result = agent.run_sync(None, message_history=history, workspace=workspace)
     if "marker command completed" not in result.output:
