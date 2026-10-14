@@ -6,6 +6,8 @@
 
 **Workspace recovery boundary:** CP87 confirms exact confirmed-effect replay and unknown-outcome quarantine in the existing gateway. The cached A2 StepPersistence and test-only resume-gate regressions pass with network disabled. A/C persistent history and Hermes workspace identity are unqualified; arbitrary uncertain shell effects remain review-only. No generic exactly-once claim.
 
+**CP88 safety correction:** the stateless shared candidate API now parks active tasks with confirmed workspace effects in `WAITING` for operator review instead of starting a fresh model turn that could produce a new operation identity. Missing effect snapshots also fail closed. The isolated offline regression passed; exact-SHA CI is pending. This blocks auto-replay but does not restore final-answer delivery.
+
 ## Current checkpoint — CP85 resource-limited memory screen
 
 - A fresh project `hades-v3-exp-cp85-mem-20261014` used the cached Qwen3-8B Q4_K_M file read-only, 40,960 effective context, temperature 0, output limit 1,024, and 50-second timeout. Internal-only networks, no published ports, a nonprivileged read-only candidate, and candidate DNS-denial checks passed. CP75/CP80 containers and endpoints were untouched.

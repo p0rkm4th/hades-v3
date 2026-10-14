@@ -514,6 +514,39 @@ def transition_task(
     return updated
 
 
+def workspace_resume_guard(token: str, task_id: str, current: dict) -> dict | None:
+    """Fail closed when stateless resume could issue a new workspace identity."""
+    if current.get("state") not in {"RUNNING", "WAITING"}:
+        return None
+    effects = current.get("effects")
+    if not isinstance(effects, list):
+        reason = "workspace_effect_snapshot_unavailable"
+    elif any(
+        isinstance(effect, dict)
+        and effect.get("effect_kind") == "WORKSPACE_COMMAND"
+        and effect.get("state") == "CONFIRMED"
+        for effect in effects
+    ):
+        reason = "workspace_resume_requires_persisted_identity"
+    else:
+        return None
+
+    if current.get("state") == "RUNNING":
+        transition_task(
+            token,
+            task_id,
+            "WAITING",
+            [],
+            error_type=reason,
+            annotations={"operator_review_required": True, reason: True},
+        )
+    return {
+        "error": "workspace continuation requires the original durable invocation identity",
+        "task_state": "WAITING",
+        "operator_review_required": True,
+    }
+
+
 def finalize_turn(token: str, task_id: str, result: dict):
     current = gateway_call("task_resume", {}, token, task_id)
     if current.get("http_status") or current.get("task_id") != task_id:
@@ -633,6 +666,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json(404, {"error": "task not found"})
                 if current.get("state") in {"COMPLETED", "FAILED", "CANCELLED"}:
                     return self.send_json(409, {"error": "terminal task cannot be resumed", "task_state": current.get("state")})
+                workspace_guard = workspace_resume_guard(token, task_id, current)
+                if workspace_guard is not None:
+                    return self.send_json(409, workspace_guard)
                 if current.get("state") == "WAITING":
                     checkpoint = current.get("checkpoint") or {}
                     effects = current.get("effects") or []

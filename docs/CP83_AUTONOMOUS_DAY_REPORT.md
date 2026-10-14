@@ -87,6 +87,13 @@ ADR-010 remains **NOT READY**. CP84 closes the deterministic candidate-finalizer
 - A2's gate remains test-only. A/C forward call IDs but durable resume identity is unqualified; Hermes currently lacks the identity and fails closed. Unknown arbitrary shell outcomes have no generic canonical reconciler. No code change was justified and no exactly-once guarantee is claimed.
 - This is contract/source evidence, not model-equivalent performance. It used no gateway deployment, real workspace, Hypnos request, privileged operation, or shared test stack.
 
+## CP88 — stateless workspace resume guard
+
+- Source review found the A/C shared `/api/turn` endpoint has durable task/effect state but no durable model-call journal. After a confirmed workspace command and lost response, a resumed fresh model turn could assign a new tool-call identity; the gateway would treat it as a new operation and dispatch again.
+- Added a narrow fail-closed guard: if an active task has a confirmed workspace command, do not call the model on resume; transition `RUNNING` to `WAITING` for operator review, keep an already `WAITING` task there, and park if the effect snapshot is missing. This prevents a duplicate dispatch while preserving the known effect; it does not reconstruct the final answer.
+- The candidate identity regression passed in the cached dependency image with current source mounted read-only, no network, no capabilities, and no fixture. It checks parked/running/WAITING and missing-effect-snapshot cases, plus the no-hidden-retry and original operation identity properties. No model request or workspace command was sent. The exact-SHA CI run will be attached after publication.
+- This stopgap is specific to the stateless API. A2's persisted-call continuation remains a separate unintegrated route; arbitrary unknown shell outcomes still require review. No exactly-once claim.
+
 ## Late-morning follow-up — 11:12 AM CDT
 
 - Published the CP85 CI diagnosis and ADR-010 readiness table as `5a54d083f715829ccceeb3b4cf03acea24afdc91` by normal fast-forward. Exact-SHA Prototype CI run [38595098048](https://github.com/p0rkm4th/hades-v3/actions/runs/38595098048) passed all workflow steps, including gateway/lifecycle regressions, A2 Shell recovery, CP79/83/84 DBOS integration, and CP69's strict three-harness offline E2E. The failed exact-SHA CP85 run [38594357498] remains preserved as a Docker Hub fixture-startup rate-limit failure; it was not retroactively changed to pass.
