@@ -186,6 +186,9 @@ jobs:
         if: always()
         run: docker compose -p "$CP84_COMPOSE_PROJECT_NAME" --profile cp84-dbos-finalization -f experiment/compose.yaml -f experiment/compose.cp84-dbos-finalization.yaml down --volumes --remove-orphans --timeout 5
 
+      - name: Validate isolated CP85 memory retest profile
+        run: docker compose -p "${COMPOSE_PROJECT_NAME}-cp85memory" --profile harness --profile model-8b -f experiment/compose.yaml -f experiment/compose.cp85-memory-retest.yaml config --quiet
+
       - name: Validate isolated CP69 offline profile
         run: docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml config --quiet
 

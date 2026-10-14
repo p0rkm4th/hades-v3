@@ -1,6 +1,6 @@
 # HADES v3 autonomous engineering day — progress handoff
 
-**Date:** 2026-10-14, in progress (10:43 AM CDT)
+**Date:** 2026-10-14, in progress (10:58 AM CDT)
 **Authority:** frozen PRD and Bounded Operator architecture
 **ADR-010:** NOT READY
 **Next update:** before 6:00 PM CDT
@@ -43,6 +43,13 @@
 - Two test-driver failures were preserved separately: the first called the Pydantic `RunUsage` property as a function, leaving a confirmed effect and `RUNNING` task; the second double-stripped a result prefix after HADES had already completed the task. Each was independently read and cleaned; neither is a candidate pass. The driver defects were fixed before the 3/3 clean repetitions.
 - Exact task/effect identities, classifications, and cleanup are recorded in [CP84 report](CP84_DBOS_CANDIDATE_FINALIZATION.md) and [trial JSONL](../experiment/results/cp84-dbos-candidate-finalization-20261014.jsonl). CP84 proves process-level recovery only. DBOS used SQLite under runner tmpfs; full container/host restart, durable-store privacy, retries/cancellation, uncertain-result reconciliation, and net code reduction remain unproven.
 
+## CP85 — held-out structured-memory screen
+
+- A fresh project used Qwen3-8B Q4_K_M and 40,960 effective context with a four-CPU cap, temperature 0, 1,024 output limit, and 50-second provider timeout. All networks were internal, no host ports were published, the candidate was read-only/nonprivileged, and candidate DNS could reach only the gateway/model. CP75/CP80 were not contacted or restarted.
+- One matched held-out structured correction each for A and C timed out before tool selection. A returned HTTP 502 after three canceled upstream requests; C returned HTTP 502 after one. Independent DB reads show zero tool calls/effects, unchanged revision-1 memory, and durable `FAILED` tasks. These are resource-limited pre-tool failures, not memory-CAS or selection scores and do not change CP81 results.
+- Model residency consumed about 9 GB; host load reached 19.64 on 20 cores, so no higher-cap retry or further generation was sent. Exact CP85 containers, networks, and volumes were removed; 14 CP75/CP80 containers remained. Disk remained 44 GB free and available memory recovered to 19 GB. Five CP85 image tags remain for Tallowmere's review; no pruning was done.
+- Full details and task IDs are in [CP85 report](CP85_MEMORY_RETEST_REPORT.md) and [JSONL](../experiment/results/cp85-memory-retest-20261014.jsonl). The new answer-oracle tests passed (4 tests); they validate the oracle only, not candidate behavior.
+
 ## Living HADES v2 control
 
 - Read-only public API recheck found v2 `main` at `eccaf8a4eec9802341cc31261496b98fe50856be`; exact-SHA Public CI runs `38522183010` and `38522042760` passed.
@@ -54,13 +61,13 @@
 - A direct Codex thread listing was attempted at this milestone, but the local TUI MCP transport returned a connection error. No Tallowmere or Cinder reply was received in this session; no message receipt is claimed.
 - The shared CP75/CP80 fixture containers remain active and untouched. Before CP84, no new Docker project, volume, image, or host rule had been created today; the identity regression ran as a one-shot network-disabled container from an already cached image, with auto-removal. Current free disk was 44 GB.
 - CP84's own fixture project was removed by its exact project name: zero CP84 containers, networks, or volumes remained; the 14 CP75/CP80 containers were still running. Five CP84-tagged reproducible images totaling roughly 1.4 GB by listed image sizes remain for Tallowmere's cleanup review; I did not prune them. Free disk remained 44 GB.
-- Documentation-only follow-up updates the campaign next-step pointer, current state, CP83 complexity assessment, and matrix without changing historical test results. `git diff --check` passed; Gitleaks scanned `docs/` and found no leaks; private-address/account-path scan of the touched public docs found no matches.
+- Documentation follow-ups update the campaign pointer, current state, reuse assessment, and matrix without changing historical scores. `git diff --check` passed; targeted Gitleaks scans found no leaks; private-address/account-path scan of touched public docs found no matches.
 
 ## Decision status and next actions
 
-ADR-010 remains **NOT READY**. CP84 closes the deterministic candidate-finalizer integration gap for one bounded A2 workspace flow, but CP83/84 still do not establish safe continuation after an unknown shell result, live-model quality, or net engineering reduction. Candidate C remains a useful minimal baseline; current evidence does not justify selecting it or a winner. Existing A/B/C scores and negative outcomes remain unchanged.
+ADR-010 remains **NOT READY**. CP84 closes the deterministic candidate-finalizer integration gap for one bounded A2 workspace flow, but CP83/84 do not establish safe continuation after an unknown shell result or net engineering reduction. CP85 did not provide model-equivalent memory evidence because both candidates timed out before tools under a resource cap. Candidate C remains a useful minimal baseline; current evidence does not justify selecting it or a winner. Existing A/B/C scores and negative outcomes remain unchanged.
 
-1. Exact-SHA CI through `8b75934` passed. The current CP84 source/workflow commit is not yet published; run CI after publication and record its exact SHA.
-2. Existing CP75/CP80 containers, including the CPU model service, remain active and have not been released for reuse. Do not connect to or restart them. A separately owned duplicate model run needs a fresh resource preflight before inference; meanwhile use deterministic contracts and source review.
+1. CP84 was published as `b2175ceedf8429a0e4c7fcba9cc7c9963d072841`; exact-SHA CI run [38591919710](https://github.com/p0rkm4th/hades-v3/actions/runs/38591919710) passed. CP85 changes remain unpublished and need privacy checks, tests, normal fast-forward publication, and exact-SHA CI.
+2. Existing CP75/CP80 containers, including the CPU model service, remain active and have not been released for reuse. Do not connect to or restart them. CP85's own model endpoint was stopped and its own fixtures removed; the four-CPU profile reached host capacity, so no higher-cap inference is planned today.
 3. Compare CP84 against A2 StepPersistence for unknown-result handling, output delivery after process restart, DBOS history protection, bounded retry/cancel semantics, and net code/operational burden. No persistent DBOS service or second ledger.
-4. Preserve CP81 scores and Hermes context limits; at day end update this report with completed work, exact CI, resource cleanup, and the next actionable handoff. Stop initiating new engineering at 6:00 PM CDT.
+4. Preserve CP81/CP85 scores and Hermes context limits; at day end update this report with completed work, exact CI, resource cleanup, and the next actionable handoff. Stop initiating new engineering at 6:00 PM CDT.
