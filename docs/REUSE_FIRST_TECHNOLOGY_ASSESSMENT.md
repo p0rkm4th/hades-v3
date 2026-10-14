@@ -213,3 +213,23 @@ Most release/package snapshots were checked 2026-10-13; Pydantic Harness Shell a
 - Testcontainers Python: https://github.com/testcontainers/testcontainers-python
 - Testcontainers Python v4.15.0 release: https://github.com/testcontainers/testcontainers-python/releases/tag/testcontainers-v4.15.0
 - OpenTelemetry GenAI semantic conventions: https://opentelemetry.io/docs/specs/semconv/gen-ai/
+
+## ADR-010 readiness after CP85
+
+| Decision question | Evidence in hand | Readiness |
+|---|---|---|
+| Can HADES retain one enforceable authority/task/effect system while reusing an agent runtime? | CP82 gateway identity/digest replay; CP83 Shell + DBOS quarantine/replay; CP84 shared HADES tool adapter and finalizer across two process-death windows. | **Partially demonstrated** for deterministic workspace flows; unknown external shell outcomes and container/host restarts remain open. |
+| Does Pydantic AI Harness reduce HADES-specific production code? | CP78/80/82/83/84 exercise supported extension points. Candidate API, lifecycle, gateway, task/effect records, and workspace adapter remain. CP82 resume gate was test-only. | **Not demonstrated**; experimental/test helpers may shrink, but DBOS and Harness currently add dependencies/configuration. |
+| Can A, B, and C complete the same context-eligible live task? | Historical A/C CPU trials are mixed. CP69 strict peer passed offline. Hermes remains below its 64,000 context floor on the CPU profile; CP71 is externally blocked. | **Missing**; no A2 or three-harness live model-equivalent score. CP85's two pre-tool timeouts at a protective 4-CPU cap are unscored resource evidence. |
+| Is memory correction dependable across types, restart, and recall? | CP81 scalar correction/restart/recall passed 3/3 for A/C; structured selection 0/3; list mutation 3/3 with answer 2/3 and fresh recall 0/3. CAS exact/stale/cross-domain contracts are independently tested. | **Not qualified**; CP85 did not reach a memory tool. Need a reserved model endpoint and fresh held-out cases. |
+| Do candidates complete compound/protected work safely under interruption? | CP72/73/84 cover specific commitment/workspace crash windows, partial effects, and trusted finalization; gateway has identity and quarantine rules. | **Partially demonstrated**; held-out compound operations, adversarial outputs, approval freshness/replay, and unresolved shell reconciliation remain. |
+| Is A2 preferable to the living v2 control in owner use? | Current v2 public acceptance records and Cinder ownership are separate; no current matched v2/v3 owner task was observed. | **Missing**; source/CI or a positive strict-peer run is not owner acceptance. |
+
+### Smallest decision-changing evidence set
+
+1. Run a matched A2/C live CPU or approved GPU task only when an isolated endpoint has adequate reserved capacity; include one compound operation and one interruption with independent canonical verification.
+2. For a three-way selection, obtain an authorized context-compliant model route and run the same bounded task through A2, reduced Hermes, and C with identical model/settings. CP71 is not reopened by this assessment.
+3. Add held-out memory correction plus fresh-context recall after adequate model capacity is available; keep stale/CAS and identity checks deterministic and independent.
+4. Obtain current, owner-accepted HADES v2 control evidence through Cinder's authorized snapshot/handoff before claiming comparative superiority.
+
+Do not select DBOS or Candidate C on implementation size alone. Current evidence favors keeping HADES's gateway and ledger, reusing Pydantic Harness capability extensions experimentally, and leaving DBOS as an optional execution layer until it shows less operational/custom recovery burden than StepPersistence. ADR-010 remains **NOT READY**; owner ratification is required.

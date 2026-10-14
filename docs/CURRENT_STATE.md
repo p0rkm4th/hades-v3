@@ -8,6 +8,7 @@
 - The model server had a four-CPU limit to bound interference. A and C each got HTTP 502 after a timeout before tool selection; A's provider path had three canceled requests and C's had one. Independent records show no tool calls, no effects, unchanged synthetic JSON/revision 1, and durable `FAILED` tasks.
 - Available host memory fell from 17 GB to about 9.5 GB while the model was loaded and host load reached 19.64/20. Further inference stopped; the model server was stopped and only CP85's project containers/networks/volumes were removed. Free disk remained 44 GB; memory recovered to 19 GB; 14 CP75/CP80 containers remained. Five CP85-tagged images remain for cleanup-lead review.
 - This is an unscored, resource-limited screen, not evidence of incorrect memory selection or A/C ranking. See [CP85 report](CP85_MEMORY_RETEST_REPORT.md) and [JSONL](../experiment/results/cp85-memory-retest-20261014.jsonl).
+- Published SHA `998cdc9fc61fd833b4a551d6f8ee8b638a233650` has exact-SHA CI run `38594357498`; it failed before tests because Docker Hub returned `toomanyrequests` pulling Postgres/Grocy. The linked GitHub integration lacks Actions write permission for retrying that failed job. CP84's exact-SHA run passed; the registry failure is retained separately from experiment results.
 
 ## Previous checkpoint — CP84 Pydantic AI + DBOS finalization
 
