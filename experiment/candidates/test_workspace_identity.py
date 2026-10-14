@@ -96,6 +96,7 @@ def _test_waiting_transition_uses_orchestrator_contract() -> None:
         )
     checkpoint_call = gateway.call_args_list[1]
     assert checkpoint_call.args[0] == "task_checkpoint", checkpoint_call
+    assert checkpoint_call.kwargs.get("trusted_internal") is True, checkpoint_call
     arguments = checkpoint_call.args[1]
     assert arguments["_orchestrator_finalization"] == {
         "reason": "workspace_resume_requires_persisted_identity",

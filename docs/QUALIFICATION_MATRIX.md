@@ -247,3 +247,13 @@ The keyed CAS gateway integration passed: same-task exact retry returned the ori
 | Remaining recovery risk | Unqualified | Unqualified | Unqualified | Concurrent same-task turns are not serialized; a distinct identity after confirmation cannot be distinguished from a legitimate next command without durable invocation identity. Arbitrary uncertain shell results remain quarantined. |
 
 CP90 closes a direct gateway bypass of the sequential CP88 review park for new operations. It does not establish cross-restart general shell continuation, exactly-once execution, or candidate qualification. See [CP90 report](CP90_WORKSPACE_REVIEW_GATE.md). ADR-010 remains **NOT READY**.
+
+## CP91 — Orchestrator argument boundary
+
+| Property | A | B | C | Common evidence / remaining gap |
+|---|---|---|---|---|
+| Model-supplied reserved task fields | Rejected before HTTP | Shared MCP proxy path rejects | Rejected before HTTP | `_orchestrator_resume` and `_orchestrator_finalization` cannot cause the proxy to attach its orchestrator credential. |
+| Trusted internal finalization/resume | Shared explicit internal flag | Same shared path | Same shared path | `transition_task` opts in only when it adds trusted metadata; cached-image identity regression passed without network. |
+| Qualification scope | Contract/security regression | Contract/security regression | Contract/security regression | No live model call or full gateway exploit was executed. Independent gateway evidence validation remains required. |
+
+The pre-fix source reproduced the credential-attachment behavior with a synthetic request-capture stub and no network. The new proxy regression passed before `urlopen`; Candidate A/C/B comparative scores are unchanged. See [CP91 report](CP91_ORCHESTRATOR_ARGUMENT_BOUNDARY.md). ADR-010 remains **NOT READY**.

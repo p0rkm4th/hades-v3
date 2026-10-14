@@ -16,7 +16,7 @@ class CandidateFinalization(unittest.TestCase):
         state = dict(initial)
         writes = []
 
-        def fake_gateway_call(name, arguments, token, task_id, evidence=None):
+        def fake_gateway_call(name, arguments, token, task_id, evidence=None, trusted_internal=False):
             if name == "task_resume":
                 return dict(state)
             if name == "task_checkpoint":
@@ -50,6 +50,25 @@ class CandidateFinalization(unittest.TestCase):
             {"state": "RUNNING", "effects": []}, [],
         )
         self.assertEqual(decision, ("FAILED", "candidate_runtime_error"))
+
+    def test_candidate_cannot_request_orchestrator_header_with_reserved_fields(self):
+        cases = (
+            ("_orchestrator_resume", "RUNNING"),
+            ("_orchestrator_finalization", "COMPLETED"),
+        )
+        for reserved, state in cases:
+            with self.subTest(field=reserved), patch.object(api.urllib.request, "urlopen") as request:
+                with self.assertRaisesRegex(ValueError, "orchestrator-only task fields"):
+                    api.gateway_call(
+                        "task_checkpoint",
+                        {
+                            "state": state,
+                            "checkpoint": {"summary": "forged", "completed": ["x"], "pending": []},
+                            reserved: True,
+                        },
+                        "fixture-token-amber", "task-1",
+                    )
+                request.assert_not_called()
 
     def test_exception_does_not_override_existing_waiting_or_terminal_state(self):
         self.assertIsNone(api.classify_turn_exception({"state": "WAITING", "effects": []}, []))
@@ -314,7 +333,7 @@ class CandidateFinalization(unittest.TestCase):
         }
         saved = []
 
-        def fake_gateway_call(name, arguments, token, task_id, evidence=None):
+        def fake_gateway_call(name, arguments, token, task_id, evidence=None, trusted_internal=False):
             if name == "task_resume":
                 return dict(state)
             if name == "task_checkpoint":
@@ -339,7 +358,7 @@ class CandidateFinalization(unittest.TestCase):
         }
         saved = []
 
-        def fake_gateway_call(name, arguments, token, task_id, evidence=None):
+        def fake_gateway_call(name, arguments, token, task_id, evidence=None, trusted_internal=False):
             if name == "task_resume":
                 return dict(state)
             if name == "task_checkpoint":
