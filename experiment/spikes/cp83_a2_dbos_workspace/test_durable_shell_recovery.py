@@ -236,6 +236,23 @@ def main() -> None:
             model_calls = (state / "model-calls.log").read_text().splitlines()
             calls_for_run = [value for value in model_calls if value == run_id]
             assert len(calls_for_run) == 2, calls_for_run
+            status, before_repeat = request("GET", f"/v1/tasks/{task_id}")
+            assert status == 200 and len(before_repeat["effects"]) == 2, before_repeat
+            assert before_repeat["effects"][0]["effect_id"] == first["effect_id"]
+            assert before_repeat["effects"][1]["effect_id"] == marker_result["effect_id"]
+
+            repeated_resume = _run_child("resume", task_id, marker, run_id, state)
+            assert repeated_resume.returncode == 0, (
+                case, repeated_resume.returncode, repeated_resume.stderr[-1000:]
+            )
+            repeated_final = next((line[11:] for line in repeated_resume.stdout.splitlines()
+                                   if line.startswith("CP83_FINAL:")), None)
+            assert repeated_final == final, (repeated_final, final)
+            assert (state / "model-calls.log").read_text().splitlines() == model_calls
+            status, after_repeat = request("GET", f"/v1/tasks/{task_id}")
+            assert status == 200 and after_repeat["effects"] == before_repeat["effects"], (
+                after_repeat, before_repeat
+            )
 
             status, cleanup = _workspace_request(
                 task_id, "oracle-cleanup", f"python -c \"from pathlib import Path; Path('{marker}').unlink()\"",
@@ -249,6 +266,7 @@ def main() -> None:
                 "effect_reused": True,
                 "marker_count": 1,
                 "model_generations": len(calls_for_run),
+                "repeated_resume_added_generations": 0,
                 "workspace_cleanup": True,
                 "task_state": after_cleanup["state"],
             })

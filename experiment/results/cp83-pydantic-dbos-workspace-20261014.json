@@ -32,7 +32,8 @@
     "independent_read_and_cleanup": "passed",
     "all_workspace_effects_confirmed": true,
     "task_state": "RUNNING",
-    "task_finalization_or_delivery_in_scope": false
+    "task_finalization_or_delivery_in_scope": false,
+    "repeated_workflow_result_retrieval": "same final result; zero additional model generations or effects in all 3 repetitions"
   },
   "initial_rejected_configuration": {
     "workspace_provided_only_at_agent_run": true,
