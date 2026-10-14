@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP83 A2 + first-party DBOSDurability; confirmed-result Shell recovery passed 3/3, while unknown-effect recovery and task finalization remain untested
+**Current workstream:** CP83 A2 + first-party DBOSDurability; confirmed-result Shell recovery passed 3/3; a quarantined timeout safely blocked replay but left the task RUNNING without a final answer
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -38,7 +38,7 @@ Research and bounded disposable integrations continue without live GPU access. S
 
 ## Current next steps
 
-1. Exercise a quarantined/unknown workspace result under DBOS and prove replay does not redispatch; keep the task incomplete and effect quarantined.
+1. Evaluate the smallest trusted reconciliation/finalization path for a bounded, independently checkable workspace task; keep arbitrary shell uncertain effects in review.
 2. Resume held-out memory qualification only where it adds structured/list correction and fresh-context evidence beyond CP81; preserve the mixed CP81 scores.
 3. Compare the minimum A2+DBOS glue and operational needs against A2 StepPersistence without a second task/effect authority.
 4. Advance protected-action and compound-operation cases, then refresh current Cinder control evidence if an agreed read-only snapshot is available.

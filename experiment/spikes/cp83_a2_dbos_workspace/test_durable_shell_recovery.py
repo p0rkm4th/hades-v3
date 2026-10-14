@@ -22,7 +22,7 @@ from pydantic_ai.durable_exec.dbos import DBOSDurability
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai_harness import Shell
-from pydantic_ai.workspaces import WorkspaceBackend, WorkspaceRef
+from pydantic_ai.workspaces import WorkspaceBackend, WorkspaceRef, WorkspaceUnavailableError
 
 from gateway_workspace import HadesGatewayWorkspace
 from operation_identity import HadesOperationIdentity
@@ -52,7 +52,7 @@ def request(method: str, path: str, body: dict | None = None):
             return error.code, {}
 
 
-def _model_for(marker: str, calls_path: Path, run_id: str):
+def _model_for(marker: str, calls_path: Path, run_id: str, *, quarantine_case: bool = False):
     def model(messages, info):
         with calls_path.open("a", encoding="utf-8") as stream:
             stream.write(run_id + "\n")
@@ -68,11 +68,18 @@ def _model_for(marker: str, calls_path: Path, run_id: str):
                 return ModelResponse(parts=[TextPart("The synthetic marker was recorded.")])
             return ModelResponse(parts=[TextPart("The marker result was not confirmed.")])
         tool = next(item for item in info.function_tools if item.name == "run_command")
-        command = (
-            f"python -c \"from pathlib import Path; p=Path('{marker}'); "
-            "p.write_text((p.read_text() if p.exists() else '') + 'x'); "
-            "print('marker recorded')\""
-        )
+        if quarantine_case:
+            command = (
+                f"python -c \"from pathlib import Path; import time; p=Path('{marker}'); "
+                "p.write_text((p.read_text() if p.exists() else '') + 'x'); "
+                "print('marker recorded', flush=True); time.sleep(25)\""
+            )
+        else:
+            command = (
+                f"python -c \"from pathlib import Path; p=Path('{marker}'); "
+                "p.write_text((p.read_text() if p.exists() else '') + 'x'); "
+                "print('marker recorded')\""
+            )
         return ModelResponse(parts=[ToolCallPart(tool.name, {
             "command": command,
             "timeout_seconds": 20,
@@ -83,6 +90,15 @@ def _model_for(marker: str, calls_path: Path, run_id: str):
 class _CrashAfterGatewayResponse(HadesGatewayWorkspace):
     def _execute(self, command: str, operation_id: str):
         super()._execute(command, operation_id)
+        os._exit(79)
+
+
+class _CrashAfterGatewayOutcome(HadesGatewayWorkspace):
+    def _execute(self, command: str, operation_id: str):
+        try:
+            super()._execute(command, operation_id)
+        except WorkspaceUnavailableError:
+            os._exit(80)
         os._exit(79)
 
 
@@ -116,12 +132,19 @@ def _child(mode: str, task_id: str, marker: str, run_id: str, state: Path) -> in
         "system_database_url": f"sqlite:///{db_path}",
     })
     agent = Agent(
-        FunctionModel(_model_for(marker, calls_path, run_id), model_name="cp83-strict-dbos-peer"),
+        FunctionModel(
+            _model_for(marker, calls_path, run_id, quarantine_case=mode.endswith("quarantine")),
+            model_name="cp83-strict-dbos-peer",
+        ),
         name="hades-cp83-shell",
         deps_type=str,
         capabilities=[
             _HadesGatewayWorkspaceCapability(
-                backend_class=(_CrashAfterGatewayResponse if mode == "crash" else HadesGatewayWorkspace),
+                backend_class=(
+                    _CrashAfterGatewayResponse if mode == "crash"
+                    else _CrashAfterGatewayOutcome if mode == "crash_quarantine"
+                    else HadesGatewayWorkspace
+                ),
             ),
             Shell(tools=["run_command"], default_timeout=20),
             HadesOperationIdentity(),
@@ -131,11 +154,14 @@ def _child(mode: str, task_id: str, marker: str, run_id: str, state: Path) -> in
 
     @DBOS.workflow()
     async def run_marker(workspace_task_id: str) -> str:
-        result = await agent.run(PROMPT, deps=workspace_task_id)
+        result = await agent.run(
+            PROMPT, deps=workspace_task_id,
+            model_settings={"temperature": 0},
+        )
         return result.output
 
     DBOS.launch()
-    if mode == "crash":
+    if mode in {"crash", "crash_quarantine"}:
         with SetWorkflowID(run_id):
             asyncio.run(run_marker(task_id))
         raise RuntimeError("fault injection did not terminate the worker")
@@ -226,6 +252,72 @@ def main() -> None:
                 "workspace_cleanup": True,
                 "task_state": after_cleanup["state"],
             })
+
+        status, task = request("POST", "/v1/tasks", {
+            "goal": "Write one synthetic marker, then report only if its command is confirmed."
+        })
+        assert status == 201, task
+        task_id = str(task["task_id"])
+        marker = f".cp83-uncertain-marker-{uuid.uuid4().hex}.txt"
+        run_id = f"hades-task-{task_id}"
+        crashed = _run_child("crash_quarantine", task_id, marker, run_id, state)
+        assert crashed.returncode == 80, (crashed.returncode, crashed.stderr[-1200:])
+        status, quarantined = request("GET", f"/v1/tasks/{task_id}")
+        assert status == 200 and len(quarantined["effects"]) == 1, quarantined
+        uncertain = quarantined["effects"][0]
+        assert uncertain["state"] == "QUARANTINED", uncertain
+
+        resumed = _run_child("resume_quarantine", task_id, marker, run_id, state)
+        assert resumed.returncode == 1, (resumed.returncode, resumed.stdout[-800:])
+        assert "WorkspaceUnavailableError: HADES workspace command outcome is not confirmed" in (
+            resumed.stderr
+        ), resumed.stderr[-1200:]
+        assert "CP83_FINAL:" not in resumed.stdout
+        status, after_resume = request("GET", f"/v1/tasks/{task_id}")
+        assert status == 200 and len(after_resume["effects"]) == 1, after_resume
+        assert after_resume["effects"][0]["effect_id"] == uncertain["effect_id"]
+        assert after_resume["effects"][0]["state"] == "QUARANTINED"
+
+        status, observer = request("POST", "/v1/tasks", {
+            "goal": "Independently inspect one synthetic workspace marker."
+        })
+        assert status == 201, observer
+        observer_id = str(observer["task_id"])
+        status, marker_result = _workspace_request(
+            observer_id, "uncertainty-oracle-read",
+            f"python -c \"from pathlib import Path; print(Path('{marker}').read_text())\"",
+        )
+        assert status == 200 and marker_result["stdout"] == "x\n", marker_result
+        calls_before_repeat = (state / "model-calls.log").read_text().splitlines()
+        quarantined_calls = [value for value in calls_before_repeat if value == run_id]
+        repeated = _run_child("resume_quarantine", task_id, marker, run_id, state)
+        assert repeated.returncode == 1, (repeated.returncode, repeated.stderr[-1200:])
+        assert "WorkspaceUnavailableError: HADES workspace command outcome is not confirmed" in (
+            repeated.stderr
+        ), repeated.stderr[-1200:]
+        assert "CP83_FINAL:" not in repeated.stdout
+        assert (state / "model-calls.log").read_text().splitlines() == calls_before_repeat
+        status, after_repeated_resume = request("GET", f"/v1/tasks/{task_id}")
+        assert status == 200 and len(after_repeated_resume["effects"]) == 1
+        assert after_repeated_resume["effects"][0]["effect_id"] == uncertain["effect_id"]
+        assert after_repeated_resume["effects"][0]["state"] == "QUARANTINED"
+        status, cleanup = _workspace_request(
+            observer_id, "uncertainty-oracle-cleanup",
+            f"python -c \"from pathlib import Path; Path('{marker}').unlink()\"",
+        )
+        assert status == 200 and cleanup["exit_code"] == 0, cleanup
+        outcomes.append({
+            "scenario": "quarantined timeout across DBOS worker restart",
+            "effect_id_preserved": True,
+            "effect_state": "QUARANTINED",
+            "independently_observed_marker_count": 1,
+            "duplicate_dispatch": False,
+            "repeat_resume_model_generations": 0,
+            "task_state": after_repeated_resume["state"],
+            "final_response": None,
+            "resume_result": "fail-closed exception; no false success",
+            "cleanup": True,
+        })
         print(json.dumps({
             "classification": "CONTRACT_TEST",
             "pydantic_ai_slim": "2.56.0",
@@ -234,7 +326,10 @@ def main() -> None:
             "dbos_durability": True,
             "workflow_identity": "deterministically derived from HADES task ID",
             "crash_boundary": "after gateway confirmed before Harness received result",
-            "workflow_resume_repetitions": len(outcomes),
+            "workflow_resume_repetitions": 3,
+            "quarantined_restart_case_passed": True,
+            "quarantined_task_state": after_repeated_resume["state"],
+            "quarantined_tool_calls_after_timeout": len(quarantined_calls),
             "all_repetitions_passed": True,
             "model_generations_per_repetition": 2,
             "effect_reused_per_repetition": True,
