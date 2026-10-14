@@ -276,8 +276,10 @@ class GatewayIntegration(unittest.TestCase):
         self.assertEqual(status, 200, complete)
         self.assertEqual(complete["state"], "COMPLETED")
         self.assertEqual(complete["checkpoint"]["response_delivery"], "PERSISTED_PENDING_DELIVERY")
-        self.assertEqual(len(complete["effects"]), 1)
-        self.assertEqual(complete["effects"][0]["effect_id"], effect_id)
+        status, completed_task = call("GET", f"/v1/tasks/{task_id}", AMBER)
+        self.assertEqual(status, 200, completed_task)
+        self.assertEqual(len(completed_task["effects"]), 1)
+        self.assertEqual(completed_task["effects"][0]["effect_id"], effect_id)
         status, canonical = call("GET", f"/v1/memory/{key}", AMBER)
         self.assertEqual((status, canonical["value"], canonical["revision"]), (200, after, 2))
 
