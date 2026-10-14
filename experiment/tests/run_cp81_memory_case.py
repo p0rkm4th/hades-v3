@@ -11,7 +11,36 @@ import urllib.request
 import psycopg
 from psycopg.types.json import Jsonb
 
-from run_cp75_memory_cas_case import CASES, GATEWAY, CANDIDATE_API, TOKEN
+GATEWAY = "http://tool-gateway:8080"
+CANDIDATE_API = "http://candidate-api:8080"
+TOKEN = "fixture-token-amber"
+CASES = {
+    "coffee_scalar": {
+        "key_prefix": "coffee-preference",
+        "before": "medium roast", "after": "light roast",
+        "correct": "Update my saved coffee preference: switch from medium roast to light roast.",
+        "correct_terms": ["light", "roast"],
+        "recall": "Which roast do I prefer for coffee?",
+        "answer_terms": ["light", "roast"],
+    },
+    "weekly_structured": {
+        "key_prefix": "weekly-planning-note",
+        "before": {"layout": "paragraphs", "length": "long"},
+        "after": {"layout": "numbered checklist", "length": "concise"},
+        "correct": "For my weekly planning note, replace long paragraphs with a concise numbered checklist.",
+        "correct_terms": ["numbered", "concise"],
+        "recall": "How should my weekly planning note be laid out?",
+        "answer_terms": ["numbered", "concise"],
+    },
+    "reminder_list": {
+        "key_prefix": "weekday-reminders",
+        "before": ["morning", "weekdays"], "after": ["late afternoon", "weekdays"],
+        "correct": "Change my weekday reminder time from morning to late afternoon; keep it on weekdays.",
+        "correct_terms": ["late", "afternoon"],
+        "recall": "When do I want reminders on weekdays?",
+        "answer_terms": ["late", "afternoon"],
+    },
+}
 
 
 def request_json(url, token=None, body=None, orchestrator=False, timeout=600):
@@ -39,7 +68,7 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
     case = CASES[case_name]
     source_task_id = None
     if phase == "correct":
-        key = f"cp81-{case_name}-r{replicate}-{uuid.uuid4().hex[:10]}"
+        key = f"cp81-{case['key_prefix']}-r{replicate}-{uuid.uuid4().hex[:8]}"
         with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO scoped_memory (user_id,domain_id,memory_key,value) "
