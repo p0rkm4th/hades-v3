@@ -275,6 +275,34 @@ class GatewayIntegration(unittest.TestCase):
         status, cobalt_row = call("GET", f"/v1/memory/{key}", COBALT)
         self.assertEqual((status, cobalt_row["value"], cobalt_row["revision"]), (200, other_value, 1))
 
+        # A task row for the same user but another domain is not valid
+        # authorization for a correction through the amber domain token.
+        status, foreign_domain_task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Reject a memory correction bound to another domain",
+        })
+        self.assertEqual(status, 201, foreign_domain_task)
+        foreign_domain_task_id = foreign_domain_task["task_id"]
+        task_ids.append(foreign_domain_task_id)
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE tasks SET domain_id='domain-home-cobalt' WHERE task_id=%s AND user_id='user-amber'",
+                (foreign_domain_task_id,),
+            )
+            self.assertEqual(cur.rowcount, 1)
+        foreign_domain = {
+            **mutation,
+            "task_id": foreign_domain_task_id,
+            "expected_revision": 2,
+            "value": {"format": "cross-domain attack"},
+        }
+        self.assertEqual(call("POST", "/v1/memory/correct-by-key", AMBER, foreign_domain)[0], 404)
+        status, after_domain_rejection = call("GET", f"/v1/memory/{key}", AMBER)
+        self.assertEqual((status, after_domain_rejection["value"], after_domain_rejection["revision"]),
+                         (200, corrected, 2))
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM effects WHERE task_id=%s", (foreign_domain_task_id,))
+            self.assertEqual(cur.fetchone()[0], 0)
+
         proof = {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
                  "tool_evidence": [{"tool": "memory_correct", "status": "ok", "state": "CONFIRMED",
                                     "effect_id": effect_id, "memory_key": key, "memory_revision": 2}]}
