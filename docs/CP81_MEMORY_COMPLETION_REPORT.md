@@ -12,7 +12,7 @@ The missing-checkpoint case had enough durable evidence only for a task whose re
 
 ## Contract
 
-The version 1 `memory_correction` completion contract identifies exactly one `memory_key`, positive `expected_revision`, and desired JSON `value`. It is immutable after task creation and supports only `memory_correct`; it cannot authorize `memory_write` or multiple corrections. The gateway finalizer independently verifies:
+The version 1 `memory_correction` completion contract identifies exactly one `memory_key`, positive `expected_revision`, and desired JSON `value`. It is immutable after task creation and supports only `memory_correct`; it cannot authorize `memory_write` or multiple corrections. The gateway finalizer independently verifies, locking the canonical row through the task-state commit:
 
 - The effect belongs to the original task, authenticated user, and memory domain.
 - There is exactly one persisted effect and it is a confirmed `MEMORY_MUTATION` for the exact resource key.
@@ -26,7 +26,7 @@ Missing, partial, extra, mismatched, or unconfirmed effects remain incomplete. A
 
 - `test_task_lifecycle.py`: 16 passing tests, including exact contract normalization, task identity, exact persisted value/revision, missing/extra effects, wrong identity, and stale revision rejection.
 - `test_candidate_finalization.py`: 20 passing tests, including completion with no model checkpoint, read-only fallback rejection for a correction contract, no-op claim rejection, and provider failure after a confirmed effect remaining `WAITING`.
-- `test_gateway.py` now includes a database-backed integration case: an orchestrator-created contract rejects a false success claim before mutation, then completes only after the exact CAS mutation and canonical row verification. This test is scheduled in public CI; local execution against the live shared fixture was deferred to avoid restarting or repurposing Tallowmere's unacknowledged CP75/CP80 resources.
+- `test_gateway.py` now includes a database-backed integration case: an orchestrator-created contract rejects a false success claim before mutation, then completes only after the exact CAS mutation and canonical row verification. The first exact-SHA CI run (`5505974`, run `38517855031`) failed at this case because the existing external-commitment branch matched every stored contract; the routing condition was corrected in `cdd05fa`. CI for that fix is still running. Local execution against the live shared fixture was deferred to avoid restarting or repurposing Tallowmere's unacknowledged CP75/CP80 resources.
 - Python compilation and `git diff --check` passed. No persistent test project was created; no shared resource, HADES v2 service, Hypnos route, or firewall was touched.
 
 ## Qualification still required
