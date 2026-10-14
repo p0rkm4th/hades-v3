@@ -23,7 +23,7 @@ jobs:
 
       - name: Validate Python and tool contract
         run: |
-          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/contracts/memory_schema.py experiment/contracts/memory_diagnostics.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py experiment/tests/run_cp74_fresh_memory_recall.py experiment/tests/run_cp75_memory_cas_case.py experiment/spikes/cp77_durable_execution_probe.py
+          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/contracts/memory_schema.py experiment/contracts/memory_diagnostics.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py experiment/tests/run_cp74_fresh_memory_recall.py experiment/tests/run_cp75_memory_cas_case.py experiment/tests/run_cp81_memory_case.py experiment/spikes/cp77_durable_execution_probe.py
           python -m py_compile experiment/contracts/task_lifecycle.py
           python -m py_compile experiment/services/inference_adapter.py
           python -m py_compile experiment/services/ollama_protocol.py
