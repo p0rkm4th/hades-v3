@@ -126,3 +126,12 @@ CP75 establishes that stable-key CAS fixes the brittle old-value serialization b
 | Isolation / recovery | — | Bounded operator-only internal network check; no workspace/database DNS resolution | — | — | Not a complete adversarial egress test. Uncertain command recovery, background execution, task finalization, and live model behavior remain unqualified. |
 
 CP78 establishes that upstream Harness workspace tools can compose with the existing HADES gateway and effect ledger in a deterministic synthetic repository task. It does not qualify A2 as an agent or compare A/B/C. See [CP78 report](CP78_A2_HARNESS_WORKSPACE_REPORT.md). Historical CP67–CP74 scores and failures remain unchanged. CP71 remains blocked on host firewall privilege; no GPU was used. ADR-010 remains NOT READY.
+
+## Reuse spike update — CP79
+
+| Candidate/area | Protocol and recovery | Independent outcome | Classification | Remaining gap |
+|---|---|---|---|---|
+| DBOS 3.2.0 + HADES gateway | Three worker-death/restart cases replayed the same task/effect request; two DBOS step attempts per case | HADES ledger retained one confirmed effect and simulator one canonical receive; independent verifier checked approval/effect identity and trusted finalization completed task | **CONTRACT TEST**, not A/B/C score | Compare recovery complexity against current candidates; SQLite spike is not production durability evidence |
+| Pydantic AI Harness A2 | CP78 three deterministic workspace runs, 18 candidate commands each | Source/tests and 19 effects independently verified; task remained RUNNING by design | **CONTRACT TEST**, not historical A score | Shell-only comparison and task-finalization/recovery behavior remain open |
+
+CP79's Python 3.13/3.14 SQLite setup failures occurred before any gateway effect and remain recorded in the CP79 report. They do not count as workflow failures.

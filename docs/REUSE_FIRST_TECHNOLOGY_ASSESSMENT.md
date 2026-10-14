@@ -67,6 +67,10 @@ The interface repair did not qualify end-to-end candidate memory work. A and C e
 
 The remaining question is agent behavior and lifecycle interaction under the CAS contract, not a need for another memory authority. PostgreSQL full-text search and `pg_trgm` remain suitable discovery/ranking options only; a stable key plus current revision/value must authorize mutation. Fuzzy similarity never authorizes a write.
 
+## CP79 DBOS integration evidence
+
+The selected DBOS hypothesis now has a real HADES gateway/simulator contract result: three worker-death/restart cases replayed after the gateway response and before DBOS step persistence. HADES returned the original effect identity; independent checks confirmed one canonical external receive and one effect, after which the trusted HADES finalizer completed the tasks. This narrows the composition question: DBOS can own resumable execution metadata while HADES remains the sole authority. It does not prove production persistence, model integration, or lower total maintenance burden. The SQLite runner compatibility failure on Python 3.13/3.14 was fixed by pinning a compatible Python 3.11 runner and is documented as a pre-dispatch setup failure. Keep the spike disposable; adoption still requires a comparative complexity and recovery benefit over existing candidate behavior.
+
 ## Build-versus-reuse justification
 
 | Problem | Existing solution evaluated | HADES-specific remainder | New custom subsystem? |

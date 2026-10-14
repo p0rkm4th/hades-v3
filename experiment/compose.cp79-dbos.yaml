@@ -1,0 +1,72 @@
+services:
+  cp79-dbos-setup:
+    build:
+      context: .
+      dockerfile: spikes/cp79_dbos_gateway/Dockerfile
+    command: ["python", "/app/setup.py"]
+    environment:
+      DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
+      GATEWAY_URL: http://tool-gateway:8080
+      HADES_USER_TOKEN: fixture-token-amber
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set ORCHESTRATOR_SECRET in the ignored local .env file}
+    volumes: [cp79-state:/state]
+    networks: [fixture-backend, operator]
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 1g
+    restart: "no"
+    profiles: [cp79-dbos]
+
+  cp79-dbos-worker:
+    build:
+      context: .
+      dockerfile: spikes/cp79_dbos_gateway/Dockerfile
+    command: ["python", "/app/worker.py"]
+    environment:
+      GATEWAY_URL: http://tool-gateway:8080
+      HADES_USER_TOKEN: fixture-token-amber
+      CP79_STATE_DIR: /state
+    volumes: [cp79-state:/state]
+    networks: [operator]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 1g
+    restart: "no"
+    profiles: [cp79-dbos]
+
+  cp79-dbos-verify:
+    build:
+      context: .
+      dockerfile: spikes/cp79_dbos_gateway/Dockerfile
+    command: ["python", "/app/verify.py"]
+    environment:
+      DATABASE_URL: postgresql://fixture_writer:disposable-only-not-a-secret@postgres:5432/hades_lab
+      GATEWAY_URL: http://tool-gateway:8080
+      HADES_USER_TOKEN: fixture-token-amber
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set ORCHESTRATOR_SECRET in the ignored local .env file}
+      CP79_STATE_DIR: /state
+    volumes: [cp79-state:/state]
+    networks: [fixture-backend, operator]
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 1g
+    restart: "no"
+    profiles: [cp79-dbos]
+
+volumes:
+  cp79-state:
