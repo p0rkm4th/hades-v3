@@ -26,6 +26,12 @@ Independent PostgreSQL reads confirmed both tasks were `FAILED` and had zero eff
 
 The same agent task wording and settings were used for A and C. The provider timeout occurred before tool selection for both; A's provider path retried three times while C made one timed-out request. This is an observed runtime difference under this constrained condition, but a single repetition cannot establish a candidate reliability difference. CP81's earlier outcomes remain unchanged.
 
+### Follow-up: A transport retry accounting
+
+After CP85, the exact pinned candidate image was inspected offline without sending another model request. Its lockfile pins `pydantic-ai-slim==2.55.0` and `openai==3.29.0`; the instantiated OpenAI client reports `max_retries=2`. In this SDK, that permits up to three HTTP attempts (initial request plus two retries). Pydantic AI's `Agent(retries=1)` setting controls tool/output validation retries and does not disable OpenAI transport retries. Candidate C's direct `urllib` path made one attempt. This is strongly consistent with CP85's three canceled A requests versus one C request and identifies a likely source of retry-budget asymmetry.
+
+The CP85 runner did not assign per-attempt IDs or capture request-level timing, so the causal mapping between each server cancellation and an SDK retry is not directly proven. Treat this as a supported transport explanation, not a retroactive rescore or confirmed per-request trace. Future bounded comparisons should explicitly set the provider's `max_retries` to zero in a new pinned candidate revision, or durably reserve and report each transport attempt. No CP85 inference was repeated, and its pre-tool timeouts remain unchanged.
+
 ## Stop and cleanup
 
 Before any CPU-cap increase, host load reached 19.64 on 20 cores and available memory fell from 17 GB to about 9.5 GB while the model was resident. No further generation was sent. The CP85 model server was stopped, then only project `hades-v3-exp-cp85-mem-20261014` was removed with its own containers, networks, and volumes. Post-cleanup inventory found zero resources carrying that project label; all 14 CP75/CP80 containers remained running. Available memory recovered to 19 GB and disk remained at 44 GB free.

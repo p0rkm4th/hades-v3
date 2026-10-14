@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP85's held-out A/C structured-memory screen timed out before tools under a four-CPU safety cap; preserve that unscored result and do not rerun model inference today. CP84's 3/3 deterministic DBOS/finalizer recovery remains positive contract evidence, not live-model qualification. Local isolated deterministic lifecycle/finalizer/oracle tests passed 44/44. The current cross-domain memory contract test at `389ebb038cdd0aa087b17c7365553f79fee306bd` passed full exact-SHA CI as run `38600538341`. A small source-complexity observation on Candidate C is recorded separately; it does not change candidate scores.
+**Current workstream:** CP85's held-out A/C structured-memory screen timed out before tools under a four-CPU safety cap; preserve that unscored result and do not rerun model inference today. Exact-image inspection found Pydantic A's OpenAI client default permits two transport retries, likely explaining its three canceled requests versus C's one; attempt-level causality was not captured. Future comparisons must disable or durably count provider retries. CP84's 3/3 deterministic DBOS/finalizer recovery remains positive contract evidence, not live-model qualification. Local isolated deterministic lifecycle/finalizer/oracle tests passed 44/44. The current cross-domain memory contract test at `389ebb038cdd0aa087b17c7365553f79fee306bd` passed full exact-SHA CI as run `38600538341`. A small source-complexity observation on Candidate C is recorded separately; it does not change candidate scores.
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order

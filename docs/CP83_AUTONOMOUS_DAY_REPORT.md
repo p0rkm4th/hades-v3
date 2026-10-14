@@ -73,6 +73,13 @@ ADR-010 remains **NOT READY**. CP84 closes the deterministic candidate-finalizer
 3. Compare CP84 against A2 StepPersistence for unknown-result handling, output delivery after process restart, DBOS history protection, bounded retry/cancel semantics, and net code/operational burden. No persistent DBOS service or second ledger.
 4. Preserve CP81/CP85 scores and Hermes context limits; at day end update this report with completed work, exact CI, resource cleanup, and the next actionable handoff. Stop initiating new engineering at 6:00 PM CDT.
 
+## CP86 — provider retry accounting and bounded request correction
+
+- No-network inspection of the exact cached CP85 candidate image identified `pydantic-ai-slim==2.55.0` and `openai==3.29.0`. A strict mock transport reproduced three HTTP attempts at SDK default `max_retries=2`, versus one with retries disabled. `Agent(retries=1)` is a separate tool/output validation setting. This strongly explains the historical 3:1 canceled-request count; CP85 did not retain attempt IDs, so exact causal linkage remains unproven.
+- Candidate A now constructs `AsyncOpenAI(max_retries=0, timeout=...)` and injects it into `OpenAIProvider`. Its new offline regression passed in the cached image with network disabled and current files mounted read-only; the existing workspace identity regression passed in the same run. This is an unscored source revision for future trials. CP85's outcomes and scores were not changed, and no inference was sent.
+- The pinned SDK reproducer and candidate setting are recorded in [CP86](CP86_PROVIDER_RETRY_ACCOUNTING.md), with the matrix updated. CP71 remains blocked; no GPU, firewall, v2, shared fixture, or cleanup-lead-owned resource was touched.
+- Next: run the repository's relevant local static checks and privacy scans, publish this coherent checkpoint normally, and verify exact-SHA CI. Then resume source-level investigation of cross-restart shell-operation replay; do not claim exactly-once arbitrary shell behavior.
+
 ## Late-morning follow-up — 11:12 AM CDT
 
 - Published the CP85 CI diagnosis and ADR-010 readiness table as `5a54d083f715829ccceeb3b4cf03acea24afdc91` by normal fast-forward. Exact-SHA Prototype CI run [38595098048](https://github.com/p0rkm4th/hades-v3/actions/runs/38595098048) passed all workflow steps, including gateway/lifecycle regressions, A2 Shell recovery, CP79/83/84 DBOS integration, and CP69's strict three-harness offline E2E. The failed exact-SHA CP85 run [38594357498] remains preserved as a Docker Hub fixture-startup rate-limit failure; it was not retroactively changed to pass.
