@@ -181,6 +181,7 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
     checkpoint = durable_task.get("checkpoint") or {}
     candidate_turn = checkpoint.get("candidate_turn") or {}
     tools = candidate_turn.get("tools", [])
+    persisted_response = checkpoint.get("final_response")
     output = {
         "candidate": candidate, "case": case_name, "phase": phase,
         "replicate": replicate, "task_id": task_id, "task_state": durable_task.get("state"),
@@ -189,6 +190,11 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
         "candidate_error_category": candidate_error_category(status, result),
         "task_error_type": candidate_turn.get("error_type"),
         "task_finalization_reason": (checkpoint.get("task_finalization") or {}).get("reason"),
+        "response_delivery_state": checkpoint.get("response_delivery"),
+        "durable_final_response_correct": (
+            persisted_response == result.get("text") and bool(persisted_response)
+            if phase == "correct" and status == 200 else None
+        ),
         "tools": tools, "effect_count": len(effects),
         "effect_ids": [str(effect.get("effect_id")) for effect in effects],
         "canonical_value": None, "canonical_revision": None,
@@ -223,7 +229,8 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
             and canonical.get("revision") == 2)
         output["answer_correct"] = answer_matches(output["answer"], case)
         output["passed"] = all(output[key] for key in (
-            "durable_task_correct", "tool_selection_correct", "mutation_correct", "answer_correct"))
+            "durable_task_correct", "tool_selection_correct", "mutation_correct",
+            "answer_correct", "durable_final_response_correct"))
     else:
         memory_after = canonical_row(key)
         output["memory_key"] = key
