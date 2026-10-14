@@ -11,6 +11,7 @@
 - Published SHA `998cdc9fc61fd833b4a551d6f8ee8b638a233650` has exact-SHA CI run `38594357498`; it failed before tests because Docker Hub returned `toomanyrequests` pulling Postgres/Grocy. The linked GitHub integration lacks Actions write permission for retrying that failed job. CP84's exact-SHA run passed; the registry failure is retained separately from experiment results.
 - Follow-up SHA `5a54d083f715829ccceeb3b4cf03acea24afdc91` passed full exact-SHA CI run [38595098048](https://github.com/p0rkm4th/hades-v3/actions/runs/38595098048), including strict offline A/B/C, A2 recovery, DBOS, gateway, and lifecycle suites. It does not alter CP85's pre-tool timeout result or its original Docker Hub startup failure.
 - Current documentation/handoff SHA `d47433a1550d007b29e84879df2dc1a2f5534cac` passed full exact-SHA CI run [38596642984](https://github.com/p0rkm4th/hades-v3/actions/runs/38596642984); public and local `main` matched at verification. No candidate inference was run for this follow-up.
+- Coordination/report SHA `db5adc4f4277310c7c009f63f79d917db8864344` passed full exact-SHA CI run [38598208988](https://github.com/p0rkm4th/hades-v3/actions/runs/38598208988), again with no candidate inference.
 
 ## Previous checkpoint — CP84 Pydantic AI + DBOS finalization
 
