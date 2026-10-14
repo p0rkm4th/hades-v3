@@ -1,5 +1,12 @@
 # HADES v2 control baseline
 
+## Living-control source recheck — 2026-10-14
+
+- Public `main` is `eccaf8a4eec9802341cc31261496b98fe50856be`; exact-SHA Public CI run [38522183010](https://github.com/p0rkm4th/hades/actions/runs/38522183010) passed. This is read-only source and CI evidence; no HADES v2 checkout, runtime, or services were accessed.
+- At this pinned source, `docs/current-blockers.md` records the owner's explicit promotion of Open WebUI 0.12.0, healthy exact-artifact production state, and a synthetic UI smoke. It also says direct Scotty Dogfood remains active with owner evidence pending. The owner-workflow scoreboard records bounded conversation, memory, operator, and household workflows as PASS + PERSISTENCE, with scope-specific limitations. These are v2's published owner-facing acceptance records; they are not a matched HADES v3 comparison.
+- The latest campaign-state document in this commit is dated 2026-10-11 and still describes the owner-reported read-routing issue as requiring reproduction. The newer current-blockers and scoreboard sources supersede that older campaign summary where they conflict. No direct v2 runtime or owner data was observed for this recheck.
+- Comparative implication: v2 has current public production-promotion and owner-workflow acceptance evidence that v3 does not yet have. V3's deterministic recovery contracts and CP85's pre-tool resource timeouts do not establish a product-level usability advantage. Preserve independent v2 ownership and request a fresh Cinder snapshot through the established protected channel when it becomes accessible.
+
 ## Recorded source observation
 
 - Repository: `https://github.com/p0rkm4th/hades`
