@@ -209,3 +209,14 @@ CP85 does not alter CP81's A/C outcomes. See [CP85 report](CP85_MEMORY_RETEST_RE
 ## CP86 — provider transport retry accounting
 
 Offline inspection and a strict mock transport using CP85's pinned candidate image reproduced the OpenAI SDK default of two retries (three HTTP attempts). The candidate's `Agent(retries=1)` setting is separate from provider transport retries. Candidate A now configures `max_retries=0`; an offline regression confirms the provider setting, and the real adapter identity test still passes. This is a new unscored source revision and a budget-accounting correction, not a CP85 rescore or a model-performance result. See [CP86 report](CP86_PROVIDER_RETRY_ACCOUNTING.md).
+
+## CP87 — workspace command restart boundary
+
+| Area | Evidence | Classification | Remaining gap |
+|---|---|---|---|
+| Gateway replay | Existing task/effect ledger returns the saved result for an exact confirmed task/operation identity, rejects a changed request under that identity, and quarantines unresolved outcomes before any new dispatch. | **SOURCE REVIEW + GATEWAY CONTRACT TESTS** | Same-command requests with distinct call identities are distinct operations; generic shell has no canonical reconciliation. |
+| A2 identity persistence | Pinned Harness StepPersistence retains an interrupted Shell call identity; the test-only resume gate permits absent pre-dispatch or confirmed original calls and blocks uncertain effects/WAITING state. Both isolated offline tests passed in the cached A2 image. | **CONTRACT TEST** | Resume gate is not integrated with scored A/C runtime. Default Harness continuation may omit the interrupted call; caller must inspect unresolved effects first. |
+| A/C | Both adapters forward provider tool-call IDs to the gateway. | **ADAPTER CONTRACT** | Persistent history/identity and cross-process continuation remain unqualified; a new identity could create a new effect. |
+| Hermes | MCP workspace route lacks operation identity and fails closed. | **SOURCE REVIEW** | Identity-bearing MCP integration and recovery remain unqualified. |
+
+No safe generic fix was added. Deduplicating by command text would collapse legitimate repeated commands, while stable IDs alone cannot reconcile arbitrary shell effects. See [CP87 boundary review](CP87_WORKSPACE_REPLAY_BOUNDARY.md).

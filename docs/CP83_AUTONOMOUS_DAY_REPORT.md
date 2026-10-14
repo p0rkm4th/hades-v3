@@ -80,6 +80,13 @@ ADR-010 remains **NOT READY**. CP84 closes the deterministic candidate-finalizer
 - The pinned SDK reproducer and candidate setting are recorded in [CP86](CP86_PROVIDER_RETRY_ACCOUNTING.md), with the matrix updated. CP71 remains blocked; no GPU, firewall, v2, shared fixture, or cleanup-lead-owned resource was touched.
 - Next: run the repository's relevant local static checks and privacy scans, publish this coherent checkpoint normally, and verify exact-SHA CI. Then resume source-level investigation of cross-restart shell-operation replay; do not claim exactly-once arbitrary shell behavior.
 
+## CP87 — workspace replay boundary
+
+- Source review confirms the shared gateway's exact operation-ID idempotency and uncertain-outcome quarantine are already implemented in the task/effect ledger. Changed requests under the same ID reject. Different IDs are intentionally distinct, so command-text deduplication would be unsafe for a task that legitimately repeats a command.
+- In the cached A2 runner (`sha256:90331becfbeb7bd15a10623367b457466963cc147ba9fd4e15b037650d6c3387`), isolated no-network tests passed: the fail-closed resume gate blocks uncertain effects, and Pydantic Harness StepPersistence retains the original interrupted tool-call ID while its default continuation may omit the pending call. No replay occurred in this probe.
+- A2's gate remains test-only. A/C forward call IDs but durable resume identity is unqualified; Hermes currently lacks the identity and fails closed. Unknown arbitrary shell outcomes have no generic canonical reconciler. No code change was justified and no exactly-once guarantee is claimed.
+- This is contract/source evidence, not model-equivalent performance. It used no gateway deployment, real workspace, Hypnos request, privileged operation, or shared test stack.
+
 ## Late-morning follow-up — 11:12 AM CDT
 
 - Published the CP85 CI diagnosis and ADR-010 readiness table as `5a54d083f715829ccceeb3b4cf03acea24afdc91` by normal fast-forward. Exact-SHA Prototype CI run [38595098048](https://github.com/p0rkm4th/hades-v3/actions/runs/38595098048) passed all workflow steps, including gateway/lifecycle regressions, A2 Shell recovery, CP79/83/84 DBOS integration, and CP69's strict three-harness offline E2E. The failed exact-SHA CP85 run [38594357498] remains preserved as a Docker Hub fixture-startup rate-limit failure; it was not retroactively changed to pass.

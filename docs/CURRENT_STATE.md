@@ -4,6 +4,8 @@
 
 **Current unscored source correction:** CP86 reproduced Pydantic A's pinned OpenAI SDK retry default with an offline strict mock and disabled hidden HTTP retries (`max_retries=0`) for future runs. A source-level regression passes. CP85 results remain unchanged; no inference was repeated. See [CP86 report](CP86_PROVIDER_RETRY_ACCOUNTING.md).
 
+**Workspace recovery boundary:** CP87 confirms exact confirmed-effect replay and unknown-outcome quarantine in the existing gateway. The cached A2 StepPersistence and test-only resume-gate regressions pass with network disabled. A/C persistent history and Hermes workspace identity are unqualified; arbitrary uncertain shell effects remain review-only. No generic exactly-once claim.
+
 ## Current checkpoint — CP85 resource-limited memory screen
 
 - A fresh project `hades-v3-exp-cp85-mem-20261014` used the cached Qwen3-8B Q4_K_M file read-only, 40,960 effective context, temperature 0, output limit 1,024, and 50-second timeout. Internal-only networks, no published ports, a nonprivileged read-only candidate, and candidate DNS-denial checks passed. CP75/CP80 containers and endpoints were untouched.
