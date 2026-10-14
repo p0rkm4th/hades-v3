@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP86 disabled Candidate A's hidden OpenAI HTTP retries for future runs and passed its offline provider-setting/workspace-identity regression; CP85's timed-out result remains unchanged. CP87 confirms the shared gateway safely replays only an exact confirmed operation identity and quarantines unknown shell outcomes; A2 persists the identity in a synthetic process-death test, while A/C restart history and Hermes identity remain unqualified. No model inference or live infrastructure was used. Next: continue the CP81 CAS memory contract qualification and source-level ADR-010 simplification analysis; do not rerun inference until adequate isolated CPU capacity is available.
+**Current workstream:** CP86 disabled Candidate A's hidden OpenAI HTTP retries for future runs; CP87 tested the existing A2 identity recovery boundary; CP88 now parks stateless task resumes after confirmed workspace effects rather than risk a new operation identity. The offline regression passed; no model inference or live infrastructure was used. CP85's timed-out result remains unchanged. Next: continue the CP81 CAS memory contract qualification and source-level ADR-010 simplification analysis; do not rerun inference until adequate isolated CPU capacity is available.
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order

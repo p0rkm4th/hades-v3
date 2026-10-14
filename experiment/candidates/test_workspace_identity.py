@@ -40,6 +40,37 @@ def main() -> None:
     provider = api.pydantic_provider()
     assert provider.client.max_retries == 0, provider.client.max_retries
 
+    running_with_confirmed_workspace_effect = {
+        "state": "RUNNING",
+        "effects": [{"effect_kind": "WORKSPACE_COMMAND", "state": "CONFIRMED"}],
+    }
+    with patch.object(api, "transition_task") as transition:
+        guarded = api.workspace_resume_guard("fixture-token-amber", TASK_ID,
+                                             running_with_confirmed_workspace_effect)
+        assert guarded is not None and guarded["task_state"] == "WAITING", guarded
+        transition.assert_called_once()
+        assert transition.call_args.args[:4] == (
+            "fixture-token-amber", TASK_ID, "WAITING", [],
+        ), transition.call_args
+        assert transition.call_args.kwargs["error_type"] == "workspace_resume_requires_persisted_identity"
+    with patch.object(api, "transition_task") as transition:
+        guarded = api.workspace_resume_guard("fixture-token-amber", TASK_ID, {
+            "state": "WAITING",
+            "effects": [{"effect_kind": "WORKSPACE_COMMAND", "state": "CONFIRMED"}],
+        })
+        assert guarded is not None and guarded["operator_review_required"], guarded
+        transition.assert_not_called()
+    assert api.workspace_resume_guard("fixture-token-amber", TASK_ID, {
+        "state": "RUNNING", "effects": [],
+    }) is None
+    assert api.workspace_resume_guard("fixture-token-amber", TASK_ID, {
+        "state": "RUNNING", "effects": [{"effect_kind": "MEMORY_MUTATION", "state": "CONFIRMED"}],
+    }) is None
+    with patch.object(api, "transition_task") as transition:
+        guarded = api.workspace_resume_guard("fixture-token-amber", TASK_ID, {"state": "RUNNING"})
+        assert guarded is not None and guarded["task_state"] == "WAITING", guarded
+        assert transition.call_args.kwargs["error_type"] == "workspace_effect_snapshot_unavailable"
+
     captured: list[dict] = []
 
     def fake_urlopen(request, timeout=30):
@@ -94,7 +125,7 @@ def main() -> None:
         assert result.output == "command observation received", result.output
         _assert_identity(captured, CALL_ID)
 
-    print("PASS Pydantic provider has no hidden HTTP retries; tool context and lean adapter bind workspace effects to the same persisted call ID")
+    print("PASS provider retry budget, stateless workspace-resume quarantine, and A/C tool-call identity contracts")
 
 
 if __name__ == "__main__":
