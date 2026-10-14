@@ -1,0 +1,71 @@
+{
+  "checkpoint": "CP83",
+  "date": "2026-10-14",
+  "classification": "CONTRACT_TEST",
+  "candidate_revision": "A2 Pydantic AI Harness shell-only plus first-party DBOSDurability",
+  "runtime_versions": {
+    "python": "3.11",
+    "pydantic_ai_slim": "2.56.0",
+    "pydantic_ai_harness": "0.56.0",
+    "dbos": "3.2.0"
+  },
+  "model": {
+    "kind": "Pydantic FunctionModel deterministic peer",
+    "live_inference": false,
+    "generation_calls_per_trial": 2
+  },
+  "durability": {
+    "engine": "DBOSDurability",
+    "metadata": "ephemeral SQLite in disposable runner tmpfs",
+    "workflow_identity": "derived deterministically from HADES task ID",
+    "hades_task_effect_ledger_remains_authoritative": true,
+    "step_persistence_or_resume_gate_used": false
+  },
+  "fault": "worker process exited after workspace gateway confirmed the synthetic command and before Harness received the result",
+  "repetitions": 3,
+  "outcomes": {
+    "all_resumed": true,
+    "same_effect_identity_reused": true,
+    "canonical_candidate_effects_per_task": 1,
+    "independently_verified_marker_count_after_resume": 1,
+    "model_generations_per_task": 2,
+    "independent_read_and_cleanup": "passed",
+    "all_workspace_effects_confirmed": true,
+    "task_state": "RUNNING",
+    "task_finalization_or_delivery_in_scope": false
+  },
+  "initial_rejected_configuration": {
+    "workspace_provided_only_at_agent_run": true,
+    "result": "DBOSDurability rejected missing construction-time workspace capability before model request and tool dispatch",
+    "preserved": true
+  },
+  "security": {
+    "candidate_network": "scoped operator network only",
+    "database_credentials_in_runner": false,
+    "host_shell_or_mount": false,
+    "docker_socket": false,
+    "privileged_container": false,
+    "persistent_service": false
+  },
+  "cleanup": {
+    "project_scoped_resources_removed": true,
+    "temporary_credentials_removed": true,
+    "cp75_cp80_resources_untouched": true
+  },
+  "limitations": [
+    "Deterministic contract peer only; no live model comparison.",
+    "Only the post-confirmation/pre-Shell-acknowledgment crash boundary was repeated.",
+    "Quarantined or unknown-effect recovery under DBOS was not tested.",
+    "The durable HADES task remained RUNNING; task finalization and delivery were not evaluated.",
+    "No production DBOS metadata deployment or end-to-end maintenance-cost comparison was performed."
+  ],
+  "exact_sha_ci": "pending",
+  "local_reproduction": {
+    "fresh_unique_project": "hades-v3-cp83-verify-20261014",
+    "compose_config_valid": true,
+    "all_repetitions_passed": true,
+    "cleanup_verified": true,
+    "remaining_disk_gb": 39,
+    "cp75_cp80_running_containers_unchanged": 14
+  }
+}

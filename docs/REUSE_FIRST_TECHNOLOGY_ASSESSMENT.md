@@ -167,6 +167,10 @@ The combined Shell/FileSystem configuration generated 18 candidate-side workspac
 
 CP75 materially improved the trusted memory mutation boundary but did not qualify candidate correction: successful scalar/list mutations still stayed `WAITING`, structured corrections got no tool call, and fresh-context recall was inconsistent. This is a candidate/model interaction gap, not evidence to build another memory engine. Next decision-changing evidence is (a) the two bounded reuse spikes above, (b) repeated held-out memory correction/resume with the established CAS contract and task-finalization behavior, and (c) held-out compound/protected-action tasks. No further live Hypnos generation is authorized. CP71 remains `BLOCKED_EXTERNAL_DEPENDENCY`.
 
+### CP83 first-party DBOSDurability integration update
+
+**RESEARCH:** pinned current docs/package versions expose `DBOSDurability` and the public Harness workspace-capability hook. **CONTRACT TEST:** Harness Shell used that hook to reach only the existing authenticated HADES workspace gateway; a process killed after the gateway confirmed a command resumed the original effect in 3/3 deterministic runs. The task remained RUNNING, and the test did not cover unknown/quarantined results. This shows that DBOS can replace the test-only CP82 resume gate for this specific confirmed-result window, but it does not show a net reduction in total code or operational burden. Continue only with a quarantined-outcome test and a small code/configuration inventory comparison; do not create a persistent DBOS service or a second ledger.
+
 ## Primary sources reviewed
 
 Most release/package snapshots were checked 2026-10-13; Pydantic Harness Shell and WorkspaceBackend documentation was rechecked 2026-10-14. Official docs and release/package metadata describe upstream capability; they do not establish HADES qualification. Version metadata should be revalidated before any future pin.

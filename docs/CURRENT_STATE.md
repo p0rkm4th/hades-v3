@@ -1,6 +1,13 @@
 # Current state
 
-**Campaign status:** CP81 memory results are mixed. CP82 adds identity-bound replay for the separate A2 Shell adapter and proves one worker-recovery path; unresolved StepPersistence reconciliation and A/C workspace replay remain open. ADR-010 remains NOT READY. This is a prototype comparison, not production implementation.
+**Campaign status:** CP81 memory results remain mixed. CP82 proves identity-bound replay for A2 under a test-only resume gate. CP83 adds a separate A2 + Pydantic DBOSDurability contract spike: 3/3 worker deaths after gateway confirmation resumed the same confirmed effect without duplicate markers. Unknown-effect recovery and durable HADES task finalization remain unproven. ADR-010 remains NOT READY. This is a prototype comparison, not production implementation.
+
+## Current checkpoint — CP83 A2 + DBOSDurability
+
+- The pinned Pydantic AI Harness `0.56.0`, Pydantic AI `2.56.0`, and DBOS `3.2.0` integration used the documented construction-time `AbstractCapability.get_workspace` hook to route Shell through the authenticated HADES workspace gateway. DBOS workflow identity derives from the HADES task ID; DBOS metadata lived only in disposable runner tmpfs.
+- In three strict deterministic repetitions, the worker died after the gateway recorded `CONFIRMED` and before Harness received the command result. Restarted DBOS execution replayed the original operation identity, returned the same HADES effect, and independently verified exactly one marker. Each trial used two deterministic generations. The durable task stayed `RUNNING`; finalization/delivery was not in scope.
+- This demonstrates first-party DBOSDurability can compose with the A2 Shell adapter for one confirmed-result crash boundary. It does not establish safe recovery of quarantined/unknown outcomes, semantic model performance, general shell exactly-once behavior, or a net maintenance reduction. CP79/CP82 evidence remains unchanged; no DBOS adoption decision is made.
+- CP83 fixture projects were removed by exact project scope; post-cleanup inventory found no CP83 containers, networks, or volumes. The 14 CP75/CP80 containers remained running; available disk stayed at 39 GB. No GPU, privileged host, v2, or shared cleanup action occurred. See [CP83 report](CP83_PYDANTIC_DBOS_WORKSPACE_RECOVERY.md).
 
 ## Previous checkpoint — CP81
 
