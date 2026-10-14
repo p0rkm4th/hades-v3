@@ -1,7 +1,7 @@
 # Reuse-first technology assessment
 
-**Assessment date:** 2026-10-13
-**Source baseline:** HADES v3 CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
+**Assessment date:** 2026-10-14
+**Source baseline:** HADES v3 CP77, `88d1017e7a27b87324ead831dcf4dd61f9720c75`
 **Authority:** frozen PRD and Bounded Operator architecture
 **Status:** research synthesis; recommendations are hypotheses until integrated and independently tested
 
@@ -127,7 +127,8 @@ This section records the source state checked for CP76. Release numbers are a sn
 ### Evidence strength and compatibility notes
 
 - Current scored A, B, and C results remain attached to their exact source revisions and settings. Package/release features listed above are **RESEARCH**, not a score for those revisions.
-- Pydantic Harness's own Shell and filesystem tools do not provide the isolation required by the Bounded Operator design. A2 must use the existing separate workspace runner or an equivalently enforced sandbox. A prompt allowlist is not an OS boundary.
+- Pydantic Harness's own Shell and filesystem tools do not provide the isolation required by the Bounded Operator design. Upstream says Shell allowlists are guardrails, not security boundaries; `LocalWorkspaceBackend` runs commands on the agent machine. The `WorkspaceBackend` protocol permits a command-only adapter, with filesystem operations derived through that backend's shell. A2 can therefore plausibly reuse the Harness while routing all commands through HADES `workspace_exec`; this adapter must preserve gateway authentication, task binding, and one durable `WORKSPACE_COMMAND` effect per command.
+- The current workspace runner has a fixed timeout and does not accept command-specific environment settings. The Harness adapter must reject or deliberately map those options; no unsupported setting may be silently presented as enforced. Background/persistent shell compatibility remains untested.
 - DBOS stores durable workflow history separately from application state. Mapping `workflow_id` to HADES `task_id` is execution correlation only; the gateway remains the only source of task, grant, effect, reconciliation, and completion truth.
 - DBOS's workflow ID deduplication does not make an unrecorded external operation exactly-once. A HADES effect ID and target-side idempotency/reconciliation remain necessary around every consequential operation.
 - Hermes's latest release materially expands the available product capability set, but it is not the pinned CP69–CP75 runtime. A fresh B profile would require a new immutable revision, dependency/environment capture, and new matched qualification; no 40,960-context CPU run is equivalent to its 64,000 minimum.
@@ -138,6 +139,10 @@ This section records the source state checked for CP76. Release numbers are a sn
 1. **A2: Pydantic AI Harness capability composition.** Pin the current Harness/core pair in a separate experiment image. Use one isolated shell/repository task through the existing HADES gateway and existing sandbox. Compare custom code surface, tool correctness, recovery behavior, isolation, runtime footprint, and independently verified repo postconditions against historical A and C. Reject if the Harness requires duplicating authority or its shell cannot be confined by the existing workspace boundary.
 2. **DBOS: durable execution adapter.** Use a disposable PostgreSQL system database and a toy workflow with read-only/model steps plus a simulator effect routed through the existing task/effect gateway. Inject worker restart around dispatch/acknowledgment; assert same task/effect IDs, one canonical receive, no repeated authorization bypass, and correct gateway state. Measure retained custom resume code and DBOS deployment/configuration burden. Do not adopt it if it needs a second task/effect authority or cannot make retries safe through HADES.
 
+### CP77 follow-up evidence
+
+The CP77 DBOS subprocess probe passed exact-SHA CI, but it remains a SQLite contract test: DBOS retried a step after restart and a synthetic target's idempotency key kept one canonical effect. It provides no HADES integration evidence. The separately pinned A2 package inspection confirms the upstream workspace extension point is sufficient in shape for an adapter that calls HADES `workspace_exec`; package API fit is **RESEARCH**, not a working integration. Reject direct `LocalWorkspaceBackend` or a Harness shell attached to the agent host because either would bypass the existing workspace/effect boundary. Next proof must run in a unique disposable fixture project and verify real HADES task/effect rows and repository postconditions independently.
+
 These are the only selected spikes for this assessment. Temporal, Restate, Prefect, Testcontainers, and OTel remain alternatives or targeted utilities, not parallel deployments. DBOS should be tested first; the A2 spike can proceed independently and must not alter scored A/B/C.
 
 ## Updated decision path
@@ -146,7 +151,7 @@ CP75 materially improved the trusted memory mutation boundary but did not qualif
 
 ## Primary sources reviewed
 
-Accessed 2026-10-13. Official docs and release/package metadata describe upstream capability; they do not establish HADES qualification. Version metadata should be revalidated before any future pin.
+Most release/package snapshots were checked 2026-10-13; Pydantic Harness Shell and WorkspaceBackend documentation was rechecked 2026-10-14. Official docs and release/package metadata describe upstream capability; they do not establish HADES qualification. Version metadata should be revalidated before any future pin.
 
 - Pydantic AI Harness overview: https://pydantic.dev/docs/ai/harness/
 - Harness Coder: https://pydantic.dev/docs/ai/harness/coder/
