@@ -9,6 +9,7 @@
 - The goal cited `268e34babfc18e543dee9f93fdd5b7ba9a2243de` as last verified baseline; session preflight found both local and public `main` had already advanced and were synchronized at `eb2b212c090a72c68c0a8efd53043bec18334322`.
 - CP92 initial source-review documentation is public at `c6f60a0e28fda6c5efdcf14647b0d74ce00d020f`; exact-SHA CI passed: [run 38616383083](https://github.com/p0rkm4th/hades-v3/actions/runs/38616383083).
 - Follow-up documentation is public at `ebbdbacd34db1a67e5787dd29ec3bb320bbe09ce`; exact-SHA CI passed: [run 38617681737](https://github.com/p0rkm4th/hades-v3/actions/runs/38617681737). The strict three-harness offline, A2, DBOS, gateway, and lifecycle checks completed before cleanup.
+- The CP92 source-review/reuse-evidence follow-up is public at `1a53ff0c062bc3108d96e2d413d906db4f76079d`; its exact-SHA CI passed: [run 38624076796](https://github.com/p0rkm4th/hades-v3/actions/runs/38624076796), including the strict three-harness offline qualification and scoped fixture cleanup.
 - CP89 through CP91 evidence remains unchanged. No Hypnos, privileged firewall, HADES v2, or production action occurred.
 
 ## CP81 memory qualification and CP89 resource screen
