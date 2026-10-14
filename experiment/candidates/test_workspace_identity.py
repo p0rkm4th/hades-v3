@@ -78,6 +78,30 @@ def _test_stateless_resume_route() -> None:
         thread.join(timeout=3)
 
 
+def _test_waiting_transition_uses_orchestrator_contract() -> None:
+    current = {
+        "task_id": TASK_ID,
+        "state": "RUNNING",
+        "checkpoint": {"summary": "synthetic task", "completed": [], "pending": []},
+        "effects": [{"effect_kind": "WORKSPACE_COMMAND", "state": "CONFIRMED"}],
+    }
+    with patch.object(api, "ORCHESTRATOR_SECRET", "synthetic-orchestrator-secret"), patch.object(
+        api, "gateway_call", side_effect=[current, {"task_id": TASK_ID, "state": "WAITING"}],
+    ) as gateway:
+        api.transition_task(
+            "fixture-token-amber", TASK_ID, "WAITING", [],
+            error_type="workspace_resume_requires_persisted_identity",
+            finalization={"reason": "workspace_resume_requires_persisted_identity"},
+            annotations={"operator_review_required": True},
+        )
+    checkpoint_call = gateway.call_args_list[1]
+    assert checkpoint_call.args[0] == "task_checkpoint", checkpoint_call
+    arguments = checkpoint_call.args[1]
+    assert arguments["_orchestrator_finalization"] == {
+        "reason": "workspace_resume_requires_persisted_identity",
+    }, arguments
+
+
 def main() -> None:
     provider = api.pydantic_provider()
     assert provider.client.max_retries == 0, provider.client.max_retries
@@ -95,6 +119,9 @@ def main() -> None:
             "fixture-token-amber", TASK_ID, "WAITING", [],
         ), transition.call_args
         assert transition.call_args.kwargs["error_type"] == "workspace_resume_requires_persisted_identity"
+        assert transition.call_args.kwargs["finalization"] == {
+            "reason": "workspace_resume_requires_persisted_identity",
+        }
         assert transition.call_args.kwargs["annotations"]["effect_outcome_uncertain"] is False
     with patch.object(api, "transition_task") as transition:
         guarded = api.workspace_resume_guard("fixture-token-amber", TASK_ID, {
@@ -115,6 +142,7 @@ def main() -> None:
         assert transition.call_args.kwargs["error_type"] == "workspace_effect_snapshot_unavailable"
         assert "effect_outcome_uncertain" not in transition.call_args.kwargs["annotations"]
     _test_stateless_resume_route()
+    _test_waiting_transition_uses_orchestrator_contract()
 
     captured: list[dict] = []
 
