@@ -4,6 +4,8 @@
 
 **Next steps:** Do not rerun CP89's timed-out model cases under the same conditions. First define a trusted intent-to-memory-mutation contract compatible with the frozen architecture; then obtain resource-adequate matched A/C correction, restart, and fresh-context evidence. Continue workspace concurrency/reconciliation and A2/DBOS net-complexity work offline. CP71 remains blocked; no Hypnos or privileged-host actions are authorized.
 
+Today's progress and closeout status are tracked in the [CP92 autonomous day report](CP92_AUTONOMOUS_DAY_REPORT.md).
+
 **Current unscored source correction:** CP86 reproduced Pydantic A's pinned OpenAI SDK retry default with an offline strict mock and disabled hidden HTTP retries (`max_retries=0`) for future runs. A source-level regression passes. CP85 results remain unchanged; no inference was repeated. See [CP86 report](CP86_PROVIDER_RETRY_ACCOUNTING.md).
 
 **Workspace recovery boundary:** CP87 confirms exact confirmed-effect replay and unknown-outcome quarantine in the existing gateway. The cached A2 StepPersistence and test-only resume-gate regressions pass with network disabled. A/C persistent history and Hermes workspace identity are unqualified; arbitrary uncertain shell effects remain review-only. No generic exactly-once claim.
