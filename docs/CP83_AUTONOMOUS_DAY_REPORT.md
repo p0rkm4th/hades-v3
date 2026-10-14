@@ -1,6 +1,6 @@
 # HADES v3 autonomous engineering day — progress handoff
 
-**Date:** 2026-10-14, in progress (10:58 AM CDT)
+**Date:** 2026-10-14, in progress (11:16 AM CDT)
 **Authority:** frozen PRD and Bounded Operator architecture
 **ADR-010:** NOT READY
 **Next update:** before 6:00 PM CDT
@@ -72,3 +72,10 @@ ADR-010 remains **NOT READY**. CP84 closes the deterministic candidate-finalizer
 2. Existing CP75/CP80 containers, including the CPU model service, remain active and have not been released for reuse. Do not connect to or restart them. CP85's own model endpoint was stopped and its own fixtures removed; the four-CPU profile reached host capacity, so no higher-cap inference is planned today.
 3. Compare CP84 against A2 StepPersistence for unknown-result handling, output delivery after process restart, DBOS history protection, bounded retry/cancel semantics, and net code/operational burden. No persistent DBOS service or second ledger.
 4. Preserve CP81/CP85 scores and Hermes context limits; at day end update this report with completed work, exact CI, resource cleanup, and the next actionable handoff. Stop initiating new engineering at 6:00 PM CDT.
+
+## Late-morning follow-up — 11:12 AM CDT
+
+- Published the CP85 CI diagnosis and ADR-010 readiness table as `5a54d083f715829ccceeb3b4cf03acea24afdc91` by normal fast-forward. Exact-SHA Prototype CI run [38595098048](https://github.com/p0rkm4th/hades-v3/actions/runs/38595098048) passed all workflow steps, including gateway/lifecycle regressions, A2 Shell recovery, CP79/83/84 DBOS integration, and CP69's strict three-harness offline E2E. The failed exact-SHA CP85 run [38594357498] remains preserved as a Docker Hub fixture-startup rate-limit failure; it was not retroactively changed to pass.
+- Ran 44 pure task-lifecycle, candidate-finalization, and CP81 answer-oracle tests from a cached runner image with `--network none`, read-only repository mount, and a temporary filesystem. All 44 passed; no shared fixture or service was accessed. Initial invocation omitted the answer-oracle module path and failed to import that module; rerunning with `PYTHONPATH=/repo/experiment/tests` passed the complete set.
+- Rechecked public v2 `main` read-only at `eccaf8a4eec9802341cc31261496b98fe50856be`; exact-SHA Public CI [38522183010](https://github.com/p0rkm4th/hades/actions/runs/38522183010) passed. Current public records report the authorized Open WebUI 0.12.0 promotion and PASS + PERSISTENCE owner-workflow slices for conversation, memory, bounded operator delegation, and household; direct owner dogfood remains active. This is materially stronger current owner-acceptance evidence than v3 has, but not a matched v2/v3 task. Added the pinned observation to [v2 control baseline](V2_CONTROL_BASELINE.md) and ADR readiness assessment.
+- A direct Codex thread-list attempt again failed at the local TUI MCP transport; no Cinder or Tallowmere response is claimed. CP75/CP80 and all other shared resources remain untouched. CP71 remains externally blocked; no model inference, GPU, privileged host action, or v2 runtime access occurred.

@@ -9,6 +9,7 @@
 - Available host memory fell from 17 GB to about 9.5 GB while the model was loaded and host load reached 19.64/20. Further inference stopped; the model server was stopped and only CP85's project containers/networks/volumes were removed. Free disk remained 44 GB; memory recovered to 19 GB; 14 CP75/CP80 containers remained. Five CP85-tagged images remain for cleanup-lead review.
 - This is an unscored, resource-limited screen, not evidence of incorrect memory selection or A/C ranking. See [CP85 report](CP85_MEMORY_RETEST_REPORT.md) and [JSONL](../experiment/results/cp85-memory-retest-20261014.jsonl).
 - Published SHA `998cdc9fc61fd833b4a551d6f8ee8b638a233650` has exact-SHA CI run `38594357498`; it failed before tests because Docker Hub returned `toomanyrequests` pulling Postgres/Grocy. The linked GitHub integration lacks Actions write permission for retrying that failed job. CP84's exact-SHA run passed; the registry failure is retained separately from experiment results.
+- Follow-up SHA `5a54d083f715829ccceeb3b4cf03acea24afdc91` passed full exact-SHA CI run [38595098048](https://github.com/p0rkm4th/hades-v3/actions/runs/38595098048), including strict offline A/B/C, A2 recovery, DBOS, gateway, and lifecycle suites. It does not alter CP85's pre-tool timeout result or its original Docker Hub startup failure.
 
 ## Previous checkpoint — CP84 Pydantic AI + DBOS finalization
 

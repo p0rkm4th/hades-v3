@@ -41,3 +41,5 @@ ADR-010 remains **NOT READY**. CP71 remains `BLOCKED_EXTERNAL_DEPENDENCY`; no GP
 ## Publication and CI
 
 CP85 was published at `998cdc9fc61fd833b4a551d6f8ee8b638a233650`, and remote `main` matched. Exact-SHA CI run [38594357498](https://github.com/p0rkm4th/hades-v3/actions/runs/38594357498) failed at the pre-existing fixture startup step before tests ran: Docker Hub returned `toomanyrequests` while pulling Postgres/Grocy. The new CP85 Compose configuration step was not reached. An attempt to rerun only the failed GitHub Actions job was rejected with HTTP 403 because the connected GitHub integration lacks Actions write access. This is an external CI dependency; it is preserved as failure evidence and is not evidence of a CP85 test failure.
+
+A subsequent sanitized documentation checkpoint, `5a54d083f715829ccceeb3b4cf03acea24afdc91`, passed the complete Prototype CI run [38595098048](https://github.com/p0rkm4th/hades-v3/actions/runs/38595098048), including all gateway, lifecycle, recovery, DBOS/Harness, adapter, and strict CP69 offline tests. This later green run does not change CP85's resource-limited candidate outcome or the original startup failure.
