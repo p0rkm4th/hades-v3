@@ -39,9 +39,9 @@ Research and bounded disposable integrations continue without live GPU access. S
 ## Current next steps
 
 1. Run held-out A/C scalar, structured, and list corrections with exact CAS contracts, independent task/effect/canonical-memory checks, exact retries, service restart, and fresh-context recall. Preserve CP75 outcomes unchanged.
-2. Coordinate CP80/CP75 fixture ownership and release with Tallowmere before touching running resources. Do not delete or restart shared fixtures without coordination.
-3. Add the bounded A2 Shell-only uncertain-command recovery regression only if it does not distract from memory qualification. Keep DBOS viable until an integration spike measures a reduction in HADES-specific recovery complexity.
-4. Continue only decision-relevant reuse and recovery work. CP71 stays `BLOCKED_EXTERNAL_DEPENDENCY`; no firewall checks or Hypnos inference. ADR-010 remains NOT READY.
+2. Wait for Tallowmere to identify and release a disposable fixture project. Until then, do not start, rebuild, restart, or remove CP75/CP80 resources; candidate-mediated mutation and fresh-context recall remain the blocking CP81 evidence.
+3. The bounded A2 Shell-only uncertain-command check is complete as a deterministic contract test: one quarantined response caused the pinned Harness to abort after one model and one gateway request. The separate A2 Shell recovery behavior remains unqualified; do not let it displace memory qualification.
+4. Keep DBOS viable but unadopted until a HADES integration demonstrates measurable recovery-complexity reduction while HADES remains the sole task/effect authority. Continue offline work without Hypnos or privileged host access; CP71 stays `BLOCKED_EXTERNAL_DEPENDENCY` and ADR-010 remains NOT READY.
 
 ## CP81 checkpoint — bounded memory completion contract
 
