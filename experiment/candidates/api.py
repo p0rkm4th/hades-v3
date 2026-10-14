@@ -174,10 +174,16 @@ def workspace_operation_id(task_id: str, tool_call_id: str | None) -> str:
 def gateway_call(
     name: str, arguments: dict, token: str, task_id: str,
     evidence: list | None = None, tool_call_id: str | None = None,
+    trusted_internal: bool = False,
 ):
     contract = next((item for item in TOOLS if item["name"] == name), None)
     if contract is None:
         raise ValueError("unknown shared tool")
+    reserved_orchestrator_fields = {"_orchestrator_finalization", "_orchestrator_resume"}
+    if (name == "task_checkpoint"
+            and reserved_orchestrator_fields.intersection(arguments)
+            and not trusted_internal):
+        raise ValueError("orchestrator-only task fields are not candidate-accessible")
     if (name == "task_checkpoint" and arguments.get("state") == "WAITING"
             and "_orchestrator_finalization" not in arguments):
         return {"http_status": 400, "error": "WAITING is an orchestrator-owned task state"}
@@ -214,9 +220,8 @@ def gateway_call(
         GATEWAY + path, data=data, method=contract["method"],
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
-    if name == "task_checkpoint" and any(
-        key in arguments for key in ("_orchestrator_finalization", "_orchestrator_resume")
-    ):
+    if (name == "task_checkpoint" and trusted_internal
+            and reserved_orchestrator_fields.intersection(arguments)):
         if not ORCHESTRATOR_SECRET:
             raise RuntimeError("orchestrator credential is not configured")
         req.add_header("X-Hades-Orchestrator", ORCHESTRATOR_SECRET)
@@ -502,7 +507,10 @@ def transition_task(
         arguments["_orchestrator_finalization"] = finalization
     if resume:
         arguments["_orchestrator_resume"] = True
-    updated = gateway_call("task_checkpoint", arguments, token, task_id)
+    updated = gateway_call(
+        "task_checkpoint", arguments, token, task_id,
+        trusted_internal=bool(finalization is not None or resume),
+    )
     if updated.get("http_status") or updated.get("state") != state:
         raise RuntimeError("task state could not be saved")
     transition = {"task_id": task_id, "state": state, "resume": resume}
