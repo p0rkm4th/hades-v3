@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP84 Pydantic AI + DBOS candidate-finalizer integration passed 3/3 deterministic crash/recovery trials; uncertain shell outcomes remain quarantined and live-model performance is untested
+**Current workstream:** CP85's held-out A/C structured-memory screen timed out before tools under a four-CPU safety cap; CP84's 3/3 deterministic DBOS/finalizer recovery remains positive contract evidence, not live-model qualification
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -38,10 +38,10 @@ Research and bounded disposable integrations continue without live GPU access. S
 
 ## Current next steps
 
-1. Preserve CP81's mixed A/C outcomes. Do not rerun scored memory trials until a separately owned CPU model endpoint and fixture are available; prioritize candidates that can be executed without touching CP75/CP80.
+1. Preserve CP81's mixed A/C outcomes and CP85's matched pre-tool timeouts. Do not raise the CP85 CPU cap or repeat inference while host load is near capacity; resume model-equivalent memory correction/recall only with reserved CPU/memory, then use a fresh held-out task.
 2. Keep CP83/84 guarantees bounded: same confirmed effect is replayed, unknown outcomes quarantine and block; neither DBOS nor a stable command ID proves exactly-once arbitrary shell effects. CP84 reuses HADES `gateway_call` and `finalize_turn` but does not run the candidate HTTP Handler or Harness Shell.
 3. Compare the minimum CP84 DBOS integration against A2 StepPersistence for uncertain outcomes, delivery recovery, history privacy, cancellation/retry bounds, and operations burden before adoption.
-4. Advance offline compound-operation and protected-action contracts with independent postconditions, then refresh Cinder's v2 evidence only from an agreed read-only snapshot.
+4. Advance deterministic CAS, stale-revision, cross-domain, replay, compound-operation, and protected-action contracts with independent postconditions; refresh Cinder's v2 evidence only from an agreed read-only snapshot.
 5. Keep CP71 `BLOCKED_EXTERNAL_DEPENDENCY`; no Hypnos, privileged firewall, HADES v2, frozen-document, or production work. CP75/CP80 remain untouched.
 
 ## CP81 checkpoint — bounded memory completion contract

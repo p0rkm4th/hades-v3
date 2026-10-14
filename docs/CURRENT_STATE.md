@@ -1,8 +1,20 @@
 # Current state
 
-**Campaign status:** CP81 memory results remain mixed. CP82 proves identity-bound replay for A2 under a test-only resume gate. CP83 confirmed A2 Shell/DBOS replay for a confirmed result and no-replay quarantine for an uncertain result. CP84 then passed 3/3 deterministic Pydantic AI + DBOS crash trials through the shared HADES tool adapter and trusted finalizer, including a second interruption before task transition. These are contract tests, not live-model A/B/C results. Unknown shell outcomes, DBOS operations/history privacy, and net maintained-code reduction remain open; ADR-010 remains NOT READY.
+**Campaign status:** CP84 passed 3/3 deterministic Pydantic AI + DBOS crash/finalization trials through the shared HADES tools and trusted finalizer. CP85's new held-out structured-memory screen failed before tool selection for both A and C because the four-CPU model service timed out; canonical memory stayed at revision 1, zero effects were created, and tasks correctly became `FAILED`. CP85 was stopped as host load approached capacity. These do not alter CP81's earlier mixed A/C memory evidence and are not a harness ranking. CP71 remains blocked; ADR-010 remains NOT READY.
 
-## Current checkpoint — CP83 A2 + DBOSDurability
+## Current checkpoint — CP85 resource-limited memory screen
+
+- A fresh project `hades-v3-exp-cp85-mem-20261014` used the cached Qwen3-8B Q4_K_M file read-only, 40,960 effective context, temperature 0, output limit 1,024, and 50-second timeout. Internal-only networks, no published ports, a nonprivileged read-only candidate, and candidate DNS-denial checks passed. CP75/CP80 containers and endpoints were untouched.
+- The model server had a four-CPU limit to bound interference. A and C each got HTTP 502 after a timeout before tool selection; A's provider path had three canceled requests and C's had one. Independent records show no tool calls, no effects, unchanged synthetic JSON/revision 1, and durable `FAILED` tasks.
+- Available host memory fell from 17 GB to about 9.5 GB while the model was loaded and host load reached 19.64/20. Further inference stopped; the model server was stopped and only CP85's project containers/networks/volumes were removed. Free disk remained 44 GB; memory recovered to 19 GB; 14 CP75/CP80 containers remained. Five CP85-tagged images remain for cleanup-lead review.
+- This is an unscored, resource-limited screen, not evidence of incorrect memory selection or A/C ranking. See [CP85 report](CP85_MEMORY_RETEST_REPORT.md) and [JSONL](../experiment/results/cp85-memory-retest-20261014.jsonl).
+
+## Previous checkpoint — CP84 Pydantic AI + DBOS finalization
+
+- A deterministic Pydantic AI Agent used DBOS with the existing HADES `gateway_call` and `finalize_turn`; it did not run the HTTP Handler or Harness Shell. Three clean trials recovered after process death following a confirmed effect and after workflow completion but before HADES finalization. Same effect and workflow result were retained; independent reads saw one marker; repeated resume added no effect/generation; trusted HADES finalization reached `COMPLETED`.
+- Two test-driver failures remain separately preserved and are excluded from the three passes. DBOS remains unadopted: only process restart with SQLite in runner tmpfs was tested; uncertain outcomes, persistent-store privacy, cancellation/retry, container/host restart, live inference, and net runtime-code reduction remain open. Exact CI run 38591919710 passed SHA `b2175ceedf8429a0e4c7fcba9cc7c9963d072841`. See [CP84 report](CP84_DBOS_CANDIDATE_FINALIZATION.md).
+
+## Previous checkpoint — CP83 A2 + DBOSDurability
 
 - The pinned Pydantic AI Harness `0.56.0`, Pydantic AI `2.56.0`, and DBOS `3.2.0` integration used the documented construction-time `AbstractCapability.get_workspace` hook to route Shell through the authenticated HADES workspace gateway. DBOS workflow identity derives from the HADES task ID; DBOS metadata lived only in disposable runner tmpfs.
 - In three strict deterministic repetitions, the worker died after the gateway recorded `CONFIRMED` and before Harness received the command result. Restarted DBOS execution replayed the original operation identity, returned the same HADES effect, and independently verified exactly one marker. Repeated result retrieval added no generation or effect. Each trial used two deterministic generations. The durable task stayed `RUNNING`; finalization/delivery was not in scope.

@@ -194,3 +194,14 @@ CP83 supports one A2/DBOS composition hypothesis, not a harness ranking. It prov
 | Reuse impact | DBOS recovery composes with HADES task/effect authority and trusted finalizer; no second ledger was introduced. | **CONTRACT TEST** | No net runtime code reduction shown; DBOS history privacy, payload codec, persistent DB, retry/cancellation and lifecycle integration need qualification. |
 
 CP84 is a separate deterministic Pydantic AI + DBOS integration candidate, not an A/B/C score. It improves the evidence that a confirmed effect and final response can survive process interruption while HADES independently decides task completion. See [CP84 report](CP84_DBOS_CANDIDATE_FINALIZATION.md) and [sanitized trial records](../experiment/results/cp84-dbos-candidate-finalization-20261014.jsonl). ADR-010 remains NOT READY.
+
+## CP85 — resource-limited held-out memory screen
+
+| Area | Evidence | Classification | Remaining gap |
+|---|---|---|---|
+| Isolation | New unique project, internal-only networks, no host ports or privileged services; candidate resolved only gateway/model aliases. Shared CP75/CP80 services were not contacted or restarted. | **OPERATIONAL EVIDENCE** | Inference still consumed shared host CPU/RAM; stopped when load approached capacity. |
+| A/C held-out structured correction | One identical lab-report JSON correction each. Both timed out before tool selection; A had three canceled upstream requests and C one. | **LIVE CPU SCREEN, RESOURCE-LIMITED** | One trial per candidate; no CAS operation or fresh-context recall occurred. Not a memory-selection failure or candidate ranking. |
+| Canonical state and lifecycle | Independent reads showed original revision-1 JSON unchanged, zero effects, and both tasks `FAILED`. | **INDEPENDENT FIXTURE VERIFICATION** | No correction success to restart/retrieve; prior CP81 observations remain the controlling memory evidence. |
+| Resource/cleanup | Four-CPU cap led to 50-second provider timeout; host load reached 19.64/20. CP85 containers, networks, and volumes were removed; 14 CP75/CP80 containers remained. | **OPERATIONAL EVIDENCE** | Five project-tagged images remain for cleanup-lead review; no pruning. No higher-cap rerun during this session. |
+
+CP85 does not alter CP81's A/C outcomes. See [CP85 report](CP85_MEMORY_RETEST_REPORT.md) and [sanitized per-trial records](../experiment/results/cp85-memory-retest-20261014.jsonl).

@@ -51,6 +51,21 @@ CASES = {
         ],
         "recall": "When do I want reminders on weekdays?",
     },
+    "lab_report_formatting": {
+        "key_prefix": "lab-report-formatting",
+        "before": {"headings": "detailed", "body": "paragraphs", "citations": True},
+        "after": {"headings": "short", "body": "bullets", "citations": True},
+        "correct": (
+            "Change my saved lab-report settings so headings are short and the content uses bullets. "
+            "Keep the citations setting as it is."
+        ),
+        "answer_phrases": ["short", "bullets"],
+        "answer_negations": [
+            r"\bnot\s+short\b", r"\bnot\s+bullets\b",
+            r"\b(?:do not|don't|does not|doesn't)\s+(?:use|choose|prefer|want|keep)\s+(?:short|bullets)\b",
+        ],
+        "recall": "How should my lab reports be formatted?",
+    },
 }
 
 

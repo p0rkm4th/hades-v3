@@ -1,7 +1,7 @@
 # Reuse-first technology assessment
 
 **Assessment date:** 2026-10-14
-**Source baseline:** HADES v3 CP77, `88d1017e7a27b87324ead831dcf4dd61f9720c75`
+**Source baseline:** HADES v3 CP84, `b2175ceedf8429a0e4c7fcba9cc7c9963d072841`
 **Authority:** frozen PRD and Bounded Operator architecture
 **Status:** research synthesis; recommendations are hypotheses until integrated and independently tested
 
@@ -170,6 +170,12 @@ CP75 materially improved the trusted memory mutation boundary but did not qualif
 ### CP83 first-party DBOSDurability integration update
 
 **RESEARCH:** pinned current docs/package versions expose `DBOSDurability` and the public Harness workspace-capability hook. **CONTRACT TEST:** Harness Shell used that hook to reach only the existing authenticated HADES workspace gateway; a process killed after the gateway confirmed a command resumed the original effect in 3/3 deterministic runs. A distinct timed-out command remained quarantined across restart and was not redispatched, but DBOS surfaced a fail-closed exception; no final response or task completion followed. This shows DBOS can replace the test-only CP82 resume gate for the confirmed-result window and preserves no-replay safety for this quarantine case. It does not show general task recovery or a net reduction in total code/operational burden. Next compare only a bounded trusted reconciliation path and the code/configuration footprint; do not create a persistent DBOS service or a second ledger.
+
+### CP84 candidate-finalization composition
+
+**CONTRACT TEST:** a deterministic Pydantic AI Agent using DBOS called the existing HADES `gateway_call` and trusted `finalize_turn`. In 3/3 clean trials it survived process death after a confirmed workspace effect and again after DBOS returned but before task finalization. Resume returned the same workflow result and effect ID; independent workspace reads found one marker, the HADES task reached `COMPLETED`, and repeated retrieval added no generation or effect. Two earlier test-driver failures remain recorded and are excluded from the 3/3 result. This is not a live-model result and did not run the candidate HTTP Handler or Harness Shell.
+
+**Reuse decision:** DBOS composes coherently with the single HADES ledger and prevents the experiment from needing an ad hoc persisted workflow-result store for this path. It has not yet shown a net reduction in maintained HADES runtime code: the 303-line CP84 driver is test code, the candidate API/lifecycle/gateway remain, and DBOS adds dependency, workflow-history, retry/cancellation, and production-store obligations. The principal next proof is direct comparison with the pinned Harness `StepPersistence`/resume boundary for accepted and quarantined effects, process restart, and result delivery. Keep the CP84 candidate separate; do not adopt DBOS or replace scored Candidate A based on this contract test.
 
 ### CP83 code-surface check
 
