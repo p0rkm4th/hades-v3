@@ -1,22 +1,42 @@
-"""Forward Pydantic tool-call identity to the HADES workspace adapter."""
+"""Bind each Harness workspace dispatch to its persisted model tool call."""
 
 from __future__ import annotations
 
+import hashlib
+import threading
 from contextvars import ContextVar
+from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic_ai import RunContext
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.toolsets import AbstractToolset, ToolsetTool, WrapperToolset
-from pydantic_ai import RunContext
 
 
-_tool_call_id: ContextVar[str | None] = ContextVar("hades_tool_call_id", default=None)
+@dataclass
+class _ToolCallIdentity:
+    tool_call_id: str
+    next_dispatch: int = 0
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def operation_id(self, task_id: str) -> str:
+        # One Harness tool may perform several backend calls. Keep them distinct,
+        # but make replay of the same ordered tool call deterministic.
+        with self.lock:
+            ordinal = self.next_dispatch
+            self.next_dispatch += 1
+        raw = f"{task_id}:{self.tool_call_id}:{ordinal}".encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
 
 
-def current_tool_call_id() -> str | None:
-    """Return the active Harness tool-call ID for this workspace invocation."""
+_tool_call: ContextVar[_ToolCallIdentity | None] = ContextVar("hades_tool_call", default=None)
 
-    return _tool_call_id.get()
+
+def next_operation_id(task_id: str) -> str:
+    identity = _tool_call.get()
+    if identity is None or not identity.tool_call_id:
+        raise RuntimeError("HADES workspace call has no persisted tool identity")
+    return identity.operation_id(task_id)
 
 
 class _IdentityToolset(WrapperToolset[Any]):
@@ -27,11 +47,11 @@ class _IdentityToolset(WrapperToolset[Any]):
         ctx: RunContext[Any],
         tool: ToolsetTool[Any],
     ) -> Any:
-        token = _tool_call_id.set(ctx.tool_call_id)
+        token = _tool_call.set(_ToolCallIdentity(ctx.tool_call_id))
         try:
             return await super().call_tool(name, tool_args, ctx, tool)
         finally:
-            _tool_call_id.reset(token)
+            _tool_call.reset(token)
 
 
 class HadesOperationIdentity(AbstractCapability[Any]):

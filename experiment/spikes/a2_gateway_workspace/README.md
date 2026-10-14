@@ -38,8 +38,10 @@ behavior.
 
 The A2 adapter includes `HadesOperationIdentity`, a supported Harness toolset
 wrapper that forwards the active `tool_call_id` through the command-only
-`WorkspaceBackend`. The adapter hashes it with the HADES task ID; the model does
-not supply this field. `workspace_exec` stores that identity and a canonical
+`WorkspaceBackend`. The adapter combines it with the HADES task ID and a per-call backend-dispatch
+ordinal; the model does not supply this field. One Shell or filesystem tool
+call may issue multiple workspace backend commands, so each dispatch gets a
+distinct deterministic ID and replay preserves the same sequence. `workspace_exec` stores that identity and a canonical
 command digest in the existing `effects.request` record. Exact confirmed replay
 returns the saved result and effect ID, a changed request under that identity
 is rejected, and any unresolved workspace effect blocks another dispatch for
@@ -56,7 +58,10 @@ the wrapper identity path and the unresolved-effect journal. This is bounded
 contract evidence, not exactly-once arbitrary shell execution: an unknown
 command outcome remains quarantined, and the task orchestrator must inspect
 unresolved StepPersistence effects before choosing a continuation snapshot.
-The legacy A/C adapters do not yet provide this invocation identity.
+The A and C adapters now forward their provider tool-call IDs through a
+network-disabled contract test, but their persistent history/resume behavior is
+not qualified. Hermes's MCP proxy does not yet provide the identity and its
+workspace route fails closed.
 
 Run this only with a fresh project-scoped fixture stack, including
 `compose.a2-harness.yaml` and the `a2-harness` profile. The candidate test

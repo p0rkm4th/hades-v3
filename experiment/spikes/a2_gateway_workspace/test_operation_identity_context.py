@@ -20,7 +20,7 @@ from pydantic_ai.workspaces import (
     WorkspaceRef,
 )
 from pydantic_ai_harness import Shell
-from operation_identity import HadesOperationIdentity, current_tool_call_id
+from operation_identity import HadesOperationIdentity, next_operation_id
 
 
 _observed: list[str] = []
@@ -47,9 +47,7 @@ class _SyntheticWorkspace(WorkspaceBackend, SupportsCommands):
 
     @staticmethod
     def _dispatch(command: WorkspaceCommand) -> None:
-        identity = current_tool_call_id()
-        assert identity
-        _observed.append(identity)
+        _observed.append(next_operation_id("synthetic-task"))
 
 
 def _model(messages, info):
@@ -57,7 +55,10 @@ def _model(messages, info):
         return ModelResponse(parts=[TextPart("identity forwarding verified")])
     tool = next(item for item in info.function_tools if item.name == "run_command")
     return ModelResponse(
-        parts=[ToolCallPart(tool.name, {"command": "printf safe", "timeout_seconds": 20})]
+        parts=[ToolCallPart(
+            tool.name, {"command": "printf safe", "timeout_seconds": 20},
+            tool_call_id="persisted-synthetic-call",
+        )]
     )
 
 
@@ -69,8 +70,14 @@ def main() -> None:
     )
     result = agent.run_sync("Run the synthetic safe command", workspace=_SyntheticWorkspace())
     assert result.output == "identity forwarding verified"
-    assert len(_observed) == 1 and _observed[0]
-    print("PASS pinned Shell forwarded its tool-call identity through async workspace I/O")
+    first_replay_sequence = list(_observed)
+    assert len(first_replay_sequence) >= 1
+    _observed.clear()
+    result = agent.run_sync("Resume the synthetic safe command", workspace=_SyntheticWorkspace())
+    assert result.output == "identity forwarding verified"
+    assert _observed == first_replay_sequence, (_observed, first_replay_sequence)
+    assert len(set(_observed)) == len(_observed)
+    print("PASS pinned Shell assigns distinct deterministic identities to repeated backend calls")
 
 
 if __name__ == "__main__":

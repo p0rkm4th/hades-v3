@@ -23,7 +23,7 @@ jobs:
 
       - name: Validate Python and tool contract
         run: |
-          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/contracts/memory_schema.py experiment/contracts/memory_diagnostics.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py experiment/tests/run_cp74_fresh_memory_recall.py experiment/tests/run_cp75_memory_cas_case.py experiment/tests/run_cp81_memory_case.py experiment/tests/test_cp81_memory_runner.py experiment/spikes/cp77_durable_execution_probe.py
+          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/candidates/test_workspace_identity.py experiment/contracts/memory_schema.py experiment/contracts/memory_diagnostics.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py experiment/tests/run_cp74_fresh_memory_recall.py experiment/tests/run_cp75_memory_cas_case.py experiment/tests/run_cp81_memory_case.py experiment/tests/test_cp81_memory_runner.py experiment/spikes/cp77_durable_execution_probe.py
           python -m py_compile experiment/contracts/task_lifecycle.py
           python -m py_compile experiment/services/inference_adapter.py
           python -m py_compile experiment/services/ollama_protocol.py
@@ -164,6 +164,9 @@ jobs:
       - name: Run strict three-harness offline end-to-end qualification
         run: |
           docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway cp68-scripted-ollama cp68-inference-adapter cp68-hermes-amber cp68-candidate-api
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 64 --memory 1g --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            "${COMPOSE_PROJECT_NAME}-cp69offline-cp68-candidate-api" python /app/candidates/test_workspace_identity.py
           docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml run --build --rm cp68-e2e-runner --output /tmp/cp69_offline_e2e.jsonl
 
       - name: Remove isolated CP69 fixtures and volumes
