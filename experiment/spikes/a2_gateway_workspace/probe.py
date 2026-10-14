@@ -105,7 +105,15 @@ def scripted_model(messages, _agent_info):
     if retries:
         detail = str(retries[-1].content)
         print(json.dumps({"harness_tool_retry": detail[:300]}, sort_keys=True), flush=True)
-        return ModelResponse(parts=[TextPart("The file tool requested a retry; no edit was made.")])
+        if TOOL_PROFILE == "shell_only" and any(
+            marker in detail.casefold()
+            for marker in ("outcome is not confirmed", "result is unavailable")
+        ):
+            return ModelResponse(parts=[TextPart(
+                "The shell command outcome is uncertain. I stopped without retrying; "
+                "reconcile it before further action."
+            )])
+        return ModelResponse(parts=[TextPart("A workspace tool operation failed; I stopped without another tool call.")])
     tool_returns = [
         part for message in messages if isinstance(message, ModelRequest)
         for part in message.parts if isinstance(part, ToolReturnPart)
