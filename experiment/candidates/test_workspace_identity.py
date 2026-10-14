@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
+import threading
 import urllib.request
+from http.server import ThreadingHTTPServer
 from unittest.mock import patch
 
 import api
@@ -34,6 +37,44 @@ def _assert_identity(requests: list[dict], call_id: str) -> None:
     assert requests[0]["operation_id"] == expected, requests
     assert requests[0]["task_id"] == TASK_ID
     assert requests[0]["command"] == COMMAND
+
+
+def _test_stateless_resume_route() -> None:
+    current = {
+        "task_id": TASK_ID,
+        "state": "RUNNING",
+        "effects": [{"effect_kind": "WORKSPACE_COMMAND", "state": "CONFIRMED"}],
+    }
+    server = ThreadingHTTPServer(("127.0.0.1", 0), api.Handler)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        body = json.dumps({
+            "candidate": "lean",
+            "user_token": "fixture-token-amber",
+            "task_id": TASK_ID,
+            "messages": [{"role": "user", "content": "Continue the synthetic task"}],
+        })
+        with (
+            patch.object(api, "gateway_call", return_value=current),
+            patch.object(api, "transition_task") as transition,
+            patch.object(api, "chat_openai") as model,
+        ):
+            connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+            connection.request("POST", "/api/turn", body=body,
+                               headers={"Content-Type": "application/json"})
+            response = connection.getresponse()
+            result = json.loads(response.read())
+            connection.close()
+            assert response.status == 409, (response.status, result)
+            assert result["task_state"] == "WAITING" and result["operator_review_required"], result
+            transition.assert_called_once()
+            model.assert_not_called()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
 
 
 def main() -> None:
@@ -70,6 +111,7 @@ def main() -> None:
         guarded = api.workspace_resume_guard("fixture-token-amber", TASK_ID, {"state": "RUNNING"})
         assert guarded is not None and guarded["task_state"] == "WAITING", guarded
         assert transition.call_args.kwargs["error_type"] == "workspace_effect_snapshot_unavailable"
+    _test_stateless_resume_route()
 
     captured: list[dict] = []
 
