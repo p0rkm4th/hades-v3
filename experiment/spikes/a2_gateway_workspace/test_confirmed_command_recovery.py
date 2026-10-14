@@ -26,6 +26,7 @@ from pydantic_ai_harness.step_persistence import SqliteStepStore, StepPersistenc
 
 from gateway_workspace import HadesGatewayWorkspace
 from operation_identity import HadesOperationIdentity
+from recovery_gate import inspect_resume
 
 
 _RUN_ID = "cp82-confirmed-command-recovery"
@@ -138,6 +139,8 @@ def main() -> None:
         status, task_state = _call("GET", f"/v1/tasks/{task_id}")
         assert status == 200 and len(task_state["effects"]) == 1, task_state
         assert task_state["effects"][0]["state"] == "CONFIRMED", task_state
+        decision = inspect_resume(task_id, [unresolved], task_state)
+        assert decision["allow"], decision
         original_effect_id = task_state["effects"][0]["effect_id"]
 
         resumed = subprocess.run(
@@ -154,6 +157,20 @@ def main() -> None:
         assert (after["effects"][0]["state"], after["effects"][0]["effect_id"]) == (
             "CONFIRMED", original_effect_id,
         ), after
+        assert inspect_resume(task_id, [unresolved], after)["allow"]
+        # Duplicate resume repeats only the original tool call; HADES returns the
+        # persisted result, so task/effect identity and target state remain stable.
+        repeated = subprocess.run(
+            [sys.executable, __file__, "worker", "resume", task_id, str(store_path)],
+            check=False,
+            timeout=25,
+            capture_output=True,
+            text=True,
+        )
+        assert repeated.returncode == 0, repeated.stderr[-1000:]
+        status, after_repeat = _call("GET", f"/v1/tasks/{task_id}")
+        assert status == 200 and len(after_repeat["effects"]) == 1, after_repeat
+        assert after_repeat["effects"][0]["effect_id"] == original_effect_id, after_repeat
         original_journal_effect = asyncio.run(_effect_record(store_path))
         assert str(original_journal_effect.status) == "started", original_journal_effect
 
@@ -178,9 +195,10 @@ def main() -> None:
         })
         assert status == 200 and cleaned["exit_code"] == 0, (status, cleaned)
         print(
-            "PASS gateway returned the same confirmed effect without redispatch; independent read "
-            "found one marker and cleanup passed. LIMITATION: StepPersistence keeps the original "
-            "run's effect marked started after replay under a new run; the orchestrator must reconcile it."
+            "PASS the HADES-aware resume gate matched the original call to its confirmed effect; "
+            "repeated resumes returned the same result, independent read found one marker, and cleanup passed. "
+            "LIMITATION: StepPersistence keeps its original run entry marked started; the gate rechecks "
+            "canonical HADES effects before each continuation."
         )
 
 

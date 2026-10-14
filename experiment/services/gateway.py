@@ -652,8 +652,17 @@ class Handler(BaseHTTPRequestHandler):
             )
             row = cur.fetchone()
             if row is not None:
-                cur.execute("SELECT effect_id, effect_kind, state FROM effects WHERE task_id=%s ORDER BY created_at", (task_id,))
-                row["effects"] = [dict(effect, effect_id=str(effect["effect_id"])) for effect in cur.fetchall()]
+                cur.execute(
+                    "SELECT effect_id,effect_kind,state, "
+                    "CASE WHEN effect_kind='WORKSPACE_COMMAND' "
+                    "THEN request->>'operation_id' END AS operation_id "
+                    "FROM effects WHERE task_id=%s ORDER BY created_at",
+                    (task_id,),
+                )
+                row["effects"] = [
+                    dict(effect, effect_id=str(effect["effect_id"]))
+                    for effect in cur.fetchall()
+                ]
         if row is None:
             raise ClientError(404, "task not found")
         return self.send_json(200, row)

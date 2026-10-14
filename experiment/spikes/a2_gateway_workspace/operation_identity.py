@@ -25,11 +25,17 @@ class _ToolCallIdentity:
         with self.lock:
             ordinal = self.next_dispatch
             self.next_dispatch += 1
-        raw = f"{task_id}:{self.tool_call_id}:{ordinal}".encode("utf-8")
-        return hashlib.sha256(raw).hexdigest()
+        return derive_operation_id(task_id, self.tool_call_id, ordinal)
 
 
 _tool_call: ContextVar[_ToolCallIdentity | None] = ContextVar("hades_tool_call", default=None)
+
+
+def derive_operation_id(task_id: str, tool_call_id: str, ordinal: int) -> str:
+    if not task_id or not tool_call_id or ordinal < 0:
+        raise ValueError("task, persisted tool-call identity, and nonnegative ordinal are required")
+    raw = f"{task_id}:{tool_call_id}:{ordinal}".encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
 
 
 def next_operation_id(task_id: str) -> str:

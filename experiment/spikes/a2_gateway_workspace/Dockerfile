@@ -6,6 +6,8 @@ COPY spikes/a2_gateway_workspace/requirements.txt /app/requirements.txt
 RUN python -m pip install --no-cache-dir -r /app/requirements.txt
 COPY spikes/a2_gateway_workspace/gateway_workspace.py /app/gateway_workspace.py
 COPY spikes/a2_gateway_workspace/operation_identity.py /app/operation_identity.py
+COPY spikes/a2_gateway_workspace/recovery_gate.py /app/recovery_gate.py
+COPY spikes/a2_gateway_workspace/test_resume_gate.py /app/test_resume_gate.py
 COPY spikes/a2_gateway_workspace/probe.py /app/probe.py
 COPY spikes/a2_gateway_workspace/test_uncertain_shell.py /app/test_uncertain_shell.py
 COPY spikes/a2_gateway_workspace/test_operation_identity_context.py /app/test_operation_identity_context.py

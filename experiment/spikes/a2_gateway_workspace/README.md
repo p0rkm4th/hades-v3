@@ -53,11 +53,14 @@ being replayed.
 confirmed a synthetic marker command but before Shell receives the result. It
 loads the interrupted Pydantic AI Harness `StepPersistence` snapshot, resumes
 the original tool-call identity, and independently reads the marker. The same
-effect is returned and the marker appears once. Separate offline tests verify
-the wrapper identity path and the unresolved-effect journal. This is bounded
-contract evidence, not exactly-once arbitrary shell execution: an unknown
-command outcome remains quarantined, and the task orchestrator must inspect
-unresolved StepPersistence effects before choosing a continuation snapshot.
+effect is returned and the marker appears once, including on a repeated
+resume. The test-only A2 resume coordinator checks the authenticated
+task/effect snapshot before choosing an interrupted-call continuation. It
+blocks `WAITING` tasks and any unresolved task effect. A missing effect or
+matching confirmed effects permit only resumption of the original call. The
+gateway exposes only hashed operation IDs in task effect summaries, not
+command contents. This is bounded contract evidence, not exactly-once arbitrary
+shell execution or a production-integrated resume coordinator.
 The A and C adapters now forward their provider tool-call IDs through a
 network-disabled contract test, but their persistent history/resume behavior is
 not qualified. Hermes's MCP proxy does not yet provide the identity and its
