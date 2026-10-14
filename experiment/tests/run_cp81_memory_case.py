@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import uuid
 import urllib.error
 import urllib.request
@@ -19,26 +20,36 @@ CASES = {
         "key_prefix": "coffee-preference",
         "before": "medium roast", "after": "light roast",
         "correct": "Update my saved coffee preference: switch from medium roast to light roast.",
-        "correct_terms": ["light", "roast"],
+        "answer_phrases": ["light roast"],
+        "answer_negations": [
+            r"\b(?:not|isn't|is not|never)\s+(?:a\s+)?light roast\b",
+            r"\b(?:do not|don't|does not|doesn't)\s+(?:use|choose|prefer|want|keep)\s+(?:a\s+)?light roast\b",
+        ],
         "recall": "Which roast do I prefer for coffee?",
-        "answer_terms": ["light", "roast"],
     },
     "weekly_structured": {
         "key_prefix": "weekly-planning-note",
         "before": {"layout": "paragraphs", "length": "long"},
         "after": {"layout": "numbered checklist", "length": "concise"},
         "correct": "For my weekly planning note, replace long paragraphs with a concise numbered checklist.",
-        "correct_terms": ["numbered", "concise"],
+        "answer_phrases": ["concise", "numbered checklist"],
+        "answer_negations": [
+            r"\bnot\s+(?:a\s+)?concise\b", r"\bnot\s+(?:a\s+)?numbered checklist\b",
+            r"\b(?:do not|don't|does not|doesn't)\s+(?:use|choose|prefer|want|keep)\s+(?:a\s+)?(?:concise|numbered checklist)\b",
+        ],
         "recall": "How should my weekly planning note be laid out?",
-        "answer_terms": ["numbered", "concise"],
     },
     "reminder_list": {
         "key_prefix": "weekday-reminders",
         "before": ["morning", "weekdays"], "after": ["late afternoon", "weekdays"],
         "correct": "Change my weekday reminder time from morning to late afternoon; keep it on weekdays.",
-        "correct_terms": ["late", "afternoon"],
+        "answer_phrases": ["late afternoon", "weekdays"],
+        "answer_negations": [
+            r"\b(?:not|isn't|is not|never)\s+late afternoon\b",
+            r"\b(?:do not|don't|does not|doesn't)\s+(?:use|choose|prefer|want|keep|set)\s+late afternoon\b",
+            r"\bnot\s+weekdays\b",
+        ],
         "recall": "When do I want reminders on weekdays?",
-        "answer_terms": ["late", "afternoon"],
     },
 }
 
@@ -85,6 +96,12 @@ def durable_task_and_effects(task_id):
         cur.execute("SELECT effect_id,task_id,user_id,domain_id,effect_kind,resource_key,state,request,result "
                     "FROM effects WHERE task_id=%s ORDER BY created_at", (task_id,))
         return task, cur.fetchall()
+
+
+def answer_matches(answer, case):
+    normalized = answer.casefold()
+    return (all(phrase in normalized for phrase in case["answer_phrases"])
+            and not any(re.search(pattern, normalized) for pattern in case["answer_negations"]))
 
 
 def run_candidate(candidate, case_name, phase, replicate, task_id=None):
@@ -159,17 +176,19 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
         "canonical_value": None, "canonical_revision": None,
         "model_generations": result.get("model_generations"),
         "duration_ms": result.get("duration_ms"), "answer": result.get("text", ""),
+        "retry_behavior": "gateway exact/changed retry covered separately by database integration test",
     }
     if phase == "correct":
         canonical = canonical_row(key)
         output.update({"memory_key": key,
                        "canonical_value": canonical.get("value") if canonical else None,
                        "canonical_revision": canonical.get("revision") if canonical else None})
-        output["passed"] = (
-            durable_task.get("state") == "COMPLETED"
-            and tools.count("memory_search") >= 1 and tools.count("memory_correct") == 1
-            and set(tools) <= {"memory_search", "memory_read", "memory_correct"}
-            and len(effects) == 1 and effects[0].get("state") == "CONFIRMED"
+        output["durable_task_correct"] = durable_task.get("state") == "COMPLETED"
+        output["tool_selection_correct"] = (
+            tools.count("memory_search") >= 1 and tools.count("memory_correct") == 1
+            and set(tools) <= {"memory_search", "memory_read", "memory_correct"})
+        output["mutation_correct"] = (
+            len(effects) == 1 and effects[0].get("state") == "CONFIRMED"
             and str(effects[0].get("task_id")) == task_id
             and effects[0].get("user_id") == "user-amber"
             and effects[0].get("domain_id") == "domain-home-amber"
@@ -182,23 +201,24 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
             and effects[0].get("result", {}).get("revision") == 2
             and canonical is not None
             and canonical.get("value") == case["after"]
-            and canonical.get("revision") == 2
-            and all(term in output["answer"].casefold() for term in case["correct_terms"])
-        )
+            and canonical.get("revision") == 2)
+        output["answer_correct"] = answer_matches(output["answer"], case)
+        output["passed"] = all(output[key] for key in (
+            "durable_task_correct", "tool_selection_correct", "mutation_correct", "answer_correct"))
     else:
         memory_after = canonical_row(key)
         output["memory_key"] = key
         output["canonical_value"] = memory_after.get("value") if memory_after else None
         output["canonical_revision"] = memory_after.get("revision") if memory_after else None
-        output["passed"] = (
-            durable_task.get("state") == "COMPLETED"
-            and tools.count("memory_search") >= 1 and set(tools) == {"memory_search"}
-            and not effects
-            and memory_after is not None
+        output["durable_task_correct"] = durable_task.get("state") == "COMPLETED"
+        output["tool_selection_correct"] = tools.count("memory_search") >= 1 and set(tools) == {"memory_search"}
+        output["mutation_correct"] = (
+            not effects and memory_after is not None
             and memory_after.get("value") == case["after"]
-            and memory_after.get("revision") == memory.get("revision")
-            and all(term in output["answer"].casefold() for term in case["answer_terms"])
-        )
+            and memory_after.get("revision") == memory.get("revision"))
+        output["answer_correct"] = answer_matches(output["answer"], case)
+        output["passed"] = all(output[key] for key in (
+            "durable_task_correct", "tool_selection_correct", "mutation_correct", "answer_correct"))
     print(json.dumps(output, ensure_ascii=False, sort_keys=True), flush=True)
     if not output["passed"]:
         raise SystemExit(1)
