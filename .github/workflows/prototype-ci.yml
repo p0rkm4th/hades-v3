@@ -39,16 +39,23 @@ jobs:
 
       - name: Create ephemeral orchestrator credential
         run: |
-          echo "ORCHESTRATOR_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" >> "$GITHUB_ENV"
-          echo "CP67_PYDANTIC_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
-          echo "CP67_HERMES_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
-          echo "CP67_LEAN_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
-          echo "CP68_PYDANTIC_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
-          echo "CP68_HERMES_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
-          echo "CP68_LEAN_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
-          echo "CP69_PYDANTIC_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
-          echo "CP69_HERMES_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
-          echo "CP69_LEAN_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "$GITHUB_ENV"
+          set +x
+          while IFS=: read -r name length; do
+            value="$(python -c "import secrets; print(secrets.token_urlsafe($length))")"
+            printf '::add-mask::%s\n' "$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          done <<'EOF'
+          ORCHESTRATOR_SECRET:48
+          CP67_PYDANTIC_KEY:24
+          CP67_HERMES_KEY:24
+          CP67_LEAN_KEY:24
+          CP68_PYDANTIC_KEY:24
+          CP68_HERMES_KEY:24
+          CP68_LEAN_KEY:24
+          CP69_PYDANTIC_KEY:24
+          CP69_HERMES_KEY:24
+          CP69_LEAN_KEY:24
+          EOF
 
       - name: Validate isolated GPU route configuration
         run: HYPNOS_INFERENCE_UPSTREAM=http://hypnos.invalid:11434 docker compose -p "$COMPOSE_PROJECT_NAME" --profile gpu-trial -f experiment/compose.yaml -f experiment/compose.gpu-trial.yaml config --quiet
