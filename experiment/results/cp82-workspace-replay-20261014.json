@@ -1,0 +1,58 @@
+{
+  "checkpoint": "CP82",
+  "date": "2026-10-14",
+  "classification": "CONTRACT_TEST",
+  "project": "hades-v3-cp81-replay-20261014",
+  "synthetic_only": true,
+  "results": {
+    "gateway_integration_tests": {
+      "passed": 8,
+      "failed": 0
+    },
+    "confirmed_retry_after_worker_crash": {
+      "passed": true,
+      "original_effect_reused": true,
+      "workspace_marker_count": 1,
+      "new_dispatch": false,
+      "task_state": "RUNNING",
+      "finalization_in_scope": false
+    },
+    "changed_command_same_identity": {
+      "status": 409,
+      "mutation": false
+    },
+    "unresolved_effect_same_or_new_identity": {
+      "status": 202,
+      "durable_state": "QUARANTINED",
+      "redispatch": false
+    },
+    "gateway_process_restart": {
+      "same_effect_reused": true,
+      "changed_command_rejected": true,
+      "marker_count": 1
+    },
+    "harness_step_persistence": {
+      "interrupted_call_identity_retained": true,
+      "default_continuation_may_omit_pending_call": true,
+      "no_automatic_replay": true,
+      "old_journal_entry_after_new_run": "started"
+    },
+    "workspace_identity_contract": {
+      "missing_identity_status": 400,
+      "confirmed_replay_same_effect": true,
+      "changed_request_status": 409
+    },
+    "workspace_flow_integration": {
+      "passed": true,
+      "tests": 1
+    }
+  },
+  "limitations": [
+    "Evidence is not live-model qualification.",
+    "A2 only; A and C workspace replay remain unqualified.",
+    "A new tool-call identity can represent a new command and is not deduplicated against confirmed history.",
+    "Unknown arbitrary shell outcomes lack a general canonical reconciliation path and remain quarantined.",
+    "StepPersistence needs an orchestrator check against HADES effects before selecting a continuation."
+  ],
+  "test_fixture_note": "Initial workspace-flow run caught a marker left by the gateway test; test now removes its exact synthetic marker through a separately identified gateway effect, and both suites pass on rerun."
+}

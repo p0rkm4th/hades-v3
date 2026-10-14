@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -24,6 +25,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai_harness import FileSystem, Shell
 
 from gateway_workspace import HadesGatewayWorkspace
+from operation_identity import HadesOperationIdentity
 
 
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://tool-gateway:8080")
@@ -165,7 +167,10 @@ def main() -> None:
     task = call("POST", "/v1/tasks", {"goal": "Fix the synthetic discount calculator and run its tests."})
     task_id = task["task_id"]
     workspace = HadesGatewayWorkspace(GATEWAY_URL, TOKEN, task_id)
-    capabilities = [Shell(tools=["run_command"], default_timeout=20)]
+    capabilities = [
+        Shell(tools=["run_command"], default_timeout=20),
+        HadesOperationIdentity(),
+    ]
     if TOOL_PROFILE == "shell_filesystem":
         capabilities.append(FileSystem(root_dir="/workspace", tools=["read_file", "write_file"]))
     elif TOOL_PROFILE != "shell_only":
@@ -209,6 +214,7 @@ def main() -> None:
     oracle = HadesGatewayWorkspace(GATEWAY_URL, TOKEN, task_id)
     verification = call("POST", "/v1/workspace/exec", {
         "task_id": task_id,
+        "operation_id": hashlib.sha256(f"{task_id}:independent-verification".encode()).hexdigest(),
         "command": (
             "python -m unittest -q && git status --short --branch "
             "&& python -c \"from pathlib import Path; s=Path('discount.py').read_text(); "

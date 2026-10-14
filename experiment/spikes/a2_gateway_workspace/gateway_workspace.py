@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import shlex
 import urllib.error
@@ -17,6 +18,7 @@ from pydantic_ai.workspaces import (
     WorkspaceRef,
     WorkspaceUnavailableError,
 )
+from operation_identity import current_tool_call_id
 
 
 class HadesGatewayWorkspace(WorkspaceBackend, SupportsCommands):
@@ -55,10 +57,20 @@ class HadesGatewayWorkspace(WorkspaceBackend, SupportsCommands):
             if shell:
                 raise TypeError("argv commands require shell=False")
             command_text = shlex.join(command)
-        return await asyncio.to_thread(self._execute, command_text)
+        tool_call_id = current_tool_call_id()
+        if not tool_call_id:
+            raise WorkspaceUnavailableError("HADES workspace call has no persisted tool identity")
+        operation_id = hashlib.sha256(
+            f"{self._task_id}:{tool_call_id}".encode("utf-8")
+        ).hexdigest()
+        return await asyncio.to_thread(self._execute, command_text, operation_id)
 
-    def _execute(self, command: str) -> CommandResult:
-        body = json.dumps({"task_id": self._task_id, "command": command}).encode()
+    def _execute(self, command: str, operation_id: str) -> CommandResult:
+        body = json.dumps({
+            "task_id": self._task_id,
+            "command": command,
+            "operation_id": operation_id,
+        }).encode()
         request = urllib.request.Request(
             f"{self._gateway_url}/v1/workspace/exec",
             data=body,

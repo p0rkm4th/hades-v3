@@ -8,6 +8,7 @@ from pydantic_ai_harness import Shell
 from pydantic_ai.workspaces import WorkspaceUnavailableError
 import probe
 from gateway_workspace import HadesGatewayWorkspace
+from operation_identity import HadesOperationIdentity
 
 
 class QuarantinedResponse:
@@ -44,7 +45,10 @@ class UncertainShellRecoveryTests(unittest.TestCase):
         workspace = HadesGatewayWorkspace("http://unused", "fixture-token", "task-id")
         agent = Agent(
             FunctionModel(probe.scripted_model, model_name="strict-hades-a2-peer"),
-            capabilities=[Shell(tools=["run_command"], default_timeout=20)],
+            capabilities=[
+                Shell(tools=["run_command"], default_timeout=20),
+                HadesOperationIdentity(),
+            ],
         )
         model_calls = None
         try:
