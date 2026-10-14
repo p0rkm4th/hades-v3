@@ -26,6 +26,12 @@ does not implement a retry for a command with an uncertain outcome. Background
 commands, recovery of a quarantined workspace command, container egress
 enforcement for an A2 container, and live model behavior are not qualified.
 
+CI also injects one `QUARANTINED` result through the real workspace adapter and
+Pydantic AI Harness `Shell` capability. The deterministic peer stops after the
+result and the test asserts exactly one gateway request. This is contract
+evidence for the shell-only profile, not a live-model guarantee or durable
+cross-process recovery qualification.
+
 Run this only with a fresh project-scoped fixture stack, including
 `compose.a2-harness.yaml` and the `a2-harness` profile. The candidate test
 container attaches only to the internal operator network; it does not share the
