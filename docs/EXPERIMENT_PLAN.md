@@ -131,3 +131,9 @@ The campaign does not yet cover a process/network failure during the reconciliat
 ## CP73 result and next comparison
 
 The bounded evidence-driven completion contract and matched restart results are in [CP73 report](CP73_EVIDENCE_DRIVEN_RECOVERY_REPORT.md). A and C passed three recoveries each; Hermes was not scored because the available CPU model is below its minimum context. The next priority is task-linked memory-effect durability and fresh-context correction/retrieval. Keep memory tasks `WAITING` until independent durable evidence is available. No Hypnos generation is authorized under CP73.
+
+## CP74 follow-up — memory continuity (not yet qualified)
+
+CP74 implemented task-linked, atomic `MEMORY_MUTATION` ledger evidence and verified it in gateway integration tests. In one matched CPU-model observation each, A and C recalled an existing preference and later retrieved a corrected fixture value in fresh context, but both candidate correction requests returned HTTP 404 without mutation. Do not count these single observations as qualification or alter/rescore them.
+
+Next run a held-out, matched correction case with bounded, sanitized evidence of the exact query and expected-value match decision. Preserve the shared tool contract and prompt across A/C. Require three repetitions per eligible candidate, independently inspect the canonical row and effect ledger after each attempt, restart the candidate/gateway between mutation and fresh-context recall, and verify exact replay does not create a second effect. Keep known no-effect rejections `FAILED`; unresolved mutation outcomes remain `WAITING`. Hermes requires an eligible context-compliant deterministic peer or >=64,000 model profile and must not be scored on the 40,960 CPU model. No Hypnos or GPU request is authorized by CP74. Continue compound operations and protected-action evaluation after this bounded memory experiment. ADR-010 remains NOT READY.

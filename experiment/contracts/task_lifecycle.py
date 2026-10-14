@@ -160,9 +160,16 @@ def decide_turn_finalization(current_state, response, evidence, claim, effect_st
     if claim and claim.get("pending"):
         return "RUNNING", "authorized_steps_remain"
     writes = [item for item in evidence if item.get("tool") in WRITE_TOOLS]
-    if any(item.get("tool") in MEMORY_WRITES for item in writes):
-        # Memory effects lack a task-linked durable record, so a later provider
-        # failure cannot establish whether the requested memory change is safe to retry.
+    if any(item.get("tool") in MEMORY_WRITES and item.get("status") == "ok" for item in writes) and not any(
+        item.get("tool") in MEMORY_WRITES
+        and item.get("status") == "ok"
+        and any(record.get("effect_id") == item.get("effect_id")
+                and record.get("effect_kind") == "MEMORY_MUTATION"
+                and record.get("state") == "CONFIRMED" for record in (effect_records or []))
+        for item in writes
+    ):
+        # A successful memory response without its identity-linked ledger row
+        # cannot establish whether the requested change is safe to retry.
         return "WAITING", "memory_effect_evidence_unproven"
     if turn_error:
         if writes or effect_states or effect_records:
@@ -209,7 +216,7 @@ def decide_turn_finalization(current_state, response, evidence, claim, effect_st
     return "COMPLETED", "verified_write_and_explicit_completion"
 
 
-def validate_finalization(proof, checkpoint, effects):
+def validate_finalization(proof, checkpoint, effects, task_identity=None, canonical_memory=None):
     """Validate gateway-supplied completion against read/write evidence and DB effects."""
     if not isinstance(proof, dict) or not isinstance(checkpoint, dict) or not isinstance(effects, list):
         return "completion proof is malformed"
@@ -224,8 +231,6 @@ def validate_finalization(proof, checkpoint, effects):
         return "completed task steps are required"
     reads = [e for e in evidence if e.get("tool") in READ_TOOLS and e.get("status") == "ok"]
     writes = [e for e in evidence if e.get("tool") in WRITE_TOOLS]
-    if any(item.get("tool") in MEMORY_WRITES for item in writes):
-        return "memory write completion is unproven without a task-linked durable effect record"
     resolved_ids = {str(item.get("effect_id")) for item in evidence
                     if item.get("tool") == "commitment_reconcile" and item.get("state") == "CONFIRMED"}
     if any(item.get("status") == "error" and not (item.get("uncertain")
@@ -244,8 +249,6 @@ def validate_finalization(proof, checkpoint, effects):
     for item in writes:
         effect_id = item.get("effect_id")
         if not effect_id:
-            if item.get("tool") in {"memory_write", "memory_correct"} and not effects and item.get("state") == "CONFIRMED" and item.get("status") == "ok":
-                continue
             return "write evidence must identify its persisted effect"
         evidence_by_id.setdefault(str(effect_id), []).append(item)
     if set(evidence_by_id) != set(db_by_id):
@@ -260,11 +263,33 @@ def validate_finalization(proof, checkpoint, effects):
                 "GROCERY_LIST": {"shopping_list_change"},
                 "WORKSPACE_COMMAND": {"workspace_exec"},
                 "EXTERNAL_COMMITMENT": {"commitment_submit", "commitment_reconcile"},
+                "MEMORY_MUTATION": {"memory_write", "memory_correct"},
             }.get(kind, set())
+            memory_valid = kind != "MEMORY_MUTATION"
+            if kind == "MEMORY_MUTATION":
+                request = db_effect.get("request") or {}
+                result = db_effect.get("result") or {}
+                canonical = (canonical_memory or {}).get(effect_id)
+                expected_tool = request.get("operation")
+                memory_valid = (
+                    item.get("tool") == expected_tool
+                    and expected_tool in MEMORY_WRITES
+                    and db_effect.get("resource_key") == f"memory:{request.get('memory_key')}"
+                    and item.get("memory_key") == request.get("memory_key")
+                    and task_identity is not None
+                    and str(db_effect.get("task_id")) == str(task_identity.get("task_id"))
+                    and db_effect.get("user_id") == task_identity.get("user_id")
+                    and db_effect.get("domain_id") == task_identity.get("domain_id")
+                    and canonical is not None
+                    and canonical.get("memory_key") == request.get("memory_key")
+                    and canonical.get("value") == request.get("value")
+                    and result.get("value") == canonical.get("value")
+                )
             if (item.get("tool") in allowed and item.get("status") == "ok"
                     and item.get("state") == "CONFIRMED"
                     and (item.get("tool") != "shopping_list_change" or item.get("verified_after") is not None)
-                    and (item.get("tool") != "workspace_exec" or item.get("exit_code") == 0)):
+                    and (item.get("tool") != "workspace_exec" or item.get("exit_code") == 0)
+                    and memory_valid):
                 valid = True
         if not valid:
             return "persisted effect lacks matching verified write evidence"

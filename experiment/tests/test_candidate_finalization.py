@@ -77,6 +77,18 @@ class CandidateFinalization(unittest.TestCase):
         self.assertEqual(writes[0]["_orchestrator_finalization"]["reason"],
                          "memory_effect_evidence_unproven")
 
+    def test_rejected_memory_mutation_is_not_left_waiting_as_if_effect_uncertain(self):
+        result = {
+            "text": "The requested memory correction did not match an existing value.",
+            "tool_calls": ["memory_correct"],
+            "tool_evidence": [{"kind": "tool_evidence", "tool": "memory_correct",
+                               "status": "error", "http_status": 404}],
+        }
+        final, _ = self.run_finalizer(
+            {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}, result,
+        )
+        self.assertEqual(final["state"], "FAILED")
+
     def test_hermes_provider_diagnostic_cannot_be_final_answer(self):
         self.assertTrue(api.provider_diagnostic(
             "⏱️ The model provider is rate-limiting requests. Please wait and try again."
