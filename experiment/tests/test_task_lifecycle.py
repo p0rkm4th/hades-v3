@@ -255,6 +255,18 @@ class TaskLifecycleContract(unittest.TestCase):
         self.assertIsNotNone(validate_trusted_effect_contract(contract, {
             "task_id": "task-1", "user_id": "user-amber", "domain_id": "domain-amber",
         }, [], {}, {}))
+        partial_effect = {
+            "effect_id": "effect-one", "task_id": "task-1", "user_id": "user-amber",
+            "domain_id": "domain-amber", "effect_kind": "EXTERNAL_COMMITMENT",
+            "state": "CONFIRMED",
+            "request": {"target_id": target, "details": "one"},
+        }
+        self.assertEqual(
+            validate_trusted_effect_contract(contract, {
+                "task_id": "task-1", "user_id": "user-amber", "domain_id": "domain-amber",
+            }, [partial_effect], {}, {}),
+            "persisted effects do not exactly match required operations",
+        )
 
 
 if __name__ == "__main__":
