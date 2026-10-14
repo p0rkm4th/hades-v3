@@ -1,7 +1,7 @@
 # CP79 — DBOS recovery through the HADES gateway
 
 **Evidence class:** CONTRACT TEST
-**Status:** completed locally; publication pending
+**Status:** published; exact-SHA CI passed
 **Scope:** disposable HADES v3 fixtures, no model or live infrastructure
 
 ## Question
@@ -36,6 +36,8 @@ DBOS documents SQLite as suitable for local development/testing and recommends P
 The CI job runs setup, crash/restart, independent verification, then project-scoped teardown with volumes. Local verification found no CP79- or A2-named containers, networks, or volumes after teardown. Reproducible sources are in `experiment/spikes/cp79_dbos_gateway/` and `experiment/compose.cp79-dbos.yaml`.
 
 Tagged CP79 and A2 runner/fixture images remain in the local Docker image store as reproducible build artifacts. No container depends on them. They are not required by the active HADES v3 services; preserving them avoids unnecessary rebuilds while CP79/A2 evidence is under review. The storage-cleanup lead may remove the specifically tagged images after confirming no concurrent experiment needs them. Do not prune shared Docker build cache as part of this experiment; it is global and can be in use by other work.
+
+Exact-SHA CI run [38512629038](https://github.com/p0rkm4th/hades-v3/actions/runs/38512629038) passed for `cde1ff32a67eb902aefaec42a1cd60730366629b`, including gateway/lifecycle regressions, A2 contract, CP79 setup/restart/verification/teardown, and strict CP69 offline qualification.
 
 ## Decision
 
