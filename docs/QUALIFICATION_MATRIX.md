@@ -135,3 +135,12 @@ CP78 establishes that upstream Harness workspace tools can compose with the exis
 | Pydantic AI Harness A2 | CP78 three deterministic workspace runs, 18 candidate commands each | Source/tests and 19 effects independently verified; task remained RUNNING by design | **CONTRACT TEST**, not historical A score | Shell-only comparison and task-finalization/recovery behavior remain open |
 
 CP79's Python 3.13/3.14 SQLite setup failures occurred before any gateway effect and remain recorded in the CP79 report. They do not count as workflow failures.
+
+## CP80 — A2 Shell-only composition comparison
+
+| Profile | Repetitions | Model/tool trace | Independent outcome | Classification | Limit |
+|---|---:|---|---|---|---|
+| Pydantic AI Harness Shell + FileSystem | 4 local; 3 matched pairs in CI | 4 deterministic model turns; 18 candidate workspace effects per task | Exact source and tests passed; 19 total confirmed effects including oracle | **CONTRACT TEST**, separate A2 candidate | No live model, finalization or recovery evidence |
+| Pydantic AI Harness Shell only | 4 local; 3 matched pairs in CI | 4 deterministic model turns; 3 candidate workspace effects per task | Exact source and tests passed; 4 total confirmed effects including oracle | **CONTRACT TEST**, separate A2 candidate | Same limitations; no historical A score change |
+
+Shell-only reduced candidate gateway effects by 15/18 (83.3%) for this specific repository task while preserving the strict oracle result. This supports omitting FileSystem for tasks naturally served by the bounded workspace shell. It does not establish general-model reliability or justify reducing HADES computer agency. The task intentionally remained `RUNNING`. Per-task synthetic IDs and outcomes: [`cp80_a2_workspace_profiles.jsonl`](../experiment/results/cp80_a2_workspace_profiles.jsonl). See [CP80 report](CP80_A2_SHELL_ONLY_REPORT.md).

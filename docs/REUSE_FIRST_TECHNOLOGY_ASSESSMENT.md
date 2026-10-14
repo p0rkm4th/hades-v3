@@ -71,6 +71,10 @@ The remaining question is agent behavior and lifecycle interaction under the CAS
 
 The selected DBOS hypothesis now has a real HADES gateway/simulator contract result: three worker-death/restart cases replayed after the gateway response and before DBOS step persistence. HADES returned the original effect identity; independent checks confirmed one canonical external receive and one effect, after which the trusted HADES finalizer completed the tasks. This narrows the composition question: DBOS can own resumable execution metadata while HADES remains the sole authority. It does not prove production persistence, model integration, or lower total maintenance burden. The SQLite runner compatibility failure on Python 3.13/3.14 was fixed by pinning a compatible Python 3.11 runner and is documented as a pre-dispatch setup failure. Keep the spike disposable; adoption still requires a comparative complexity and recovery benefit over existing candidate behavior.
 
+## CP80 A2 Shell-only finding
+
+In four local deterministic repetitions per profile, Pydantic AI Harness `Shell` alone completed the same synthetic source correction and tests with three candidate gateway effects, versus 18 for `Shell` plus `FileSystem`. Both used four model turns and passed the same independent source/test oracle; each profile also passed three matched CI repetitions. This makes Shell-only the simpler A2 workspace profile for bounded repo work. It remains a **CONTRACT TEST** using a deterministic peer; no live model qualification, task finalization, uncertain-command recovery, or general shell security guarantee follows. Keep HADES's gateway/workspace boundary; do not use Harness's local workspace backend.
+
 ## Build-versus-reuse justification
 
 | Problem | Existing solution evaluated | HADES-specific remainder | New custom subsystem? |
