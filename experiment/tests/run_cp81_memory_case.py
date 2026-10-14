@@ -5,10 +5,10 @@ import json
 import os
 import uuid
 import urllib.error
-import urllib.parse
 import urllib.request
 
 import psycopg
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 GATEWAY = "http://tool-gateway:8080"
@@ -64,6 +64,29 @@ def request_json(url, token=None, body=None, orchestrator=False, timeout=600):
         return exc.code, value
 
 
+def canonical_row(memory_key):
+    with psycopg.connect(os.environ["DATABASE_URL"], row_factory=dict_row) as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT memory_key,value,revision FROM scoped_memory "
+            "WHERE user_id='user-amber' AND domain_id='domain-home-amber' AND memory_key=%s",
+            (memory_key,),
+        )
+        return cur.fetchone()
+
+
+def durable_task_and_effects(task_id):
+    with psycopg.connect(os.environ["DATABASE_URL"], row_factory=dict_row) as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT task_id,user_id,domain_id,state,checkpoint FROM tasks "
+            "WHERE task_id=%s AND user_id='user-amber' AND domain_id='domain-home-amber'",
+            (task_id,),
+        )
+        task = cur.fetchone()
+        cur.execute("SELECT effect_id,task_id,user_id,domain_id,effect_kind,resource_key,state,request,result "
+                    "FROM effects WHERE task_id=%s ORDER BY created_at", (task_id,))
+        return task, cur.fetchall()
+
+
 def run_candidate(candidate, case_name, phase, replicate, task_id=None):
     case = CASES[case_name]
     source_task_id = None
@@ -94,19 +117,16 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
         if not task_id:
             raise ValueError("recall phase requires the correction task ID")
         source_task_id = task_id
-        status, task = request_json(f"{GATEWAY}/v1/tasks/{source_task_id}", TOKEN)
-        if status != 200:
-            raise RuntimeError("original correction task is not readable")
-        effects = task.get("effects", [])
+        source_row, effects = durable_task_and_effects(source_task_id)
+        if source_row is None or source_row["state"] != "COMPLETED":
+            raise RuntimeError("original correction task is not durably completed")
         if len(effects) != 1 or effects[0].get("state") != "CONFIRMED":
             raise RuntimeError("fresh recall requires one independently confirmed correction effect")
         key = effects[0].get("request", {}).get("memory_key")
         if not isinstance(key, str):
             raise RuntimeError("confirmed effect did not retain the stable memory key")
-        status, memory = request_json(
-            GATEWAY + "/v1/memory/" + urllib.parse.quote(key, safe=""), TOKEN,
-        )
-        if status != 200 or memory.get("value") != case["after"]:
+        memory = canonical_row(key)
+        if memory is None or memory.get("value") != case["after"]:
             raise RuntimeError("canonical memory does not contain the corrected value")
         status, recall_task = request_json(GATEWAY + "/v1/tasks", TOKEN, {
             "goal": "Recall the saved synthetic preference in a new context.",
@@ -127,44 +147,56 @@ def run_candidate(candidate, case_name, phase, replicate, task_id=None):
     if status != 200:
         raise RuntimeError("durable task readback failed")
     tools = (final_task.get("checkpoint", {}).get("candidate_turn", {}).get("tools", []))
-    effects = final_task.get("effects", [])
+    durable_task, effects = durable_task_and_effects(task_id)
+    if durable_task is None:
+        raise RuntimeError("independent durable task read failed")
     output = {
         "candidate": candidate, "case": case_name, "phase": phase,
-        "replicate": replicate, "task_id": task_id, "task_state": final_task.get("state"),
+        "replicate": replicate, "task_id": task_id, "task_state": durable_task.get("state"),
         "source_task_id": source_task_id,
         "tools": tools, "effect_count": len(effects),
-        "effect_ids": [effect.get("effect_id") for effect in effects],
+        "effect_ids": [str(effect.get("effect_id")) for effect in effects],
         "canonical_value": None, "canonical_revision": None,
         "model_generations": result.get("model_generations"),
         "duration_ms": result.get("duration_ms"), "answer": result.get("text", ""),
     }
     if phase == "correct":
-        status, canonical = request_json(
-            GATEWAY + "/v1/memory/" + urllib.parse.quote(key, safe=""), TOKEN,
-        )
+        canonical = canonical_row(key)
         output.update({"memory_key": key,
-                       "canonical_value": canonical.get("value") if status == 200 else None,
-                       "canonical_revision": canonical.get("revision") if status == 200 else None})
+                       "canonical_value": canonical.get("value") if canonical else None,
+                       "canonical_revision": canonical.get("revision") if canonical else None})
         output["passed"] = (
-            final_task.get("state") == "COMPLETED"
+            durable_task.get("state") == "COMPLETED"
             and tools.count("memory_search") >= 1 and tools.count("memory_correct") == 1
             and set(tools) <= {"memory_search", "memory_read", "memory_correct"}
             and len(effects) == 1 and effects[0].get("state") == "CONFIRMED"
-            and effects[0].get("task_id") == task_id
+            and str(effects[0].get("task_id")) == task_id
+            and effects[0].get("user_id") == "user-amber"
+            and effects[0].get("domain_id") == "domain-home-amber"
+            and effects[0].get("effect_kind") == "MEMORY_MUTATION"
+            and effects[0].get("resource_key") == f"memory:{key}"
             and effects[0].get("request", {}).get("memory_key") == key
             and effects[0].get("request", {}).get("expected_revision") == 1
+            and effects[0].get("request", {}).get("value") == case["after"]
+            and effects[0].get("result", {}).get("value") == case["after"]
+            and effects[0].get("result", {}).get("revision") == 2
+            and canonical is not None
             and canonical.get("value") == case["after"]
             and canonical.get("revision") == 2
             and all(term in output["answer"].casefold() for term in case["correct_terms"])
         )
     else:
+        memory_after = canonical_row(key)
         output["memory_key"] = key
-        output["canonical_value"] = memory["value"]
-        output["canonical_revision"] = memory["revision"]
+        output["canonical_value"] = memory_after.get("value") if memory_after else None
+        output["canonical_revision"] = memory_after.get("revision") if memory_after else None
         output["passed"] = (
-            final_task.get("state") == "COMPLETED"
+            durable_task.get("state") == "COMPLETED"
             and tools.count("memory_search") >= 1 and set(tools) == {"memory_search"}
             and not effects
+            and memory_after is not None
+            and memory_after.get("value") == case["after"]
+            and memory_after.get("revision") == memory.get("revision")
             and all(term in output["answer"].casefold() for term in case["answer_terms"])
         )
     print(json.dumps(output, ensure_ascii=False, sort_keys=True), flush=True)
