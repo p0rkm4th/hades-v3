@@ -1,6 +1,6 @@
 # HADES v3 autonomous engineering day — progress handoff
 
-**Date:** 2026-10-14, in progress (10:29 AM CDT)
+**Date:** 2026-10-14, in progress (10:43 AM CDT)
 **Authority:** frozen PRD and Bounded Operator architecture
 **ADR-010:** NOT READY
 **Next update:** before 6:00 PM CDT
@@ -9,7 +9,7 @@
 
 - Started from local and public `main` at CP82 `625c08e4bf6cad953c03745868f4c24dc010d343`, with unpublished CP83 DBOS/Harness changes and a dirty worktree.
 - Published CP83 and follow-ups by normal fast-forward. Current local and remote `main` at report entry: `6f94dd74baf582eba3a8f15e8c3a3a4a707d5894`; worktree was clean before this report update.
-- Exact-SHA CI passed on CP83 `252f21917d065cdf74de3d4c87f3bdacd0be3165`, run [38586048285](https://github.com/p0rkm4th/hades-v3/actions/runs/38586048285), quarantine follow-up `6b71fbe78a6650e0b4d421815a622044d1a9f1cb`, run [38586964117](https://github.com/p0rkm4th/hades-v3/actions/runs/38586964117), repeated-result check `6526f6cc71825bbc6079958678477b8314990888`, run [38587824181](https://github.com/p0rkm4th/hades-v3/actions/runs/38587824181), and v2-control-doc update `c6ddf4de04d45959dbf20a478d713381fe12d9d6`, run [38588165471](https://github.com/p0rkm4th/hades-v3/actions/runs/38588165471). At 10:29 CDT, `e329cde` run `38588504783` and current `6f94dd7` run `38588664035` were still in progress, checked through the public GitHub API.
+- Exact-SHA CI passed on CP83 `252f21917d065cdf74de3d4c87f3bdacd0be3165`, run [38586048285](https://github.com/p0rkm4th/hades-v3/actions/runs/38586048285), quarantine follow-up `6b71fbe78a6650e0b4d421815a622044d1a9f1cb`, run [38586964117](https://github.com/p0rkm4th/hades-v3/actions/runs/38586964117), repeated-result check `6526f6cc71825bbc6079958678477b8314990888`, run [38587824181](https://github.com/p0rkm4th/hades-v3/actions/runs/38587824181), v2-control update `c6ddf4de04d45959dbf20a478d713381fe12d9d6`, run [38588165471](https://github.com/p0rkm4th/hades-v3/actions/runs/38588165471), provider-error suite `e329cdec03cbfa052d1805469a73e21405dc1673`, run [38588504783](https://github.com/p0rkm4th/hades-v3/actions/runs/38588504783), prior report `6f94dd74baf582eba3a8f15e8c3a3a4a707d5894`, run [38588664035](https://github.com/p0rkm4th/hades-v3/actions/runs/38588664035), and this report/campaign update `8b7593413fbcc417ee6c3a5ae9aee965b31b94f7`, run [38589792987](https://github.com/p0rkm4th/hades-v3/actions/runs/38589792987). All listed runs passed exact-SHA CI.
 - Public privacy checks passed for each publishable change; Gitleaks reported no findings. No private network values or credentials were added.
 
 ## CP83 DBOS and A2 evidence
@@ -36,6 +36,13 @@
 - The A2 identity-forwarding contract passed in a fresh read-only, network-disabled container. CP82/CP83 restart probes already provide stronger deterministic integration evidence for reuse of the same effect after confirmed response loss. A quarantined timeout remains blocked and requires independent review; arbitrary shell commands do not have general canonical reconciliation and are not exactly-once.
 - No new gateway code or experiment project was needed. This closes the specific “a repeated command gets a new effect” source gap for the tested adapters, while leaving A/C persistent runtime recovery and unknown-result resolution unqualified.
 
+## CP84 — DBOS plus trusted candidate finalization
+
+- A fresh, uniquely named synthetic fixture project ran Pydantic AI `2.56.0` + DBOS `3.2.0` with a deterministic `FunctionModel`. It reused the candidate API's shared tool schemas, `gateway_call`, and `finalize_turn`; it did not run the public HTTP Handler or Harness Shell and is not an A/B/C score.
+- In three clean repetitions, the worker died after the workspace gateway returned `CONFIRMED`. DBOS replay used the same tool-call identity and the same effect. A second process death after DBOS returned the workflow result but before finalization left the task `RUNNING`; a later process fetched the same result and the trusted HADES finalizer set `COMPLETED`. The final output matched the strict peer; independent workspace reads found one marker; repeated resume added zero generations/effects. Each successful run used three model generations and two tool calls.
+- Two test-driver failures were preserved separately: the first called the Pydantic `RunUsage` property as a function, leaving a confirmed effect and `RUNNING` task; the second double-stripped a result prefix after HADES had already completed the task. Each was independently read and cleaned; neither is a candidate pass. The driver defects were fixed before the 3/3 clean repetitions.
+- Exact task/effect identities, classifications, and cleanup are recorded in [CP84 report](CP84_DBOS_CANDIDATE_FINALIZATION.md) and [trial JSONL](../experiment/results/cp84-dbos-candidate-finalization-20261014.jsonl). CP84 proves process-level recovery only. DBOS used SQLite under runner tmpfs; full container/host restart, durable-store privacy, retries/cancellation, uncertain-result reconciliation, and net code reduction remain unproven.
+
 ## Living HADES v2 control
 
 - Read-only public API recheck found v2 `main` at `eccaf8a4eec9802341cc31261496b98fe50856be`; exact-SHA Public CI runs `38522183010` and `38522042760` passed.
@@ -45,14 +52,15 @@
 ## Coordination and shared resources
 
 - A direct Codex thread listing was attempted at this milestone, but the local TUI MCP transport returned a connection error. No Tallowmere or Cinder reply was received in this session; no message receipt is claimed.
-- The shared CP75/CP80 fixture containers remain active and untouched. No new Docker project, volume, image, or host rule was created today; the identity regression ran as a one-shot network-disabled container from an already cached image, with auto-removal. Current free disk was 44 GB.
+- The shared CP75/CP80 fixture containers remain active and untouched. Before CP84, no new Docker project, volume, image, or host rule had been created today; the identity regression ran as a one-shot network-disabled container from an already cached image, with auto-removal. Current free disk was 44 GB.
+- CP84's own fixture project was removed by its exact project name: zero CP84 containers, networks, or volumes remained; the 14 CP75/CP80 containers were still running. Five CP84-tagged reproducible images totaling roughly 1.4 GB by listed image sizes remain for Tallowmere's cleanup review; I did not prune them. Free disk remained 44 GB.
 - Documentation-only follow-up updates the campaign next-step pointer, current state, CP83 complexity assessment, and matrix without changing historical test results. `git diff --check` passed; Gitleaks scanned `docs/` and found no leaks; private-address/account-path scan of the touched public docs found no matches.
 
 ## Decision status and next actions
 
-ADR-010 remains **NOT READY**. A2/DBOS now has stronger recovery evidence than CP82, while its unresolved-effect continuation and task/API integration remain open. Candidate C remains a useful minimal comparison baseline; current evidence does not justify selecting it or a winner. Existing A/B/C scores and negative outcomes remain unchanged.
+ADR-010 remains **NOT READY**. CP84 closes the deterministic candidate-finalizer integration gap for one bounded A2 workspace flow, but CP83/84 still do not establish safe continuation after an unknown shell result, live-model quality, or net engineering reduction. Candidate C remains a useful minimal baseline; current evidence does not justify selecting it or a winner. Existing A/B/C scores and negative outcomes remain unchanged.
 
-1. Exact-SHA CI recheck: `6526f6c` passed; `c6ddf4d`, `e329cde`, and `6f94dd7` were still in progress at 10:23 CDT. Recheck at the next checkpoint.
-2. Keep CP83 as bounded contract evidence. Next engineering question: can DBOS integrate with the candidate API's trusted finalizer while preserving one HADES task/effect authority? Do not add a second ledger or persistent service just to test it.
-3. Do not retry CP81 model trials until an eligible isolated model endpoint and independently owned fixture are available. Preserve CP81 scores and Hermes context limits.
-4. At end of day, update this report with completed work, exact CI, resource cleanup, and the next actionable handoff. Stop initiating new engineering at 6:00 PM CDT.
+1. Exact-SHA CI through `8b75934` passed. The current CP84 source/workflow commit is not yet published; run CI after publication and record its exact SHA.
+2. Existing CP75/CP80 containers, including the CPU model service, remain active and have not been released for reuse. Do not connect to or restart them. A separately owned duplicate model run needs a fresh resource preflight before inference; meanwhile use deterministic contracts and source review.
+3. Compare CP84 against A2 StepPersistence for unknown-result handling, output delivery after process restart, DBOS history protection, bounded retry/cancel semantics, and net code/operational burden. No persistent DBOS service or second ledger.
+4. Preserve CP81 scores and Hermes context limits; at day end update this report with completed work, exact CI, resource cleanup, and the next actionable handoff. Stop initiating new engineering at 6:00 PM CDT.

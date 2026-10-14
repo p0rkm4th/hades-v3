@@ -18,13 +18,14 @@ jobs:
       A2_COMPOSE_PROJECT_NAME: hades-v3-exp-a2-${{ github.run_id }}-${{ github.run_attempt }}
       CP79_COMPOSE_PROJECT_NAME: hades-v3-exp-cp79-${{ github.run_id }}-${{ github.run_attempt }}
       CP83_COMPOSE_PROJECT_NAME: hades-v3-exp-cp83-${{ github.run_id }}-${{ github.run_attempt }}
+      CP84_COMPOSE_PROJECT_NAME: hades-v3-exp-cp84-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Validate Python and tool contract
         run: |
-          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/candidates/test_workspace_identity.py experiment/contracts/memory_schema.py experiment/contracts/memory_diagnostics.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py experiment/tests/run_cp74_fresh_memory_recall.py experiment/tests/run_cp75_memory_cas_case.py experiment/tests/run_cp81_memory_case.py experiment/tests/test_cp81_memory_runner.py experiment/spikes/cp77_durable_execution_probe.py experiment/spikes/a2_gateway_workspace/operation_identity.py experiment/spikes/a2_gateway_workspace/recovery_gate.py experiment/spikes/a2_gateway_workspace/test_resume_gate.py experiment/spikes/cp83_a2_dbos_workspace/test_durable_shell_recovery.py
+          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/candidates/test_workspace_identity.py experiment/contracts/memory_schema.py experiment/contracts/memory_diagnostics.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py experiment/tests/run_cp74_fresh_memory_recall.py experiment/tests/run_cp75_memory_cas_case.py experiment/tests/run_cp81_memory_case.py experiment/tests/test_cp81_memory_runner.py experiment/spikes/cp77_durable_execution_probe.py experiment/spikes/a2_gateway_workspace/operation_identity.py experiment/spikes/a2_gateway_workspace/recovery_gate.py experiment/spikes/a2_gateway_workspace/test_resume_gate.py experiment/spikes/cp83_a2_dbos_workspace/test_durable_shell_recovery.py experiment/spikes/cp84_dbos_candidate_finalization/test_dbos_candidate_finalization.py
           python -m py_compile experiment/contracts/task_lifecycle.py
           python -m py_compile experiment/services/inference_adapter.py
           python -m py_compile experiment/services/ollama_protocol.py
@@ -174,6 +175,16 @@ jobs:
       - name: Remove isolated CP83 Pydantic DBOS workspace fixtures
         if: always()
         run: docker compose -p "$CP83_COMPOSE_PROJECT_NAME" --profile cp83-dbos-harness -f experiment/compose.yaml -f experiment/compose.cp83-dbos-harness.yaml down --volumes --remove-orphans --timeout 5
+
+      - name: Start isolated CP84 candidate-finalizer fixtures
+        run: docker compose -p "$CP84_COMPOSE_PROJECT_NAME" -f experiment/compose.yaml -f experiment/compose.cp84-dbos-finalization.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway
+
+      - name: Verify DBOS recovery through the HADES candidate finalizer
+        run: docker compose -p "$CP84_COMPOSE_PROJECT_NAME" --profile cp84-dbos-finalization -f experiment/compose.yaml -f experiment/compose.cp84-dbos-finalization.yaml run --build --rm --no-deps cp84-dbos-finalization-runner
+
+      - name: Remove isolated CP84 candidate-finalizer fixtures
+        if: always()
+        run: docker compose -p "$CP84_COMPOSE_PROJECT_NAME" --profile cp84-dbos-finalization -f experiment/compose.yaml -f experiment/compose.cp84-dbos-finalization.yaml down --volumes --remove-orphans --timeout 5
 
       - name: Validate isolated CP69 offline profile
         run: docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml config --quiet
