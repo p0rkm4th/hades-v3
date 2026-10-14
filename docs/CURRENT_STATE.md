@@ -1,6 +1,6 @@
 # Current state
 
-**Campaign status:** CP81 memory results remain mixed. CP82 proves identity-bound replay for A2 under a test-only resume gate. CP83 adds a separate A2 + Pydantic DBOSDurability contract spike: 3/3 worker deaths after gateway confirmation resumed the same confirmed effect without duplicate markers. Unknown-effect recovery and durable HADES task finalization remain unproven. ADR-010 remains NOT READY. This is a prototype comparison, not production implementation.
+**Campaign status:** CP81 memory results remain mixed. CP82 proves identity-bound replay for A2 under a test-only resume gate. CP83 adds a separate A2 + Pydantic DBOSDurability contract spike: 3/3 worker deaths after gateway confirmation resumed the same confirmed effect without duplicate markers; unknown outcomes stayed quarantined without replay. Today's isolated adapter identity regression and candidate lifecycle suites pass. Candidate API/DBOS finalization remains unintegrated, CP81's structured/list model failures remain, and DBOS has not shown a net maintained-code reduction. ADR-010 remains NOT READY. This is a prototype comparison, not production implementation.
 
 ## Current checkpoint — CP83 A2 + DBOSDurability
 
@@ -9,6 +9,8 @@
 - This demonstrates first-party DBOSDurability can compose with the A2 Shell adapter for one confirmed-result crash boundary. It does not establish safe recovery of quarantined/unknown outcomes, semantic model performance, general shell exactly-once behavior, or a net maintenance reduction. CP79/CP82 evidence remains unchanged; no DBOS adoption decision is made.
 - A separate CP83 timeout follow-up wrote one synthetic marker, then timed out; the gateway retained one `QUARANTINED` effect. DBOS replay was refused by the gateway, and the agent run ended in a fail-closed exception with no final response. A separate oracle read found one marker; repeated resume added no generation or effect. The task stayed `RUNNING`, so this is no-duplicate safety evidence but a recovery/finalization failure, not successful task recovery. The disposable database and marker were removed with the project.
 - The CP83 runner calls Harness and the gateway directly, outside the candidate API orchestrator. Its `RUNNING` status is therefore a test-scope limitation. The API exception classifier now has regressions proving quarantined effects map to `WAITING` for reconciliation and confirmed effects after response loss map to `WAITING` for response recovery. This is unit evidence; joining that orchestrator to the A2/DBOS runtime remains untested.
+- A fresh one-shot A2 container with no network and read-only source confirmed both the Pydantic and lean adapters derive the same workspace operation identity from the persisted tool-call ID. The local 24-test candidate-finalization and 16-test lifecycle suites passed. No existing fixture container was used by this check.
+- Source count is only a rough complexity indicator: the shared API/lifecycle/gateway are 705/367/1,097 LOC and remain HADES-specific authority/integration. A2's gateway workspace and identity wrapper are 97/69 LOC. The CP82 53-line recovery gate is test-only, while the CP83 DBOS driver is test code; no runtime reduction has been measured. Pydantic's current DBOS guidance adds history privacy, retry-budget, streaming, and cancellation constraints that remain untested.
 - CP83 fixture projects were removed by exact project scope; post-cleanup inventory found no CP83 containers, networks, or volumes. The 14 CP75/CP80 containers remained running; available disk stayed at 39 GB. No GPU, privileged host, v2, or shared cleanup action occurred. See [CP83 report](CP83_PYDANTIC_DBOS_WORKSPACE_RECOVERY.md).
 
 ## Previous checkpoint — CP81
@@ -100,10 +102,10 @@
 
 ## Next engineering actions
 
-- Continue the comparative campaign on eligible matched configurations, prioritizing the untested recovery, memory, authorization, and shell/Git families. Preserve CP67's harness failures and do not rank candidates from the smoke.
-- Treat memory write/correction completion as unproven until task-linked durable effect records exist. Keep the current fail-closed `WAITING` behavior and focused regression coverage.
-- Do not send more Hypnos inference under CP67. Its six-generation budget is consumed; any further GPU comparison needs a new bounded authorization and a harness loop designed to complete within its per-candidate request cap.
-- Keep ADR-010 NOT READY and production implementation out of scope.
+- Determine whether DBOS can wrap the candidate API's trusted finalization path without introducing another task/effect authority; require a disposable, end-to-end test and measure history privacy, retry budget, cancellation, and net operational/code burden before adoption.
+- Run further held-out A/C memory correction/retrieval only when an independently owned isolated model endpoint and fixture are available. Preserve CP81's structured/list failures; Hermes remains ineligible on the 40,960-token CPU context.
+- Use offline deterministic contracts for compound operations and protected actions while the shared CP75/CP80 fixture projects remain active. Treat quarantined arbitrary shell outcomes as review-only; no blind replay.
+- Keep CP71 `BLOCKED_EXTERNAL_DEPENDENCY`; no Hypnos or privileged firewall activity. Keep Cinder's v2 environment and the frozen PRD/architecture untouched. ADR-010 remains NOT READY and production implementation out of scope.
 
 ## Public history remediation
 
