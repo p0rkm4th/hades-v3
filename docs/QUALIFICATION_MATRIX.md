@@ -168,3 +168,14 @@ CP81 does not change CP75 scores. Hermes remains excluded from CPU model-equival
 | A/C/Hermes workspace adapter compatibility | A and C pass an isolated identity-injection contract using provider tool-call IDs; the shared gateway rejects missing operation IDs. Hermes's MCP proxy does not supply one. | **CONTRACT TEST** for A/C injection; **UNKNOWN** for B | No A/C persisted-history/resume integration has been tested; Hermes workspace execution fails closed until its MCP adapter supplies a stable identity. No live model score. |
 
 CP82 narrows the A2 Shell replay risk for exact persisted calls. It does not establish exactly-once arbitrary shell execution, task lifecycle completion, live-model performance, or a winner. See [CP82 report](CP82_WORKSPACE_COMMAND_REPLAY_REPORT.md).
+
+## CP83 — Pydantic AI Harness + DBOSDurability
+
+| Area | Evidence | Classification | Remaining gap |
+|---|---|---|---|
+| A2 Shell + DBOS composition | Pinned Harness 0.56.0 / Pydantic AI 2.56.0 / DBOS 3.2.0 used the documented workspace capability hook and HADES authenticated workspace gateway. No host shell, database credential, persistent DBOS service, or model network was available to the runner. | **CONTRACT TEST** | Separate candidate revision; not a live-model comparison or scored A/B/C result. |
+| Confirmed-result process recovery | Across 3/3 deterministic trials, a worker died after HADES persisted a confirmed command but before Shell received its response. Restart replay returned the original effect; one marker remained, two model calls occurred, and independent reads passed. | **CONTRACT TEST** | Only the confirmed boundary is covered. Quarantined/unknown outcomes, approvals, cancellation, and finalization are untested. |
+| Authority and completion | HADES task/effect ledger remained canonical; workflow ID derived from task ID. | **CONTRACT TEST** | Tasks remained `RUNNING`; no task finalization or delivery. DBOS is not adopted as task/effect authority. |
+| Complexity impact | First-party DBOSDurability removes CP82's test-only resume gate and StepPersistence journal reconciliation from this particular recovery path. | **RESEARCH + CONTRACT TEST** | Net code/operational burden was not measured; DBOS metadata lifecycle and unknown-outcome behavior still need comparison. |
+
+CP83 supports one A2/DBOS composition hypothesis, not a harness ranking. Historical CP81 memory scores and CP82 failures are unchanged. See [CP83 report](CP83_PYDANTIC_DBOS_WORKSPACE_RECOVERY.md) and [machine-readable result](../experiment/results/cp83-pydantic-dbos-workspace-20261014.json).

@@ -1,0 +1,21 @@
+services:
+  cp83-dbos-harness-runner:
+    build:
+      context: .
+      dockerfile: spikes/cp83_a2_dbos_workspace/Dockerfile
+    command: ["python", "/app/test_durable_shell_recovery.py"]
+    environment:
+      GATEWAY_URL: http://tool-gateway:8080
+      HADES_USER_TOKEN: fixture-token-amber
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    networks: [operator]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=256m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    mem_limit: 2g
+    restart: "no"
+    profiles: [cp83-dbos-harness]

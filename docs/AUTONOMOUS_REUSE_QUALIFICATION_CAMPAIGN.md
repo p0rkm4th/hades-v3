@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP82 identity-bound A2 workspace recovery; exact replay and a test-only task/effect resume coordinator are contract-tested, A/C restart persistence remains open
+**Current workstream:** CP83 A2 + first-party DBOSDurability; confirmed-result Shell recovery passed 3/3, while unknown-effect recovery and task finalization remain untested
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -11,8 +11,8 @@
 |---|---|---|---|
 | 1 | Baseline, component inventory, reuse-first technology assessment | Research synthesis complete; A2/DBOS integration evidence pending | Frozen requirements mapped to current code and official upstream options; facts separated from hypotheses |
 | 2 | CP75/CP81 correction diagnosis, safe CAS interface, and trusted bounded completion | Contract complete; A/C campaign completed with mixed results | Scalar passed 3/3 per candidate; structured no-tool 0/3; list mutations 3/3 with answer 2/3; fresh list recall 0/3. See report and JSONL. |
-| 3 | Upstream Pydantic AI Harness proof of concept | Shell-only and exact-call recovery pass under strict peer; test-only task-journal reconciliation passes | Integrate a coordinator only in a future authorized runtime; investigate A/C persistence separately |
-| 4 | Durable-engine integration spike | DBOS replay contract probe positive; production-like HADES integration pending | Measure whether DBOS can persist the same operation identity/replay handling using the existing HADES task/effect ledger, without a second ledger/service |
+| 3 | Upstream Pydantic AI Harness proof of concept | Shell-only and exact-call recovery pass; DBOSDurability + HADES workspace confirmed-result recovery passed 3/3 | Test quarantined outcome and task finalization; compare net complexity against StepPersistence path |
+| 4 | Durable-engine integration spike | DBOSDurability composes with HADES gateway for one post-confirmation crash boundary | Do not adopt until unknown outcomes, lifecycle integration, and operations burden are compared |
 | 5 | Compound work, general-purpose agency, recovery, protected actions | Planned | Held-out matched trials and independent final-state/security verification |
 | 6 | Deletion-oriented simplification and ADR-010 evidence review | Planned | Replacement parity, reduced maintenance surface, decision-readiness table |
 
@@ -37,6 +37,11 @@ CP75 resolved CP74's 404 root cause as a mismatched JSON value shape and impleme
 Research and bounded disposable integrations continue without live GPU access. Stop only the affected operation when it requires new privileged access, production changes, HADES v2 interference, modification of frozen authority, or another Hypnos generation. Publish sanitized, complete checkpoints with normal fast-forward updates and exact-SHA CI.
 
 ## Current next steps
+
+1. Exercise a quarantined/unknown workspace result under DBOS and prove replay does not redispatch; keep the task incomplete and effect quarantined.
+2. Resume held-out memory qualification only where it adds structured/list correction and fresh-context evidence beyond CP81; preserve the mixed CP81 scores.
+3. Compare the minimum A2+DBOS glue and operational needs against A2 StepPersistence without a second task/effect authority.
+4. Advance protected-action and compound-operation cases, then refresh current Cinder control evidence if an agreed read-only snapshot is available.
 
 1. Preserve CP81's mixed A/C outcomes; no prompt tuning or rescore of the same cases. Prioritize a task-orchestrator recovery gate that checks unresolved StepPersistence records and resolves them only against the matching HADES task/tool effect. The default Harness continuation may omit an interrupted call.
 2. Keep CP82's exact-call behavior bounded: same task/tool-call identity plus same digest returns the saved confirmed result; changed requests reject; unknown effects block dispatch. Do not describe this as exactly-once arbitrary shell execution. Test the orchestration bridge before widening A2 use; A/C remain unqualified.
