@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "candidates"))
 sys.path.insert(0, str(ROOT))
 import api
+from contracts.task_lifecycle import commitment_digest
 
 
 class CandidateFinalization(unittest.TestCase):
@@ -141,7 +142,51 @@ class CandidateFinalization(unittest.TestCase):
         waiting = {"task_id": "task-1", "state": "WAITING", "checkpoint": {}, "effects": []}
         final, writes = self.run_finalizer(waiting, result)
         self.assertEqual(final["state"], "WAITING")
-        self.assertEqual(writes, [])
+
+    def test_trusted_bounded_contract_completes_without_model_checkpoint(self):
+        contract = {
+            "version": 1, "kind": "external_commitment_set", "required": [{
+                "effect_kind": "EXTERNAL_COMMITMENT", "target_id": "appointment-1",
+                "details": "Reserve the exact appointment for Amber",
+                "effect_digest": commitment_digest(
+                    "appointment-1", "Reserve the exact appointment for Amber"
+                ),
+            }],
+        }
+        result = {"text": "The requested appointment was confirmed.",
+                  "tool_calls": ["commitment_submit", "commitment_reconcile"],
+                  "tool_evidence": []}
+        final, writes = self.run_finalizer({
+            "task_id": "task-1", "state": "RUNNING",
+            "checkpoint": {"trusted_completion_contract": contract},
+            "effects": [{"effect_id": "effect-1", "effect_kind": "EXTERNAL_COMMITMENT", "state": "CONFIRMED"}],
+        }, result)
+        self.assertEqual(final["state"], "COMPLETED")
+        proof = writes[0]["_orchestrator_finalization"]
+        self.assertFalse(proof["completion_claim"])
+        self.assertEqual(proof["response"], result["text"])
+        self.assertEqual(proof["reason"], "trusted_success_criteria_satisfied")
+
+    def test_provider_failure_after_confirmed_effect_waits_for_response_recovery(self):
+        result = {"text": "", "provider_error": "upstream_http_400",
+                  "tool_calls": ["commitment_submit"], "tool_evidence": []}
+        final, writes = self.run_finalizer({
+            "task_id": "task-1", "state": "RUNNING", "checkpoint": {},
+            "effects": [{"effect_id": "effect-1", "effect_kind": "EXTERNAL_COMMITMENT", "state": "CONFIRMED"}],
+        }, result)
+        self.assertEqual(final["state"], "WAITING")
+        self.assertTrue(writes[0]["checkpoint"]["final_response_pending"])
+
+    def test_missing_claim_keeps_confirmed_write_recoverable_for_review(self):
+        result = {"text": "The operation was confirmed.", "tool_calls": ["commitment_submit"],
+                  "tool_evidence": [{"kind": "tool_evidence", "tool": "commitment_submit",
+                                     "status": "ok", "state": "CONFIRMED", "effect_id": "fx-1"}]}
+        final, writes = self.run_finalizer({
+            "task_id": "task-1", "state": "RUNNING", "checkpoint": {},
+            "effects": [{"effect_id": "fx-1", "effect_kind": "EXTERNAL_COMMITMENT", "state": "CONFIRMED"}],
+        }, result)
+        self.assertEqual(final["state"], "WAITING")
+        self.assertTrue(writes[0]["checkpoint"]["completion_review_required"])
 
     def test_confirmed_write_needs_completion_claim(self):
         initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": [{"effect_id": "fx-1", "effect_kind": "GROCERY_LIST", "state": "CONFIRMED"}]}

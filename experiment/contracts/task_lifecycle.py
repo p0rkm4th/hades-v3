@@ -1,5 +1,9 @@
 """Shared task completion rules used by candidates and the trusted gateway."""
 
+import hashlib
+import json
+import re
+
 READ_TOOLS = {
     "infrastructure_read", "inventory_read", "shopping_list_read", "memory_read",
     "memory_search",
@@ -9,14 +13,127 @@ WRITE_TOOLS = {
     "commitment_reconcile", "memory_write", "memory_correct",
 }
 MEMORY_WRITES = {"memory_write", "memory_correct"}
+_PROVIDER_DIAGNOSTICS = (
+    re.compile(r"\b(?:model|inference|llm) provider\b.{0,100}\b(?:rate[- ]?limit(?:ing|ed)?|retry|error|unavailable|failed)\b", re.I),
+    re.compile(r"\bprovider\b.{0,100}\b(?:rate[- ]?limit(?:ing|ed)?|429|too many requests|temporarily unavailable)\b", re.I),
+    re.compile(r"\b(?:rate[- ]?limit(?:ing|ed)?)\b.{0,100}\b(?:provider|retry|try again|request)\b", re.I),
+)
+
+
+def provider_diagnostic(text):
+    return isinstance(text, str) and any(pattern.search(text) for pattern in _PROVIDER_DIAGNOSTICS)
 
 
 def _verified_reads(evidence):
     return any(item.get("tool") in READ_TOOLS and item.get("status") == "ok" for item in evidence)
 
 
+def commitment_digest(target_id, details):
+    canonical = json.dumps(
+        {"target_id": target_id, "details": details}, sort_keys=True,
+        separators=(",", ":"), ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def normalize_completion_contract(contract):
+    """Accept only the small, typed external-commitment criterion in CP73."""
+    if not isinstance(contract, dict) or set(contract) != {"version", "kind", "required"}:
+        raise ValueError("completion contract must contain version, kind, and required")
+    if contract["version"] != 1 or contract["kind"] != "external_commitment_set":
+        raise ValueError("unsupported trusted completion contract")
+    required = contract["required"]
+    if not isinstance(required, list) or not 1 <= len(required) <= 16:
+        raise ValueError("completion contract requires 1 to 16 exact effects")
+    normalized = []
+    targets = set()
+    for item in required:
+        if not isinstance(item, dict) or set(item) != {"effect_kind", "target_id", "details"}:
+            raise ValueError("each required effect must specify kind, target, and details")
+        target_id, details = item["target_id"], item["details"]
+        if (item["effect_kind"] != "EXTERNAL_COMMITMENT"
+                or not isinstance(target_id, str) or not re.fullmatch(r"[a-z0-9-]{1,80}", target_id)
+                or target_id in targets
+                or not isinstance(details, str) or not details.strip() or len(details) > 1000):
+            raise ValueError("invalid or duplicate exact commitment requirement")
+        details = details.strip()
+        targets.add(target_id)
+        normalized.append({
+            "effect_kind": "EXTERNAL_COMMITMENT", "target_id": target_id,
+            "details": details, "effect_digest": commitment_digest(target_id, details),
+        })
+    return {"version": 1, "kind": "external_commitment_set", "required": normalized}
+
+
+def validate_trusted_effect_contract(contract, task_identity, effects, approvals, canonical_states):
+    """Prove every registered operation against task, approval, ledger, and target state."""
+    try:
+        normalized = normalize_completion_contract({
+            "version": contract.get("version"), "kind": contract.get("kind"),
+            "required": [
+                {key: item[key] for key in ("effect_kind", "target_id", "details")}
+                for item in contract.get("required", [])
+            ],
+        })
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return "trusted completion contract is malformed"
+    if normalized != contract:
+        return "trusted completion contract digest or shape changed"
+    if not isinstance(task_identity, dict) or not task_identity.get("task_id"):
+        return "task identity is unavailable"
+    if not isinstance(effects, list) or len(effects) != len(normalized["required"]):
+        return "persisted effects do not exactly match required operations"
+    if not isinstance(approvals, dict) or not isinstance(canonical_states, dict):
+        return "trusted authorization or canonical state evidence is unavailable"
+    effect_by_target = {}
+    for effect in effects:
+        request = effect.get("request") or {}
+        target_id = request.get("target_id")
+        if target_id in effect_by_target:
+            return "multiple persisted effects match one required operation"
+        effect_by_target[target_id] = effect
+    for required in normalized["required"]:
+        target_id = required["target_id"]
+        effect = effect_by_target.get(target_id)
+        if effect is None:
+            return "required operation has no persisted effect"
+        request = effect.get("request") or {}
+        if (str(effect.get("task_id")) != str(task_identity.get("task_id"))
+                or effect.get("user_id") != task_identity.get("user_id")
+                or effect.get("domain_id") != task_identity.get("domain_id")):
+            return "effect identity does not match the original task"
+        effect_id = str(effect.get("effect_id", ""))
+        if (effect.get("effect_kind") != required["effect_kind"]
+                or effect.get("resource_key") != f"commitment:{target_id}"
+                or request.get("target_id") != target_id
+                or request.get("details") != required["details"]
+                or request.get("effect_digest") != required["effect_digest"]
+                or effect.get("state") != "CONFIRMED"):
+            return "persisted effect does not match the exact required operation"
+        approval_id = str(request.get("approval_id", ""))
+        approval = approvals.get(approval_id)
+        if (approval is None
+                or str(approval.get("task_id")) != str(task_identity.get("task_id"))
+                or approval.get("user_id") != task_identity.get("user_id")
+                or approval.get("domain_id") != task_identity.get("domain_id")
+                or approval.get("target_id") != target_id
+                or approval.get("effect_digest") != required["effect_digest"]
+                or not approval.get("consumed_at")
+                or approval["consumed_at"] > approval["expires_at"]):
+            return "persisted effect lacks its exact consumed authorization"
+        canonical = canonical_states.get(effect_id)
+        if (not isinstance(canonical, dict)
+                or canonical.get("state") != "ACCEPTED"
+                or str(canonical.get("effect_id")) != effect_id
+                or canonical.get("target_id") != target_id
+                or not isinstance(canonical.get("receive_count"), int)
+                or canonical["receive_count"] < 1):
+            return "canonical target state does not confirm the exact effect"
+    return None
+
+
 def decide_turn_finalization(current_state, response, evidence, claim, effect_states=None, effect_records=None,
-                            turn_error=None):
+                            turn_error=None, trusted_completion_contract=None):
     """Decide state from observed work, preserving externally meaningful states."""
     if current_state != "RUNNING":
         return current_state, "existing_state_preserved"
@@ -48,8 +165,12 @@ def decide_turn_finalization(current_state, response, evidence, claim, effect_st
         # failure cannot establish whether the requested memory change is safe to retry.
         return "WAITING", "memory_effect_evidence_unproven"
     if turn_error:
+        if writes or effect_states or effect_records:
+            return "WAITING", "final_response_pending"
         return "FAILED", "model_generation_failed"
     if not isinstance(response, str) or not response.strip():
+        if writes or effect_states or effect_records:
+            return "WAITING", "final_response_pending"
         return "FAILED", "no_final_model_response"
     if any(item.get("status") == "error" and not (item.get("uncertain")
            and str(item.get("effect_id")) in resolved_ids) for item in evidence):
@@ -63,8 +184,24 @@ def decide_turn_finalization(current_state, response, evidence, claim, effect_st
         return "COMPLETED", "successful_read_response"
     if not writes and not effects:
         return "FAILED", "completion_without_verified_outcome"
+    if trusted_completion_contract is not None:
+        try:
+            contract = normalize_completion_contract({
+                "version": trusted_completion_contract.get("version"),
+                "kind": trusted_completion_contract.get("kind"),
+                "required": [
+                    {key: item[key] for key in ("effect_kind", "target_id", "details")}
+                    for item in trusted_completion_contract.get("required", [])
+                ],
+            })
+        except (AttributeError, KeyError, TypeError, ValueError):
+            return "WAITING", "completion_review_required"
+        if (contract != trusted_completion_contract or len(contract["required"]) != len(effects)
+                or any(state != "CONFIRMED" for state in effects)):
+            return "WAITING", "completion_review_required"
+        return "COMPLETED", "trusted_success_criteria_satisfied"
     if not claim:
-        return "FAILED", "write_completion_not_claimed"
+        return "WAITING", "completion_review_required"
     if claim.get("pending") or not claim.get("completed"):
         return "RUNNING", "authorized_steps_remain"
     if any(item.get("status") != "ok" or item.get("state") != "CONFIRMED" for item in writes):

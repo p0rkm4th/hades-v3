@@ -3,7 +3,13 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from contracts.task_lifecycle import decide_turn_finalization, validate_finalization
+from contracts.task_lifecycle import (
+    commitment_digest,
+    decide_turn_finalization,
+    normalize_completion_contract,
+    validate_finalization,
+    validate_trusted_effect_contract,
+)
 
 
 class TaskLifecycleContract(unittest.TestCase):
@@ -25,7 +31,7 @@ class TaskLifecycleContract(unittest.TestCase):
         evidence = [{"tool": "shopping_list_change", "status": "ok", "state": "CONFIRMED",
                      "effect_id": "effect-a", "verified_after": [{"name": "Eggs", "amount": 2}]}]
         self.assertEqual(decide_turn_finalization("RUNNING", "Updated.", evidence, None),
-                         ("FAILED", "write_completion_not_claimed"))
+                         ("WAITING", "completion_review_required"))
         effect = {"effect_id": "effect-a", "effect_kind": "GROCERY_LIST", "state": "CONFIRMED"}
         proof = {"task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True, "tool_evidence": evidence}
         self.assertIsNone(validate_finalization(proof, claim, [effect]))
@@ -94,6 +100,74 @@ class TaskLifecycleContract(unittest.TestCase):
         self.assertEqual(decide_turn_finalization("RUNNING", "Resumed.",
             [{"tool": "infrastructure_read", "status": "ok"}], None), ("COMPLETED", "successful_read_response"))
         self.assertEqual(decide_turn_finalization("RUNNING", "Done.", [], None, ["QUARANTINED"])[0], "WAITING")
+
+    def test_missing_effectful_claim_is_recoverable_not_terminal_failure(self):
+        state, reason = decide_turn_finalization(
+            "RUNNING", "Confirmed.", [], None,
+            effect_records=[{"state": "CONFIRMED"}],
+        )
+        self.assertEqual((state, reason), ("WAITING", "completion_review_required"))
+
+    def test_confirmed_effect_with_provider_failure_waits_for_user_response(self):
+        state, reason = decide_turn_finalization(
+            "RUNNING", "", [], None,
+            effect_records=[{"state": "CONFIRMED"}], turn_error="upstream_http_400",
+        )
+        self.assertEqual((state, reason), ("WAITING", "final_response_pending"))
+
+    def test_trusted_exact_contract_matches_task_effect_approval_and_canonical_state(self):
+        target, details, task_id, effect_id, approval_id = (
+            "unit-target", "Reserve the exact synthetic appointment", "task-1", "effect-1", "approval-1"
+        )
+        contract = normalize_completion_contract({
+            "version": 1, "kind": "external_commitment_set",
+            "required": [{"effect_kind": "EXTERNAL_COMMITMENT", "target_id": target, "details": details}],
+        })
+        digest = commitment_digest(target, details)
+        effect = {
+            "effect_id": effect_id, "task_id": task_id, "user_id": "user-amber", "domain_id": "domain-amber",
+            "effect_kind": "EXTERNAL_COMMITMENT", "resource_key": f"commitment:{target}", "state": "CONFIRMED",
+            "request": {"target_id": target, "details": details, "effect_digest": digest, "approval_id": approval_id},
+        }
+        approval = {
+            "task_id": task_id, "user_id": "user-amber", "domain_id": "domain-amber", "target_id": target,
+            "effect_digest": digest, "created_at": 1, "expires_at": 3, "consumed_at": 2,
+        }
+        canonical = {effect_id: {"state": "ACCEPTED", "effect_id": effect_id,
+                                 "target_id": target, "receive_count": 1}}
+        identity = {"task_id": task_id, "user_id": "user-amber", "domain_id": "domain-amber"}
+        approvals = {approval_id: approval}
+        self.assertIsNone(validate_trusted_effect_contract(contract, identity, [effect], approvals, canonical))
+
+        for changed in (
+            dict(effect, task_id="other-task"),
+            dict(effect, user_id="user-cobalt"),
+            dict(effect, request={**effect["request"], "target_id": "other-target"}),
+        ):
+            self.assertIsNotNone(validate_trusted_effect_contract(contract, identity, [changed], approvals, canonical))
+        self.assertIsNotNone(validate_trusted_effect_contract(
+            contract, identity, [dict(effect, effect_id="other-effect")], approvals, canonical,
+        ))
+        self.assertIsNotNone(validate_trusted_effect_contract(
+            contract, identity, [effect], {approval_id: {**approval, "user_id": "user-cobalt"}}, canonical,
+        ))
+        self.assertIsNotNone(validate_trusted_effect_contract(
+            contract, identity, [effect], approvals,
+            {effect_id: {**canonical[effect_id], "state": "NOT_RECEIVED"}},
+        ))
+
+    def test_trusted_contract_requires_every_effect_and_rejects_unapproved_operations(self):
+        target = "unit-target"
+        contract = normalize_completion_contract({
+            "version": 1, "kind": "external_commitment_set",
+            "required": [
+                {"effect_kind": "EXTERNAL_COMMITMENT", "target_id": target, "details": "one"},
+                {"effect_kind": "EXTERNAL_COMMITMENT", "target_id": "unit-target-two", "details": "two"},
+            ],
+        })
+        self.assertIsNotNone(validate_trusted_effect_contract(contract, {
+            "task_id": "task-1", "user_id": "user-amber", "domain_id": "domain-amber",
+        }, [], {}, {}))
 
 
 if __name__ == "__main__":

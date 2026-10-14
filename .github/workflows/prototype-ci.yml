@@ -21,7 +21,7 @@ jobs:
 
       - name: Validate Python and tool contract
         run: |
-          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py
+          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py
           python -m py_compile experiment/contracts/task_lifecycle.py
           python -m py_compile experiment/services/inference_adapter.py
           python -m py_compile experiment/services/ollama_protocol.py
