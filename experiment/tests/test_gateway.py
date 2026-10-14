@@ -216,6 +216,58 @@ class GatewayIntegration(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(task_row["effects"], [])
 
+    def test_orchestrator_scoped_memory_contract_requires_real_exact_cas_before_completion(self):
+        key = "cp81-cas-" + uuid.uuid4().hex[:12]
+        task_ids = []
+        before, after = {"format": "long paragraphs"}, {"format": "three bullets"}
+
+        def cleanup():
+            with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+                for task_id in task_ids:
+                    cur.execute("DELETE FROM effects WHERE task_id=%s", (task_id,))
+                    cur.execute("DELETE FROM tasks WHERE task_id=%s", (task_id,))
+                cur.execute("DELETE FROM scoped_memory WHERE user_id='user-amber' AND memory_key=%s", (key,))
+
+        self.addCleanup(cleanup)
+        self.assertEqual(seed_memory_fixture(AMBER, key, before), 1)
+        contract = {"version": 1, "kind": "memory_correction", "required": [{
+            "effect_kind": "MEMORY_MUTATION", "memory_key": key,
+            "expected_revision": 1, "value": after,
+        }]}
+        status, task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Set the synthetic preference to three bullets", "completion_contract": contract,
+        }, orchestrator=True)
+        self.assertEqual(status, 201, task)
+        task_id = task["task_id"]
+        task_ids.append(task_id)
+        self.assertEqual(task["checkpoint"]["trusted_completion_contract"]["kind"], "memory_correction")
+
+        checkpoint = {"summary": "The requested memory correction is complete",
+                      "completed": ["preference correction"], "pending": []}
+        false_claim = {"response": "I updated the preference to three bullets.",
+                       "response_nonempty": True, "tool_evidence": [], "reason": "claimed"}
+        status, _ = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": checkpoint,
+            "_orchestrator_finalization": false_claim,
+        }, orchestrator=True)
+        self.assertEqual(status, 409, "claim without a mutation must not complete")
+
+        status, changed = call("POST", "/v1/memory/correct-by-key", AMBER, {
+            "task_id": task_id, "memory_key": key, "expected_revision": 1,
+            "value": after,
+        })
+        self.assertEqual(status, 200, changed)
+        proof = {**false_claim, "reason": "trusted_success_criteria_satisfied"}
+        status, complete = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": checkpoint,
+            "_orchestrator_finalization": proof,
+        }, orchestrator=True)
+        self.assertEqual(status, 200, complete)
+        self.assertEqual(complete["state"], "COMPLETED")
+        self.assertEqual(complete["checkpoint"]["response_delivery"], "PERSISTED_PENDING_DELIVERY")
+        status, canonical = call("GET", f"/v1/memory/{key}", AMBER)
+        self.assertEqual((status, canonical["value"], canonical["revision"]), (200, after, 2))
+
     def _cleanup_memory_atomic(self, key, constraint, task_id_getter):
         with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
             cur.execute(f"ALTER TABLE effects DROP CONSTRAINT IF EXISTS {constraint}")

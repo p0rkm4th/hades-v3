@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP77 complete; A2 Harness gateway-backed workspace proof follows
+**Current workstream:** CP81 — bounded memory correction completion and held-out fresh-context qualification
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -10,7 +10,7 @@
 | Order | Workstream | State | Dependency / exit evidence |
 |---|---|---|---|
 | 1 | Baseline, component inventory, reuse-first technology assessment | Research synthesis complete; A2/DBOS integration evidence pending | Frozen requirements mapped to current code and official upstream options; facts separated from hypotheses |
-| 2 | CP75 correction diagnosis and safe correction interface | Complete; candidate memory workflow unqualified | CAS contract verified; A/C failures and restart reads preserved in CP75 report/results |
+| 2 | CP75/CP81 correction diagnosis, safe CAS interface, and trusted bounded completion | CP75 complete; CP81 contract implemented; repeated candidate trials pending | Stable key/revision CAS plus orchestrator-authored exact correction criteria; A/C outcomes recorded independently |
 | 3 | Upstream Pydantic AI Harness proof of concept | API fit established; runtime integration pending; separate A2 revision | Pinned isolated integration; every command uses authenticated `workspace_exec` and its HADES effect record |
 | 4 | Durable-engine integration spike | DBOS replay contract probe positive; HADES integration pending | Demonstrate resume/retry while HADES remains sole task/effect authority; no external effect replay |
 | 5 | Compound work, general-purpose agency, recovery, protected actions | Planned | Held-out matched trials and independent final-state/security verification |
@@ -32,15 +32,20 @@ Every result must be labeled as **RESEARCH** (upstream source/documentation), **
 
 ## Decision path and stop conditions
 
-CP75 resolved CP74's 404 root cause as a mismatched JSON value shape and implemented stable-key/revision CAS with task-linked evidence. The correction contract is verified; model-mediated correction and completion remain unqualified. Next use the CP76 reuse hypotheses to test whether upstream durable execution and Harness capabilities reduce custom burden without creating another authority.
+CP75 resolved CP74's 404 root cause as a mismatched JSON value shape and implemented stable-key/revision CAS with task-linked evidence. CP81 adds a gateway-verified completion contract for exactly one orchestrator-specified `memory_correct` operation; the model cannot author the contract, and arbitrary memory writes remain fail-closed. Unit regressions pass. Model-mediated correction, restart, and fresh-context recall remain unqualified pending repeated A/C trials.
 
 Research and bounded disposable integrations continue without live GPU access. Stop only the affected operation when it requires new privileged access, production changes, HADES v2 interference, modification of frozen authority, or another Hypnos generation. Publish sanitized, complete checkpoints with normal fast-forward updates and exact-SHA CI.
 
 ## Current next steps
 
-1. Run the bounded DBOS integration against the real HADES gateway and commitment simulator in a separate unique disposable project. The CP77 SQLite probe established only step replay plus target-side idempotency; stop if DBOS requires a second task/effect authority.
-2. Compare A2 Shell-only against Shell plus FileSystem using the same synthetic task and independent oracle. Keep it separate from scored Candidate A. Investigate uncertain workspace-command recovery using existing gateway mechanisms before adding custom recovery code.
-3. Continue task-linked memory correction/retrieval only after recording the known CP75 outcomes; CP71 remains blocked and no Hypnos generations are authorized.
+1. Run held-out A/C scalar, structured, and list corrections with exact CAS contracts, independent task/effect/canonical-memory checks, exact retries, service restart, and fresh-context recall. Preserve CP75 outcomes unchanged.
+2. Coordinate CP80/CP75 fixture ownership and release with Tallowmere before touching running resources. Do not delete or restart shared fixtures without coordination.
+3. Add the bounded A2 Shell-only uncertain-command recovery regression only if it does not distract from memory qualification. Keep DBOS viable until an integration spike measures a reduction in HADES-specific recovery complexity.
+4. Continue only decision-relevant reuse and recovery work. CP71 stays `BLOCKED_EXTERNAL_DEPENDENCY`; no firewall checks or Hypnos inference. ADR-010 remains NOT READY.
+
+## CP81 checkpoint — bounded memory completion contract
+
+CP81's narrow lifecycle/gateway milestone and unqualified follow-up are recorded in [`CP81_MEMORY_COMPLETION_REPORT.md`](CP81_MEMORY_COMPLETION_REPORT.md). The authenticated orchestrator can store a single exact CAS correction criterion at task creation; the gateway validates durable task/effect identity and canonical memory before completion. Unit regressions pass; the database integration test is in CI. Repeated A/C model-mediated correction, service restart, and fresh-context recall remain outstanding. The CP75 candidate failures are unchanged. Local CP75 and CP80 stacks remain untouched pending cleanup-lead coordination.
 
 The CP77 DBOS probe is published and exact-SHA CI passed: run `38508417305` for `88d1017e7a27b87324ead831dcf4dd61f9720c75`. This is still contract evidence only. Do not introduce persistent services or change A/B/C scores. CP71 stays `BLOCKED_EXTERNAL_DEPENDENCY`; no firewall checks or Hypnos inference.
 
