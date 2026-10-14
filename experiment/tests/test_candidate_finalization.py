@@ -29,6 +29,32 @@ class CandidateFinalization(unittest.TestCase):
             final = api.finalize_turn("fixture-token-amber", "task-1", result)
         return final, writes
 
+    def test_quarantined_workspace_exception_is_recoverable_waiting(self):
+        decision = api.classify_turn_exception(
+            {"state": "RUNNING", "effects": [{"effect_kind": "WORKSPACE_COMMAND",
+                                                "state": "QUARANTINED"}]},
+            [{"tool": "workspace_exec", "uncertain": True}],
+        )
+        self.assertEqual(decision, ("WAITING", "effect_outcome_uncertain_after_error"))
+
+    def test_confirmed_workspace_effect_exception_waits_for_final_response(self):
+        decision = api.classify_turn_exception(
+            {"state": "RUNNING", "effects": [{"effect_kind": "WORKSPACE_COMMAND",
+                                                "state": "CONFIRMED"}]},
+            [{"tool": "workspace_exec", "state": "CONFIRMED"}],
+        )
+        self.assertEqual(decision, ("WAITING", "final_response_pending"))
+
+    def test_unaffected_runtime_error_remains_failed(self):
+        decision = api.classify_turn_exception(
+            {"state": "RUNNING", "effects": []}, [],
+        )
+        self.assertEqual(decision, ("FAILED", "candidate_runtime_error"))
+
+    def test_exception_does_not_override_existing_waiting_or_terminal_state(self):
+        self.assertIsNone(api.classify_turn_exception({"state": "WAITING", "effects": []}, []))
+        self.assertIsNone(api.classify_turn_exception({"state": "COMPLETED", "effects": []}, []))
+
     def test_read_completes_from_verified_evidence_without_model_claim(self):
         initial = {"task_id": "task-1", "state": "RUNNING", "checkpoint": {}, "effects": []}
         result = {
