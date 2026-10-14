@@ -27,7 +27,7 @@ Primary sources: [Pydantic AI Harness durable execution](https://pydantic.dev/do
 
 Three independent tasks passed. Each had two deterministic model generations, one canonical candidate command effect, one marker after recovery, and three confirmed workspace effects after independent read and cleanup. The A2 task remained `RUNNING`; task finalization and user-facing delivery are outside this experiment. The first attempt, which passed `workspace=` only at run time, was rejected before any model generation or workspace dispatch. The test was corrected to register the documented workspace capability before DBOS launch.
 
-The exact fixture project and its images, networks, volumes, and temporary credentials were removed after the run. HADES v2 and Tallowmere's CP75/CP80 fixtures were untouched. No Hypnos generation or privileged operation occurred.
+The exact fixture project and its images, networks, and volumes were removed after the run. HADES v2 and Tallowmere's CP75/CP80 fixtures were untouched. No Hypnos generation or privileged operation occurred.
 
 ## What this establishes
 
@@ -37,6 +37,14 @@ The HADES adapter and existing gateway replay contract are still required. DBOS 
 
 The CP82 A2 path and CP79 direct DBOS gateway probe remain intact. Their outcomes are not rescored. Although CP83 is evidence that first-party DBOSDurability composes with Harness Shell, it is not yet an apples-to-apples maintenance-cost comparison: the current test has no uncertain-effect replay case or trusted task finalization. Do not adopt DBOS until those gaps are tested and the operational cost of its durable metadata store is compared against the candidate's existing recovery path.
 
+## CP83 follow-up — quarantined timeout and worker restart
+
+A second isolated run exercised an actual uncertain command: the synthetic shell wrote one marker and then exceeded the workspace runner's 20-second limit. The gateway persisted one `QUARANTINED` effect. The test worker exited after receiving the gateway result and before Harness saw it. On restart, DBOS replayed the original identity; the gateway refused to redispatch it. The pinned agent run ended in `WorkspaceUnavailableError`, without a final answer. The task remained `RUNNING`; its original effect remained `QUARANTINED` with the same ID.
+
+A separate observer task read the workspace and found exactly one marker. Repeating the failed resume produced no additional model generation or HADES effect. The observer then removed the synthetic marker. This proves fail-closed replay behavior and no duplicate execution for this timeout path, but it does **not** reconcile or complete the original task. An initial test assertion expected a model-generated uncertainty response; the observed runtime exception showed that was not the actual behavior, so acceptance was corrected to preserve the exception as failure evidence rather than treating it as a product pass.
+
+The quarantine case is a distinct single contract trial, not part of the 3/3 confirmed-result repetition count. Both unique CP83 projects were removed by project-scoped cleanup; CP75/CP80 remained at 14 running containers and disk remained at 39 GB. The quarantined effect is retained only in the disposable experiment database, which was removed with its project.
+
 ## Next decision-changing test
 
-Repeat this exact Shell integration with a gateway result that is durably `QUARANTINED`, then restart the DBOS workflow and independently verify zero second dispatch, no false task completion, and a recoverable/uncertain final state. After that, compare the minimum code and operational configuration for DBOSDurability versus the current StepPersistence path using the same task/effect contract. ADR-010 remains **NOT READY**.
+The quarantined path now proves no duplicate dispatch but cannot continue after the exception. The next useful test is a narrowly scoped trusted recovery/reconciliation path for a shell operation with independently checkable canonical state; arbitrary shell still requires review. After that, compare the minimum code and operational configuration for DBOSDurability versus the current StepPersistence path using the same task/effect contract. ADR-010 remains **NOT READY**.

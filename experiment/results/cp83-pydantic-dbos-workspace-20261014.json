@@ -50,7 +50,8 @@
   "cleanup": {
     "project_scoped_resources_removed": true,
     "temporary_credentials_removed": true,
-    "cp75_cp80_resources_untouched": true
+    "cp75_cp80_resources_untouched": true,
+    "independent_quarantine_project_removed": true
   },
   "limitations": [
     "Deterministic contract peer only; no live model comparison.",
@@ -66,6 +67,20 @@
     "all_repetitions_passed": true,
     "cleanup_verified": true,
     "remaining_disk_gb": 39,
-    "cp75_cp80_running_containers_unchanged": 14
+    "cp75_cp80_running_containers_unchanged": 14,
+    "quarantine_case_passed_fail_closed": true
+  },
+  "quarantined_timeout_restart": {
+    "classification": "CONTRACT_TEST",
+    "repetitions": 1,
+    "fault": "workspace command wrote one synthetic marker then exceeded the 20 second runner timeout; worker exited after gateway response",
+    "effect_state_after_restart": "QUARANTINED",
+    "same_effect_id_retained": true,
+    "independent_oracle_marker_count": 1,
+    "replay_dispatches": 0,
+    "repeated_resume_model_generations": 0,
+    "runtime_result": "WorkspaceUnavailableError; no final response",
+    "durable_task_state": "RUNNING",
+    "cleanup": "marker removed via separate observer task; disposable project removed"
   }
 }
