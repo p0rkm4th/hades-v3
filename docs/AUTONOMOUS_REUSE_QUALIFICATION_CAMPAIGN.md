@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP81 outcome analysis and workspace replay safety; Harness wrapper identity forwarding is proven, gateway replay semantics remain to be integrated
+**Current workstream:** CP82 identity-bound A2 workspace recovery; exact replay is verified, task-orchestrator reconciliation remains open
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -11,7 +11,7 @@
 |---|---|---|---|
 | 1 | Baseline, component inventory, reuse-first technology assessment | Research synthesis complete; A2/DBOS integration evidence pending | Frozen requirements mapped to current code and official upstream options; facts separated from hypotheses |
 | 2 | CP75/CP81 correction diagnosis, safe CAS interface, and trusted bounded completion | Contract complete; A/C campaign completed with mixed results | Scalar passed 3/3 per candidate; structured no-tool 0/3; list mutations 3/3 with answer 2/3; fresh list recall 0/3. See report and JSONL. |
-| 3 | Upstream Pydantic AI Harness proof of concept | Shell-only fit and identity forwarding positive; cross-restart replay defect reproduced | Add a bounded gateway-backed test for task/run/tool identity and request digest; do not invent task+command dedupe |
+| 3 | Upstream Pydantic AI Harness proof of concept | Shell-only and exact-call recovery pass under strict peer; task-journal reconciliation remains | Reconcile StepPersistence's original `started` record against the sole HADES effect record before model continuation; A/C remain unqualified |
 | 4 | Durable-engine integration spike | DBOS replay contract probe positive; production-like HADES integration pending | Measure whether DBOS can persist the same operation identity/replay handling using the existing HADES task/effect ledger, without a second ledger/service |
 | 5 | Compound work, general-purpose agency, recovery, protected actions | Planned | Held-out matched trials and independent final-state/security verification |
 | 6 | Deletion-oriented simplification and ADR-010 evidence review | Planned | Replacement parity, reduced maintenance surface, decision-readiness table |
@@ -38,17 +38,23 @@ Research and bounded disposable integrations continue without live GPU access. S
 
 ## Current next steps
 
-1. Preserve CP81's mixed A/C outcomes. Do not tune prompts and rescore the same cases; any retest needs new held-out fixtures and must keep answer correctness separate from confirmed mutation and durable task state.
-2. Resolve the workspace replay gap at the reuse boundary: the pinned Harness wrapper forwards `RunContext.run_id` and `tool_call_id`; the interrupted-worker test confirms StepPersistence retains that identity as a `started` effect. Its default continuation may select a prior checkpoint without the pending tool call, so inspect unresolved effects before any resume. Next bind the identity and request digest to the existing effect ledger. Until gateway behavior is proven, never resume a task with an uncertain shell effect into another consequential command.
-3. Use the existing synthetic duplicate-dispatch reproduction and no-retry Shell contract as acceptance controls. Add a positive recovery contract only after an actual caller can replay the same operation identity; exact retry must return the original effect, changed request must reject, and unknown outcomes must remain quarantined.
-4. Continue the reuse assessment and compare HADES-specific code/operational complexity for Pydantic AI Harness and DBOS. Do not add a persistent DBOS service. Use current v2 evidence only if Cinder replies; do not inspect or modify Cinder's runtime.
-5. Keep CP71 `BLOCKED_EXTERNAL_DEPENDENCY`; no Hypnos, privileged firewall, HADES v2, frozen-document, or production work. The new CP81-owned disposable project was removed and its resources verified absent; CP75/CP80 remained untouched.
+1. Preserve CP81's mixed A/C outcomes; no prompt tuning or rescore of the same cases. Prioritize a task-orchestrator recovery gate that checks unresolved StepPersistence records and resolves them only against the matching HADES task/tool effect. The default Harness continuation may omit an interrupted call.
+2. Keep CP82's exact-call behavior bounded: same task/tool-call identity plus same digest returns the saved confirmed result; changed requests reject; unknown effects block dispatch. Do not describe this as exactly-once arbitrary shell execution. Test the orchestration bridge before widening A2 use; A/C remain unqualified.
+3. Continue reuse analysis: quantify A2 Shell/StepPersistence and DBOS code/operational complexity against the current HADES ledger; do not add a persistent DBOS service or second authority. Next high-value qualification is memory continuity and compound operations with independent final-state checks.
+4. Use fresh held-out cases for any additional scored A/C comparison; keep semantic answers, task completion, and operation state separate. Do not compare Hermes at the ineligible 40,960 context.
+5. Keep CP71 `BLOCKED_EXTERNAL_DEPENDENCY`; no Hypnos, privileged firewall, HADES v2, frozen-document, or production work. CP81 and CP82 disposable resources are removed; CP75/CP80 remain untouched.
 
 ## CP81 checkpoint — bounded memory completion contract
 
 CP81 implemented the narrow authenticated-orchestrator CAS completion contract and completed matched A/C CPU trials in a new project. Scalar correction plus restart/fresh-context recall passed 3/3 per candidate; structured correction invoked no tool in 0/3; list mutation was correct 3/3 but answer accuracy was 2/3, and list recall failed safely 0/3. A separate synthetic restart probe confirmed duplicate workspace dispatch because the gateway ignored an extra operation ID. The pinned Harness Shell wrapper identity-forwarding test passed with network disabled, proving a supported caller-side identity path but not durable replay. Full details are in [`CP81_MEMORY_COMPLETION_REPORT.md`](CP81_MEMORY_COMPLETION_REPORT.md) and the JSONL evidence. CP75/CP80 were untouched; the CP81 project and its owned resources were removed.
 
 The CP77 DBOS probe is published and exact-SHA CI passed: run `38508417305` for `88d1017e7a27b87324ead831dcf4dd61f9720c75`. It remains contract evidence only. CP81's 2026-10-14 A/C model run and gateway replay reproduction are recorded in `CP81_MEMORY_COMPLETION_REPORT.md` and `experiment/results/cp81-autonomous-20261014.jsonl`. The fresh project had separate internal networks, volumes, and candidate/gateway services; CP75/CP80 remain untouched. CP71 stays `BLOCKED_EXTERNAL_DEPENDENCY`; no Hypnos inference or firewall modification occurred.
+
+## CP82 checkpoint — identity-bound A2 workspace command replay
+
+The pinned A2 wrapper now sends a hash of task ID and persisted Harness `tool_call_id`; the gateway binds that identity and command digest to its existing effect record. Exact confirmed replay returns the original result; changed arguments reject; unresolved operations block new dispatch. A deterministic worker-crash test passed after killing the worker between gateway confirmation and Shell acknowledgment, then resuming the original tool call without a duplicate marker. Gateway restart replay and seeded unresolved-state cases also passed. The strict A2 repository probe passed under a deterministic peer. See [`CP82_WORKSPACE_COMMAND_REPLAY_REPORT.md`](CP82_WORKSPACE_COMMAND_REPLAY_REPORT.md).
+
+Limits remain: HADES task stayed `RUNNING`; original `StepPersistence` effect still requires reconciliation against the HADES ledger; unknown shell outcomes have no canonical resolution path; A and C do not use the new identity. The disposable CP82 project was removed after evidence capture; post-cleanup inventory was empty and CP75/CP80 remained up. No Hypnos, privileged firewall, v2 runtime, or production change occurred.
 
 ## CP76 checkpoint (2026-10-13): research synthesis complete, spikes next
 

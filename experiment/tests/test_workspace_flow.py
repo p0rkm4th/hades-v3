@@ -1,3 +1,4 @@
+import hashlib
 import json
 import unittest
 import urllib.error
@@ -23,9 +24,16 @@ def call(method, path, token=None, body=None):
 
 
 class WorkspaceFlow(unittest.TestCase):
+    def setUp(self):
+        self.call_index = 0
+
     def exec_command(self, token, task_id, command):
+        self.call_index += 1
+        operation_id = hashlib.sha256(
+            f"{task_id}:workspace-flow:{self.call_index}".encode()
+        ).hexdigest()
         status, result = call("POST", "/v1/workspace/exec", token, {
-            "task_id": task_id, "command": command,
+            "task_id": task_id, "command": command, "operation_id": operation_id,
         })
         self.assertEqual(status, 200, result)
         self.assertEqual(result["state"], "CONFIRMED")

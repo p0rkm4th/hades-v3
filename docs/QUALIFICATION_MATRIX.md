@@ -157,3 +157,14 @@ Shell-only reduced candidate gateway effects by 15/18 (83.3%) for this specific 
 The follow-up documentation run at `37589f2` (`38525623070`) failed before fixture startup due to Docker Hub rate limiting. Review of its public log found generated run-scoped test credentials in subsequent environment summaries; they were unused because no fixture service started. The workflow now masks generated values before export, verified in public logs. Exact-SHA CI passed on masking correction `d590da3` (`38525869943`); this infrastructure failure does not change CP81 candidate scores.
 
 CP81 does not change CP75 scores. Hermes remains excluded from CPU model-equivalent memory trials because 40,960 context is below its documented 64,000-token minimum. ADR-010 remains **NOT READY**.
+
+## CP82 — A2 command replay and worker recovery
+
+| Area | Evidence | Classification | Remaining gap |
+|---|---|---|---|
+| Stable invocation identity | The pinned A2 Shell wrapper forwards `tool_call_id`; it is hashed with task ID and inserted by the adapter, not selected by the model. Network-disabled runtime test passed. | **CONTRACT TEST** | Verify the production-intended orchestrator preserves the original call identity across restart and reconciles old StepPersistence entries. |
+| Gateway replay protection | Exact confirmed replay returned the original effect/result after gateway restart; changed request rejected; one marker remained. A seeded `DISPATCHED` effect blocked both same-ID and new-ID attempts without adding an effect. Eight gateway integration tests passed. | **CONTRACT TEST** and isolated synthetic gateway test | Unknown command outcomes remain quarantined with no general canonical reconciliation. The operation ID must be preserved; regenerated new IDs are new operations. |
+| Harness worker recovery | A2 worker died after gateway confirmation but before Shell received the response. The interrupted `StepPersistence` call resumed with the same tool-call ID, got the persisted gateway result, and independently verified one marker. | **CONTRACT TEST**, strict deterministic peer | HADES task remained `RUNNING`; original StepPersistence run still marks its tool as `started`. Orchestrator must reconcile that journal entry with the HADES effect. No live-model score. |
+| Current A/C/Hermes workspace adapter compatibility | CP82 identity injection is implemented for the separate A2 Harness adapter only; the shared gateway rejects missing operation IDs. | **UNKNOWN / unqualified** | Historical adapters lack the required stable identity and fail closed for workspace calls until updated; no identity-aware cross-restart claim for A, B, or C. |
+
+CP82 narrows the A2 Shell replay risk for exact persisted calls. It does not establish exactly-once arbitrary shell execution, task lifecycle completion, live-model performance, or a winner. See [CP82 report](CP82_WORKSPACE_COMMAND_REPLAY_REPORT.md).

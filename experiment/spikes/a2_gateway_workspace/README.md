@@ -22,9 +22,9 @@ independent outcome summaries in [`cp80_a2_workspace_profiles.jsonl`](../../resu
 
 Limitations: the gateway runner fixes its environment and a 20-second command
 timeout. The adapter rejects unsupported environment or timeout settings and
-does not implement a retry for a command with an uncertain outcome. Background
-commands, recovery of a quarantined workspace command, container egress
-enforcement for an A2 container, and live model behavior are not qualified.
+does not automatically retry a command. Background commands, recovery of an
+uncertain/quarantined workspace command, container egress enforcement for an A2
+container, and live model behavior are not qualified.
 
 CI injects one `QUARANTINED` result through the real workspace adapter and
 Pydantic AI Harness `Shell` capability. The pinned runtime propagates
@@ -33,6 +33,30 @@ one gateway request and no second model turn. This is contract evidence that
 the command is not blindly retried in that runtime. It does not recover or
 finalize the task, establish cross-process recovery, or qualify live-model
 behavior.
+
+## Invocation identity and bounded recovery
+
+The A2 adapter includes `HadesOperationIdentity`, a supported Harness toolset
+wrapper that forwards the active `tool_call_id` through the command-only
+`WorkspaceBackend`. The adapter hashes it with the HADES task ID; the model does
+not supply this field. `workspace_exec` stores that identity and a canonical
+command digest in the existing `effects.request` record. Exact confirmed replay
+returns the saved result and effect ID, a changed request under that identity
+is rejected, and any unresolved workspace effect blocks another dispatch for
+the task. The gateway persists `DISPATCHED` before calling the workspace
+runner, so a gateway crash at that boundary remains quarantined rather than
+being replayed.
+
+`test_confirmed_command_recovery.py` kills an A2 worker after the gateway has
+confirmed a synthetic marker command but before Shell receives the result. It
+loads the interrupted Pydantic AI Harness `StepPersistence` snapshot, resumes
+the original tool-call identity, and independently reads the marker. The same
+effect is returned and the marker appears once. Separate offline tests verify
+the wrapper identity path and the unresolved-effect journal. This is bounded
+contract evidence, not exactly-once arbitrary shell execution: an unknown
+command outcome remains quarantined, and the task orchestrator must inspect
+unresolved StepPersistence effects before choosing a continuation snapshot.
+The legacy A/C adapters do not yet provide this invocation identity.
 
 Run this only with a fresh project-scoped fixture stack, including
 `compose.a2-harness.yaml` and the `a2-harness` profile. The candidate test

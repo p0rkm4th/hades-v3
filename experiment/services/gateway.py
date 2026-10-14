@@ -948,6 +948,7 @@ class Handler(BaseHTTPRequestHandler):
     def workspace_exec(self, user_id: str, domain_id: str):
         body = self.read_json()
         command = body.get("command")
+        operation_id = body.get("operation_id")
         try:
             task_uuid = uuid.UUID(str(body.get("task_id")))
         except (ValueError, TypeError, AttributeError):
@@ -955,9 +956,22 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(command, str) or not command.strip() or len(command) > 8192:
             raise ClientError(400, "command must contain 1 to 8192 characters")
         command = command.strip()
+        if (
+            not isinstance(operation_id, str)
+            or re.fullmatch(r"[0-9a-f]{64}", operation_id) is None
+        ):
+            raise ClientError(400, "operation_id must be a lowercase SHA-256 identity")
+        request_digest = hashlib.sha256(
+            json.dumps(
+                {"command": command}, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode("utf-8")
+        ).hexdigest()
+        resource_key = f"workspace:{user_id}"
         with database() as conn, conn.cursor() as cur:
+            # Serialize command identity checks and effect creation through the
+            # existing task row; a duplicate caller cannot race the first insert.
             cur.execute(
-                "SELECT state FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s",
+                "SELECT state FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s FOR UPDATE",
                 (task_uuid, user_id, domain_id),
             )
             task = cur.fetchone()
@@ -966,18 +980,75 @@ class Handler(BaseHTTPRequestHandler):
             if task["state"] not in {"RUNNING", "WAITING"}:
                 raise ClientError(409, "task is not active")
             cur.execute(
+                "SELECT effect_id,state,request,result FROM effects "
+                "WHERE task_id=%s AND user_id=%s AND domain_id=%s "
+                "AND effect_kind='WORKSPACE_COMMAND' AND resource_key=%s "
+                "AND request->>'operation_id'=%s ORDER BY created_at LIMIT 1 FOR UPDATE",
+                (task_uuid, user_id, domain_id, resource_key, operation_id),
+            )
+            prior = cur.fetchone()
+            if prior is not None:
+                if (prior["request"] or {}).get("request_digest") != request_digest:
+                    raise ClientError(409, "operation identity is already bound to a different command")
+                if prior["state"] == "CONFIRMED":
+                    result = prior["result"]
+                    if not isinstance(result, dict):
+                        raise ClientError(409, "confirmed workspace result is unavailable")
+                    return self.send_json(200, {
+                        **result,
+                        "task_id": str(task_uuid),
+                        "effect_id": str(prior["effect_id"]),
+                        "state": "CONFIRMED",
+                        "already_recorded": True,
+                    })
+                if prior["state"] == "REJECTED":
+                    raise ClientError(409, "workspace operation was previously rejected")
+                cur.execute(
+                    "UPDATE effects SET state='QUARANTINED',updated_at=now() "
+                    "WHERE effect_id=%s AND state IN ('INTENDED','DISPATCHED','UNRESOLVED','QUARANTINED')",
+                    (prior["effect_id"],),
+                )
+                return self.send_json(202, {
+                    "task_id": str(task_uuid),
+                    "effect_id": str(prior["effect_id"]),
+                    "state": "QUARANTINED",
+                    "inspection_required": True,
+                })
+            cur.execute(
+                "SELECT effect_id,state FROM effects WHERE task_id=%s AND user_id=%s AND domain_id=%s "
+                "AND effect_kind='WORKSPACE_COMMAND' "
+                "AND state IN ('INTENDED','DISPATCHED','UNRESOLVED','QUARANTINED') "
+                "ORDER BY created_at LIMIT 1 FOR UPDATE",
+                (task_uuid, user_id, domain_id),
+            )
+            unresolved = cur.fetchone()
+            if unresolved is not None:
+                cur.execute(
+                    "UPDATE effects SET state='QUARANTINED',updated_at=now() "
+                    "WHERE effect_id=%s AND state IN ('INTENDED','DISPATCHED','UNRESOLVED','QUARANTINED')",
+                    (unresolved["effect_id"],),
+                )
+                return self.send_json(202, {
+                    "task_id": str(task_uuid),
+                    "effect_id": str(unresolved["effect_id"]),
+                    "state": "QUARANTINED",
+                    "inspection_required": True,
+                })
+            request_value = {
+                "command": command,
+                "operation_id": operation_id,
+                "request_digest": request_digest,
+            }
+            # Persist DISPATCHED before contacting the runner. If the gateway
+            # dies at the boundary, the next request must quarantine, not replay.
+            cur.execute(
                 "INSERT INTO effects "
                 "(task_id, user_id, domain_id, effect_kind, resource_key, state, request) "
-                "VALUES (%s, %s, %s, 'WORKSPACE_COMMAND', %s, 'INTENDED', %s) "
+                "VALUES (%s, %s, %s, 'WORKSPACE_COMMAND', %s, 'DISPATCHED', %s) "
                 "RETURNING effect_id",
-                (task_uuid, user_id, domain_id, f"workspace:{user_id}", Jsonb({"command": command})),
+                (task_uuid, user_id, domain_id, resource_key, Jsonb(request_value)),
             )
             effect_id = cur.fetchone()["effect_id"]
-        with database() as conn, conn.cursor() as cur:
-            cur.execute(
-                "UPDATE effects SET state='DISPATCHED', updated_at=now() WHERE effect_id=%s",
-                (effect_id,),
-            )
         try:
             status, result = workspace_request(user_id, command)
         except RuntimeError:

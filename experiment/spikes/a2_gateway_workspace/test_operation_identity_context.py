@@ -7,14 +7,11 @@ identity is stable across restart or that a gateway replay is idempotent.
 from __future__ import annotations
 
 import asyncio
-import contextvars
 from typing import Any
 
 from pydantic_ai import Agent
-from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
-from pydantic_ai.toolsets import WrapperToolset
 from pydantic_ai.workspaces import (
     CommandResult,
     SupportsCommands,
@@ -23,26 +20,10 @@ from pydantic_ai.workspaces import (
     WorkspaceRef,
 )
 from pydantic_ai_harness import Shell
+from operation_identity import HadesOperationIdentity, current_tool_call_id
 
 
-_current_call: contextvars.ContextVar[tuple[str | None, str | None] | None] = (
-    contextvars.ContextVar("hades_operation_identity", default=None)
-)
-_observed: list[tuple[str, str]] = []
-
-
-class _IdentityWrapper(WrapperToolset[Any]):
-    async def call_tool(self, name, tool_args, ctx, tool):
-        token = _current_call.set((ctx.run_id, ctx.tool_call_id))
-        try:
-            return await super().call_tool(name, tool_args, ctx, tool)
-        finally:
-            _current_call.reset(token)
-
-
-class _IdentityCapability(AbstractCapability[Any]):
-    def get_wrapper_toolset(self, toolset):
-        return _IdentityWrapper(toolset)
+_observed: list[str] = []
 
 
 class _SyntheticWorkspace(WorkspaceBackend, SupportsCommands):
@@ -66,9 +47,9 @@ class _SyntheticWorkspace(WorkspaceBackend, SupportsCommands):
 
     @staticmethod
     def _dispatch(command: WorkspaceCommand) -> None:
-        identity = _current_call.get()
-        assert identity and identity[0] and identity[1]
-        _observed.append((identity[0], identity[1]))
+        identity = current_tool_call_id()
+        assert identity
+        _observed.append(identity)
 
 
 def _model(messages, info):
@@ -84,12 +65,12 @@ def main() -> None:
     _observed.clear()
     agent = Agent(
         FunctionModel(_model, model_name="strict-identity-peer"),
-        capabilities=[Shell(tools=["run_command"]), _IdentityCapability()],
+        capabilities=[Shell(tools=["run_command"]), HadesOperationIdentity()],
     )
     result = agent.run_sync("Run the synthetic safe command", workspace=_SyntheticWorkspace())
     assert result.output == "identity forwarding verified"
-    assert len(_observed) == 1 and all(_observed[0])
-    print("PASS pinned Shell forwarded run and tool-call identities through async workspace I/O")
+    assert len(_observed) == 1 and _observed[0]
+    print("PASS pinned Shell forwarded its tool-call identity through async workspace I/O")
 
 
 if __name__ == "__main__":

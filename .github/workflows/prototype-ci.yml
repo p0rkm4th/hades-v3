@@ -71,6 +71,9 @@ jobs:
       - name: Run gateway integration test
         run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_gateway.py
 
+      - name: Run isolated workspace command contract test
+        run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_workspace_flow.py
+
       - name: Run uncertain commitment recovery regression
         run: docker compose -p "$COMPOSE_PROJECT_NAME" -f experiment/compose.yaml run --build --rm test-runner python /app/tests/test_commitment_recovery.py
 
@@ -124,6 +127,9 @@ jobs:
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --memory=2g --pids-limit=64 --tmpfs /tmp:rw,noexec,nosuid,size=64m \
             "${A2_COMPOSE_PROJECT_NAME}-a2-harness-runner" python /app/test_step_persistence_interrupted_shell.py
+
+      - name: Verify A2 Shell retries a confirmed call without redispatch
+        run: docker compose -p "$A2_COMPOSE_PROJECT_NAME" --profile a2-harness -f experiment/compose.yaml -f experiment/compose.a2-harness.yaml run --rm --no-deps a2-harness-runner python /app/test_confirmed_command_recovery.py
 
       - name: Run Pydantic Harness gateway workspace contract probe
         run: |

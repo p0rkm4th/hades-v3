@@ -1,13 +1,20 @@
 # Current state
 
-**Campaign status:** CP81 memory qualification measured; A/C results are mixed. Workspace-command cross-restart replay is confirmed unsafe. ADR-010 remains NOT READY. This is a prototype comparison, not production implementation.
+**Campaign status:** CP81 memory results are mixed. CP82 adds identity-bound replay for the separate A2 Shell adapter and proves one worker-recovery path; unresolved StepPersistence reconciliation and A/C workspace replay remain open. ADR-010 remains NOT READY. This is a prototype comparison, not production implementation.
 
-## Current checkpoint — CP81
+## Previous checkpoint — CP81
 
 - The trusted memory correction contract is immutable and orchestrator-authored: exactly one stable memory key, expected revision, and replacement value. The gateway verifies task/user/domain, matching confirmed effect, exact CAS request/result, canonical row at revision+1, and a non-provider-error final response. Arbitrary `memory_write` remains fail-closed. The exact-result and false-claim paths have database-backed tests.
 - **CP81 matched A/C result:** on identical CPU Qwen3-8B Q4_K_M, 40,960 context, temp 0, output cap 1,024, scalar correction plus restart/fresh-context recall passed 3/3 for each. Structured corrections failed 0/3 for both with no tool/effect and `WAITING`. List mutations were correct 3/3 per candidate, but final-answer correctness was 2/3 and fresh-context recall 0/3. Results and per-run IDs/metrics are in [the CP81 trial JSONL](../experiment/results/cp81-autonomous-20261014.jsonl); the method and limitations are in [the CP81 report](CP81_MEMORY_COMPLETION_REPORT.md). Hermes was excluded because 40,960 is below its 64,000 minimum. CP75 outcomes remain unchanged.
 - **Workspace replay:** an isolated post-restart request with the same task, command, and supplied operation ID created a second confirmed effect and repeated a synthetic file append. The gateway ignored the ID; the pinned A2 `WorkspaceBackend.run()` does not expose a stable persisted invocation identity. A task-plus-command ID would conflate legitimate repeated commands, so no unsafe deduplication patch was made. Keep uncertain shell work under review pending a persisted call-identity contract and gateway replay handling in the existing effect ledger.
 - CP81 used a new isolated project `hades-v3-cp81-day-20261014`; it has been removed by exact project/container/volume/network/image names. Verification found no remaining CP81 project resources; CP75 and CP80 remained running and untouched. Disk free space remained 39 GB. No Hypnos or privileged host work occurred. CP71 remains `BLOCKED_EXTERNAL_DEPENDENCY`; ADR-010 remains NOT READY.
+
+## Current checkpoint — CP82 workspace replay
+
+- The separate pinned A2 Harness adapter now forwards task-bound tool-call identity. The workspace gateway rejects missing/malformed identities, stores a request digest in the existing effect record, returns the saved result for exact confirmed replay, rejects changed requests, blocks new dispatch while a workspace effect is unresolved, and records `DISPATCHED` before runner contact.
+- Strict isolated tests passed for an A2 worker death after gateway confirmation, same-call resume without a duplicate marker, exact replay across gateway restart, changed-request rejection, and unresolved-effect quarantine. The A2 task intentionally stayed `RUNNING`; this does not qualify task completion or live-model behavior.
+- `StepPersistence` still marks the original run's tool effect `started` after replay under a new run ID. The coordinator must reconcile that journal entry with HADES's confirmed effect before continuing. A regenerated new tool-call ID is distinct; A/C adapters remain unqualified for cross-restart workspace replay.
+- CP82's disposable gateway/workspace project was removed by exact project-scoped cleanup. Post-cleanup inventory found no CP82 containers, networks, volumes, or project images; the 14 CP75/CP80 containers remained running, and disk free space was 44 GB. No Hypnos, privileged firewall, HADES v2, or production service activity occurred. See the [CP82 report](CP82_WORKSPACE_COMMAND_REPLAY_REPORT.md).
 
 ## Historical checkpoint context
 

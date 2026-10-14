@@ -1,4 +1,5 @@
 import json
+import hashlib
 import os
 import unittest
 import urllib.error
@@ -45,6 +46,97 @@ def seed_memory_fixture(token, key, value):
 
 
 class GatewayIntegration(unittest.TestCase):
+    def test_workspace_operation_retry_is_bound_to_identity_and_quarantines_unknown(self):
+        status, task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Write one synthetic workspace marker exactly once",
+        })
+        self.assertEqual(status, 201, task)
+        task_id = task["task_id"]
+        marker = f".cp81-operation-{task_id}.txt"
+        command = (
+            "python -c \"from pathlib import Path; p=Path('" + marker + "'); "
+            "p.write_text((p.read_text() if p.exists() else '') + 'x')\""
+        )
+        operation_id = hashlib.sha256(f"{task_id}:tool-call-1".encode()).hexdigest()
+        body = {"task_id": task_id, "command": command, "operation_id": operation_id}
+        status, missing_identity = call("POST", "/v1/workspace/exec", AMBER, {
+            "task_id": task_id, "command": command,
+        })
+        self.assertEqual(status, 400, missing_identity)
+
+        status, first = call("POST", "/v1/workspace/exec", AMBER, body)
+        self.assertEqual((status, first["state"]), (200, "CONFIRMED"), first)
+        status, replay = call("POST", "/v1/workspace/exec", AMBER, body)
+        self.assertEqual((status, replay["effect_id"], replay.get("already_recorded")),
+                         (200, first["effect_id"], True))
+        status, changed = call("POST", "/v1/workspace/exec", AMBER,
+                               {**body, "command": command + " "+"# changed"})
+        self.assertEqual(status, 409, changed)
+
+        read_id = hashlib.sha256(f"{task_id}:tool-call-read".encode()).hexdigest()
+        read_command = f"python -c \"from pathlib import Path; print(Path('{marker}').read_text())\""
+        status, observed = call("POST", "/v1/workspace/exec", AMBER, {
+            "task_id": task_id, "command": read_command, "operation_id": read_id,
+        })
+        self.assertEqual(status, 200, observed)
+        self.assertEqual(observed["stdout"].strip(), "x")
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT effect_id,state,request FROM effects WHERE task_id=%s "
+                "AND effect_kind='WORKSPACE_COMMAND' AND request->>'operation_id'=%s",
+                (task_id, operation_id),
+            )
+            rows = cur.fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual((rows[0][0], rows[0][1]), (uuid.UUID(first["effect_id"]), "CONFIRMED"))
+            self.assertEqual(rows[0][2]["request_digest"], hashlib.sha256(
+                json.dumps({"command": command}, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=False).encode("utf-8")
+            ).hexdigest())
+
+        cleanup_command = f"python -c \"from pathlib import Path; Path('{marker}').unlink()\""
+        cleanup_id = hashlib.sha256(f"{task_id}:cleanup".encode()).hexdigest()
+        status, cleanup = call("POST", "/v1/workspace/exec", AMBER, {
+            "task_id": task_id, "command": cleanup_command, "operation_id": cleanup_id,
+        })
+        self.assertEqual(status, 200, cleanup)
+
+        status, unknown_task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Do not repeat an unresolved synthetic workspace operation",
+        })
+        self.assertEqual(status, 201, unknown_task)
+        unknown_task_id = unknown_task["task_id"]
+        unknown_operation = hashlib.sha256(f"{unknown_task_id}:interrupted-call".encode()).hexdigest()
+        unknown_command = "python -c \"from pathlib import Path; Path('.unknown-marker').write_text('x')\""
+        unknown_digest = hashlib.sha256(
+            json.dumps({"command": unknown_command}, sort_keys=True, separators=(",", ":"),
+                       ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO effects (task_id,user_id,domain_id,effect_kind,resource_key,state,request) "
+                "VALUES (%s,'user-amber','domain-home-amber','WORKSPACE_COMMAND',%s,'DISPATCHED',%s) "
+                "RETURNING effect_id",
+                (unknown_task_id, "workspace:user-amber", psycopg.types.json.Jsonb({
+                    "command": unknown_command,
+                    "operation_id": unknown_operation,
+                    "request_digest": unknown_digest,
+                })),
+            )
+            unknown_effect_id = str(cur.fetchone()[0])
+        for retry_id in (unknown_operation, hashlib.sha256(b"different-call").hexdigest()):
+            status, quarantined = call("POST", "/v1/workspace/exec", AMBER, {
+                "task_id": unknown_task_id,
+                "command": unknown_command,
+                "operation_id": retry_id,
+            })
+            self.assertEqual((status, quarantined["state"], quarantined["effect_id"]),
+                             (202, "QUARANTINED", unknown_effect_id))
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*),MIN(state) FROM effects WHERE task_id=%s AND effect_kind='WORKSPACE_COMMAND'",
+                        (unknown_task_id,))
+            self.assertEqual(cur.fetchone(), (1, "QUARANTINED"))
+
     def test_memory_correction_diagnostics_are_structural_and_distinguish_mismatch(self):
         self.assertEqual(json_shape({"private-key-name": ["secret value"]}), "object:1:[array:1:[string]]")
         self.assertEqual(json_shape(True), "boolean")
