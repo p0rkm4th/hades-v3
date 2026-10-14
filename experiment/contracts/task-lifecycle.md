@@ -4,14 +4,30 @@ The candidate API reports a model turn separately from the canonical task state.
 
 ## Completion
 
-The candidate's `task_checkpoint(COMPLETED, ...)` is a completion claim, held until the model turn returns a nonempty final response. The orchestrator then submits the canonical completion to the gateway with evidence captured from actual tool calls. The gateway accepts `COMPLETED` only when:
+An ordinary task's candidate `task_checkpoint(COMPLETED, ...)` remains a claim, held until the model turn returns a nonempty final response. Semantic answer correctness is evaluated separately. The orchestrator submits completion to the gateway with evidence captured from actual tool calls. The gateway accepts ordinary completion only when:
 
 - the final response is nonempty;
 - the completion claim has at least one completed step and an empty pending list;
 - a read-only task has successful read-tool evidence, or an effect task has explicit completion and current verification evidence; and
 - every recorded task effect is `CONFIRMED` (write evidence must include read-back where that tool supports it).
 
-The gateway rejects candidate-originated completion requests unless the request carries the separate internal orchestrator credential; a user-scoped fixture token and a fabricated body marker alone are insufficient. Candidate tools cannot supply that credential. Set a unique `ORCHESTRATOR_SECRET` in the ignored `experiment/.env` before starting Compose; do not commit it. A verified tool write no longer completes its task on its own; the model turn must finish and the orchestrator must finalize it.
+The gateway rejects candidate-originated completion requests unless the request carries the separate internal orchestrator credential; a user-scoped fixture token and a fabricated body marker alone are insufficient. Candidate tools cannot supply that credential. Set a unique `ORCHESTRATOR_SECRET` in the ignored `experiment/.env` before starting Compose; do not commit it. A verified tool write without independently registered success criteria requires an explicit model claim or remains in a recoverable review state.
+
+### Trusted bounded success criteria
+
+A trusted task ingress may attach an immutable, typed completion contract at task creation. CP73 supports only the narrow `external_commitment_set` contract: a bounded list of exact target IDs and operation details. The gateway computes and stores each canonical effect digest in the existing task checkpoint. The model cannot create or change this field through `task_start` or `task_checkpoint`; registering it requires the orchestrator credential.
+
+For this contract, a final response without a model-generated completion checkpoint may complete the task only after the gateway independently proves that:
+
+- every contract item has exactly one matching persisted effect and there are no extra effects;
+- task, user, and domain identity match on the task, effect, and consumed approval;
+- target, requested details, and digest exactly match the immutable contract and approval, and approval consumption occurred before its expiry;
+- the effect ID is `CONFIRMED` and a fresh canonical target query reports `ACCEPTED` for that exact effect and target; and
+- no model/provider error, provider diagnostic response, or candidate-reported pending step exists, and a nonempty final response was generated.
+
+The gateway writes that response into the canonical task checkpoint atomically with `COMPLETED`, marked `PERSISTED_PENDING_DELIVERY`. If the HTTP reply is lost, an authenticated task read returns the persisted response; this is not a claim that notification was delivered. Semantic answer quality is still scored independently. A compound objective must register every required operation; partial effects, missing records, wrong identities, stale/uncertain effects, or unavailable canonical state are rejected.
+
+This does not establish general success criteria for arbitrary free-text tasks. Those keep the explicit claim and evidence path. A missing model claim after confirmed work now becomes `WAITING` for completion review rather than terminal `FAILED`; a confirmed effect followed by provider failure waits for response recovery. Rejected/failed effects remain failures, and uncertain operations remain blocked for reconciliation.
 
 ## Other outcomes
 
@@ -22,4 +38,4 @@ The gateway rejects candidate-originated completion requests unless the request 
 - A caller may resume a nonterminal task explicitly. `WAITING` can return to `RUNNING` only through the orchestrator and only when the checkpoint does not record pending approval or an uncertain effect. Terminal tasks cannot be resumed.
 - A completed response is not semantic correctness proof. Candidate answer correctness, task outcome, and verified tool effects remain separate evaluation signals.
 
-The gateway and candidate API share the pure rules in `task_lifecycle.py`. Read evidence is assembled by the gateway-call proxy from actual gateway HTTP responses; a candidate completion claim without that tool evidence is rejected. Hermes tool records are written by the proxy and consumed by the orchestrator, not asserted by the model response. The regression suite covers read completion, confirmed effect-ledger writes, unledgered memory writes, partial work, tool errors, interrupted turns, approval and uncertain outcomes, resumed tasks, state preservation, and gateway rejection of completion without orchestrator evidence.
+The gateway and candidate API share the pure rules in `task_lifecycle.py`. Ordinary read/write evidence is assembled by the gateway-call proxy from actual gateway HTTP responses; a candidate completion claim without that tool evidence is rejected. Hermes tool records are written by the proxy and consumed by the orchestrator, not asserted by the model response. For a registered bounded contract, restart recovery uses the durable task contract, effect, approval, and canonical target records rather than an in-memory model-turn trace. The regression suite covers read completion, evidence-driven bounded completion, task/effect/approval identity, partial work, provider failure, unledgered memory writes, uncertain outcomes, resumed tasks, terminal-state immutability, and gateway rejection of unauthorized completion.

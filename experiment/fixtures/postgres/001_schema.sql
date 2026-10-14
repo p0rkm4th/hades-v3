@@ -65,6 +65,7 @@ CREATE TABLE commitment_targets (
     behavior text NOT NULL CHECK (behavior IN ('ACCEPT','REJECT','ACCEPT_ACK_LOST','ACCEPT_ACK_LOST_DELAYED','DUPLICATE_SAFE')),
     accepted_effect_id uuid,
     receive_count integer NOT NULL DEFAULT 0,
+    reconcile_failures_remaining integer NOT NULL DEFAULT 0 CHECK (reconcile_failures_remaining >= 0),
     revision integer NOT NULL DEFAULT 0
 );
 

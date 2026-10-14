@@ -14,7 +14,12 @@ from urllib.parse import parse_qs, unquote, urlsplit
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
-from task_lifecycle import validate_finalization
+from task_lifecycle import (
+    normalize_completion_contract,
+    provider_diagnostic,
+    validate_finalization,
+    validate_trusted_effect_contract,
+)
 
 
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -340,12 +345,23 @@ class Handler(BaseHTTPRequestHandler):
                 goal = body.get("goal")
                 if not isinstance(goal, str) or not goal.strip() or len(goal) > 1000:
                     raise ClientError(400, "goal must contain 1 to 1000 characters")
+                checkpoint = {}
+                if "completion_contract" in body:
+                    supplied = self.headers.get("X-Hades-Orchestrator", "")
+                    if not ORCHESTRATOR_SECRET or not hmac.compare_digest(supplied, ORCHESTRATOR_SECRET):
+                        raise ClientError(403, "trusted completion criteria require orchestrator authorization")
+                    try:
+                        checkpoint["trusted_completion_contract"] = normalize_completion_contract(
+                            body["completion_contract"]
+                        )
+                    except ValueError as exc:
+                        raise ClientError(400, str(exc)) from None
                 with database() as conn, conn.cursor() as cur:
                     cur.execute(
-                        "INSERT INTO tasks (user_id, domain_id, goal, state) "
-                        "VALUES (%s, %s, %s, 'RUNNING') "
+                        "INSERT INTO tasks (user_id, domain_id, goal, state, checkpoint) "
+                        "VALUES (%s, %s, %s, 'RUNNING', %s) "
                         "RETURNING task_id, user_id, domain_id, goal, state, checkpoint, revision, updated_at",
-                        (user_id, domain_id, goal.strip()),
+                        (user_id, domain_id, goal.strip(), Jsonb(checkpoint)),
                     )
                     row = cur.fetchone()
                 return self.send_json(201, row)
@@ -375,29 +391,83 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 with database() as conn, conn.cursor() as cur:
                     cur.execute(
-                        "SELECT state FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s FOR UPDATE",
+                        "SELECT task_id,user_id,domain_id,goal,state,checkpoint,revision "
+                        "FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s FOR UPDATE",
                         (checkpoint_match.group(1), user_id, domain_id),
                     )
                     current = cur.fetchone()
                     if current is None:
                         raise ClientError(404, "task not found")
-                    if current["state"] in {"COMPLETED", "FAILED", "CANCELLED"} and state != current["state"]:
-                        raise ClientError(409, "terminal task state cannot be changed")
+                    if current["state"] in {"COMPLETED", "FAILED", "CANCELLED"}:
+                        if state != current["state"]:
+                            raise ClientError(409, "terminal task state cannot be changed")
+                        # Idempotent repeats cannot rewrite the persisted outcome or response.
+                        return self.send_json(200, current)
                     if current["state"] == "WAITING" and state != "WAITING" and not (orchestrator_resume and orchestrator_authenticated):
                         raise ClientError(409, "waiting task requires an explicit orchestrator resume")
                     if state == "WAITING" and current["state"] != "WAITING" and (finalization is None or not orchestrator_authenticated):
                         raise ClientError(403, "only the orchestrator may place a task in WAITING")
+                    stored_contract = (current.get("checkpoint") or {}).get("trusted_completion_contract")
+                    submitted_contract = checkpoint.get("trusted_completion_contract")
+                    if stored_contract is not None:
+                        if submitted_contract is not None and submitted_contract != stored_contract:
+                            raise ClientError(409, "trusted completion criteria are immutable")
+                        checkpoint["trusted_completion_contract"] = stored_contract
+                    elif submitted_contract is not None:
+                        raise ClientError(403, "trusted completion criteria can only be set at task creation")
                     if state == "COMPLETED":
                         if finalization is None or not orchestrator_authenticated:
                             raise ClientError(403, "task completion must be finalized by the orchestrator")
                         cur.execute(
-                            "SELECT effect_id, effect_kind, state FROM effects WHERE task_id=%s ORDER BY created_at",
+                            "SELECT effect_id,task_id,user_id,domain_id,effect_kind,resource_key,state,request,result "
+                            "FROM effects WHERE task_id=%s ORDER BY created_at",
                             (checkpoint_match.group(1),),
                         )
                         effects = cur.fetchall()
-                        reason = validate_finalization(finalization, checkpoint, effects)
-                        if reason:
-                            raise ClientError(409, reason)
+                        if stored_contract is not None:
+                            response_text = finalization.get("response")
+                            if (not isinstance(response_text, str) or not response_text.strip()
+                                    or finalization.get("provider_error")
+                                    or provider_diagnostic(response_text)):
+                                raise ClientError(409, "a successful final response is required")
+                            if checkpoint.get("pending"):
+                                raise ClientError(409, "pending task steps prevent completion")
+                            approvals = {}
+                            canonical_states = {}
+                            for effect in effects:
+                                approval_id = (effect.get("request") or {}).get("approval_id")
+                                try:
+                                    approval_uuid = uuid.UUID(str(approval_id))
+                                except (ValueError, TypeError, AttributeError):
+                                    continue
+                                cur.execute(
+                                    "SELECT approval_id,task_id,user_id,domain_id,target_id,effect_digest,"
+                                    "created_at,expires_at,consumed_at FROM commitment_approvals WHERE approval_id=%s",
+                                    (approval_uuid,),
+                                )
+                                approval = cur.fetchone()
+                                if approval is not None:
+                                    approvals[str(approval_uuid)] = approval
+                                status, canonical = commitment_request(
+                                    "GET", f"/v1/effects/{effect['effect_id']}"
+                                )
+                                if status == 200:
+                                    canonical_states[str(effect["effect_id"])] = canonical
+                            reason = validate_trusted_effect_contract(
+                                stored_contract, current, effects, approvals, canonical_states,
+                            )
+                            if reason:
+                                raise ClientError(409, reason)
+                            checkpoint["final_response"] = response_text
+                            checkpoint["response_delivery"] = "PERSISTED_PENDING_DELIVERY"
+                            checkpoint["task_finalization"] = {
+                                "reason": "trusted_success_criteria_satisfied",
+                                "contract_kind": stored_contract["kind"],
+                            }
+                        else:
+                            reason = validate_finalization(finalization, checkpoint, effects)
+                            if reason:
+                                raise ClientError(409, reason)
                     cur.execute(
                         "UPDATE tasks SET state=%s, checkpoint=%s, revision=revision+1, updated_at=now() "
                         "WHERE task_id=%s AND user_id=%s AND domain_id=%s "
@@ -569,11 +639,14 @@ class Handler(BaseHTTPRequestHandler):
 
         with database() as conn, conn.cursor() as cur:
             cur.execute(
-                "SELECT task_id FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s",
+                "SELECT task_id,state FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s",
                 (task_uuid, user_id, domain_id),
             )
-            if cur.fetchone() is None:
+            task = cur.fetchone()
+            if task is None:
                 raise ClientError(404, "task not found")
+            if task["state"] != "RUNNING":
+                raise ClientError(409, "commitment operations require an active task")
             cur.execute(
                 "SELECT effect_id, state, request, result FROM effects "
                 "WHERE task_id=%s AND user_id=%s AND domain_id=%s "

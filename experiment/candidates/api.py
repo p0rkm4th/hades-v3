@@ -424,6 +424,9 @@ def transition_task(
             # parked. Clear the stale uncertainty marker only after a fresh
             # task read proves every recorded effect is terminal.
             checkpoint.pop("effect_outcome_uncertain", None)
+    if resume:
+        checkpoint.pop("final_response_pending", None)
+        checkpoint.pop("completion_review_required", None)
     checkpoint.setdefault("summary", "Candidate turn state update")
     checkpoint.setdefault("completed", [])
     checkpoint.setdefault("pending", [])
@@ -472,6 +475,7 @@ def finalize_turn(token: str, task_id: str, result: dict):
         [],
         current.get("effects", []),
         turn_error=result.get("provider_error") or provider_diagnostic(result.get("text", "")),
+        trusted_completion_contract=(current.get("checkpoint") or {}).get("trusted_completion_contract"),
     )
     if state == "RUNNING":
         return current
@@ -492,6 +496,9 @@ def finalize_turn(token: str, task_id: str, result: dict):
             "tool_evidence": [item for item in evidence if item.get("kind") == "tool_evidence"],
             "reason": reason,
         }
+        if (current.get("checkpoint") or {}).get("trusted_completion_contract") is not None:
+            finalization["response"] = result.get("text", "")
+            finalization["provider_error"] = result.get("provider_error")
         return transition_task(
             token, task_id, state, tools, finalization=finalization,
             annotations={**checkpoint, "task_finalization": {"reason": reason}},
@@ -502,7 +509,12 @@ def finalize_turn(token: str, task_id: str, result: dict):
             "tool_evidence": [item for item in evidence if item.get("kind") == "tool_evidence"],
             "reason": reason,
         }
-        annotations = {"approval_pending": True} if reason in {"approval_pending", "approval_required"} else {"effect_outcome_uncertain": True}
+        if reason in {"approval_pending", "approval_required"}:
+            annotations = {"approval_pending": True}
+        elif reason in {"final_response_pending", "completion_review_required"}:
+            annotations = {reason: True}
+        else:
+            annotations = {"effect_outcome_uncertain": True}
         annotations["task_finalization"] = {"reason": reason}
         return transition_task(token, task_id, state, tools, finalization=finalization, annotations=annotations)
     return transition_task(token, task_id, state, tools, error_type=reason)
@@ -609,11 +621,20 @@ class Handler(BaseHTTPRequestHandler):
                     current = gateway_call("task_resume", {}, active_token, active_task_id)
                     if current.get("state") == "RUNNING":
                         approval_pending = any(item.get("approval_pending") for item in turn_evidence)
-                        uncertain = any(
-                            state in {"INTENDED", "DISPATCHED", "QUARANTINED", "UNRESOLVED"}
-                            for state in current.get("effect_states", [])
-                        ) or any(item.get("uncertain") for item in turn_evidence)
-                        if approval_pending:
+                        effect_states = [item.get("state") for item in current.get("effects", [])]
+                        uncertain = any(state in {"INTENDED", "DISPATCHED", "QUARANTINED", "UNRESOLVED"}
+                                        for state in effect_states) or any(
+                                            item.get("uncertain") for item in turn_evidence
+                                        )
+                        if any(item.get("tool") in {"memory_write", "memory_correct"}
+                               for item in turn_evidence):
+                            transition_task(
+                                active_token, active_task_id, "WAITING", tools_used,
+                                finalization={"response_nonempty": False, "tool_evidence": turn_evidence},
+                                annotations={"memory_effect_evidence_unproven": True,
+                                             "task_finalization": {"reason": "memory_effect_evidence_unproven"}},
+                            )
+                        elif approval_pending:
                             transition_task(
                                 active_token, active_task_id, "WAITING", tools_used,
                                 finalization={"response_nonempty": False, "tool_evidence": turn_evidence},
@@ -624,6 +645,13 @@ class Handler(BaseHTTPRequestHandler):
                                 active_token, active_task_id, "WAITING", tools_used,
                                 finalization={"response_nonempty": False, "tool_evidence": []},
                                 annotations={"effect_outcome_uncertain": True, "task_finalization": {"reason": "effect_outcome_uncertain_after_error"}},
+                            )
+                        elif effect_states and all(state == "CONFIRMED" for state in effect_states):
+                            transition_task(
+                                active_token, active_task_id, "WAITING", tools_used,
+                                finalization={"response_nonempty": False, "tool_evidence": turn_evidence},
+                                annotations={"final_response_pending": True,
+                                             "task_finalization": {"reason": "final_response_pending"}},
                             )
                         else:
                             transition_task(active_token, active_task_id, "FAILED", tools_used, type(exc).__name__)

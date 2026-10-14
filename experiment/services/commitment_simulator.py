@@ -138,7 +138,7 @@ class Simulator(BaseHTTPRequestHandler):
             return self.send_json(400, {"error": "invalid effect id"})
         with database() as conn, conn.cursor() as cur:
             cur.execute(
-                "SELECT target_id, behavior, accepted_effect_id, receive_count "
+                "SELECT target_id, behavior, accepted_effect_id, receive_count, reconcile_failures_remaining "
                 "FROM commitment_targets WHERE accepted_effect_id=%s",
                 (effect_id,),
             )
@@ -151,6 +151,14 @@ class Simulator(BaseHTTPRequestHandler):
         if effect is None:
             return self.send_json(404, {"error": "effect not found"})
         target_id = effect["resource_key"].removeprefix("commitment:")
+        if accepted and accepted["reconcile_failures_remaining"] > 0:
+            with database() as conn, conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE commitment_targets SET reconcile_failures_remaining=reconcile_failures_remaining-1 "
+                    "WHERE target_id=%s AND reconcile_failures_remaining > 0",
+                    (target_id,),
+                )
+            return self.send_json(503, {"error": "injected reconciliation response interruption"})
         return self.send_json(200, {
             "effect_id": str(effect_id),
             "target_id": target_id,
