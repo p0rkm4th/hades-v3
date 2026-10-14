@@ -26,6 +26,7 @@ This is a conservative stopgap for the stateless A/B/C API. It intentionally sac
 - A missing effect snapshot is parked fail-closed.
 - Pydantic A retains `max_retries=0`, and A/C workspace dispatch still binds to the persisted call identity.
 - A route-level `/api/turn` request with a confirmed workspace effect returns HTTP 409, requests the `WAITING` transition, and makes no candidate model call. The route test stubs gateway persistence; existing database-backed gateway CI separately exercises task/effect transitions.
+- The transition request carries the orchestrator finalization marker required by the gateway's `RUNNING` to `WAITING` authorization rule. This adapter test stubs the gateway call; it verifies the request contract, while the database-backed gateway suite covers orchestrator-only waiting transitions separately.
 - A settled confirmed effect clears only the task's stale `effect_outcome_uncertain` annotation while parking; an incomplete/missing effect snapshot does not clear it.
 
 The regression passed in the cached pinned candidate image with current source mounted read-only, `--network none`, no capabilities, and no fixture service. It sent no model/provider request. The earlier CP85 and CP81 outcomes are unchanged. The full exact-SHA CI run is pending.

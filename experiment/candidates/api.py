@@ -545,6 +545,7 @@ def workspace_resume_guard(token: str, task_id: str, current: dict) -> dict | No
             "WAITING",
             [],
             error_type=reason,
+            finalization={"reason": reason},
             annotations=annotations,
         )
     return {
