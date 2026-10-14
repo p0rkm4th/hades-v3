@@ -31,7 +31,7 @@ jobs:
           python -m py_compile experiment/services/ollama_protocol.py
           python -m py_compile experiment/scripts/gpu_trial_firewall.py experiment/scripts/seed_cp67_trial_budget.py experiment/tests/test_gpu_trial_firewall.py experiment/tests/test_seed_trial_budget.py
           python -m py_compile experiment/scripts/hypnos_gpu_preflight.py experiment/tests/test_hypnos_gpu_preflight.py
-          python -m py_compile experiment/tests/scripted_ollama.py experiment/tests/run_cp68_e2e.py experiment/tests/test_ollama_protocol.py experiment/tests/compose_scope.py experiment/tests/test_compose_scope.py experiment/tests/run_family2_eggs_oats_screen.py experiment/tests/run_family3_cp64_unavailable.py experiment/tests/run_family4_cp60_screen.py experiment/tests/run_family5_workspace_screen.py experiment/tests/run_family6_restart.py experiment/tests/run_family7_denial_screen.py experiment/tests/run_family8_ack_loss_pilot.py
+          python -m py_compile experiment/tests/scripted_ollama.py experiment/tests/run_cp68_e2e.py experiment/tests/test_cp88_workspace_resume_integration.py experiment/tests/test_ollama_protocol.py experiment/tests/compose_scope.py experiment/tests/test_compose_scope.py experiment/tests/run_family2_eggs_oats_screen.py experiment/tests/run_family3_cp64_unavailable.py experiment/tests/run_family4_cp60_screen.py experiment/tests/run_family5_workspace_screen.py experiment/tests/run_family6_restart.py experiment/tests/run_family7_denial_screen.py experiment/tests/run_family8_ack_loss_pilot.py
           python -m json.tool experiment/contracts/tools.json >/dev/null
 
       - name: Run isolated DBOS process-recovery contract probe
@@ -198,6 +198,7 @@ jobs:
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --pids-limit 64 --memory 1g --tmpfs /tmp:rw,noexec,nosuid,size=64m \
             "${COMPOSE_PROJECT_NAME}-cp69offline-cp68-candidate-api" python /app/candidates/test_workspace_identity.py
+          docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml run --build --rm --no-deps --entrypoint python cp68-e2e-runner /app/tests/test_cp88_workspace_resume_integration.py
           docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml run --build --rm cp68-e2e-runner --output /tmp/cp69_offline_e2e.jsonl
 
       - name: Remove isolated CP69 fixtures and volumes
