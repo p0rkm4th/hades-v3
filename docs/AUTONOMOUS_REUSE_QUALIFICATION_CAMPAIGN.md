@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP83 evidence review and lifecycle integration gap analysis; DBOSDurability recovered confirmed A2 Shell effects 3/3 and quarantined unknown outcomes without replay, but did not finalize the HADES task or deliver an answer
+**Current workstream:** CP84 Pydantic AI + DBOS candidate-finalizer integration passed 3/3 deterministic crash/recovery trials; uncertain shell outcomes remain quarantined and live-model performance is untested
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -11,8 +11,8 @@
 |---|---|---|---|
 | 1 | Baseline, component inventory, reuse-first technology assessment | Research synthesis complete; A2/DBOS integration evidence pending | Frozen requirements mapped to current code and official upstream options; facts separated from hypotheses |
 | 2 | CP75/CP81 correction diagnosis, safe CAS interface, and trusted bounded completion | Contract complete; A/C campaign completed with mixed results | Scalar passed 3/3 per candidate; structured no-tool 0/3; list mutations 3/3 with answer 2/3; fresh list recall 0/3. See report and JSONL. |
-| 3 | Upstream Pydantic AI Harness proof of concept | Shell-only exact-call recovery passes; DBOSDurability + HADES workspace confirmed-result recovery passes 3/3; isolated adapter identity regression passes | Candidate API and trusted task finalization are not integrated with DBOS; compare actual recovery and operations footprint |
-| 4 | Durable-engine integration spike | DBOSDurability composes with HADES gateway for confirmed-result replay and quarantines uncertain results | No adoption until task/API integration, unresolved outcomes, and net maintenance burden are measured |
+| 3 | Upstream Pydantic AI Harness proof of concept | Shell-only exact-call recovery passes; CP83 DBOS/Harness confirmed-result recovery 3/3; CP84 shared-tool/finalizer composition 3/3 | Candidate HTTP Handler and Harness Shell are not combined with DBOS in one run; no live-model score |
+| 4 | Durable-engine integration spike | CP84 crossed process death after confirmed effect and before finalization, then completed through HADES finalizer 3/3 | Unknown outcomes, container/host restart, history privacy, cancellation/retry, and net maintenance burden remain |
 | 5 | Compound work, general-purpose agency, recovery, protected actions | Planned | Held-out matched trials and independent final-state/security verification |
 | 6 | Deletion-oriented simplification and ADR-010 evidence review | Planned | Replacement parity, reduced maintenance surface, decision-readiness table |
 
@@ -39,8 +39,8 @@ Research and bounded disposable integrations continue without live GPU access. S
 ## Current next steps
 
 1. Preserve CP81's mixed A/C outcomes. Do not rerun scored memory trials until a separately owned CPU model endpoint and fixture are available; prioritize candidates that can be executed without touching CP75/CP80.
-2. Keep CP83's guarantee bounded: same confirmed effect is replayed, unknown outcomes quarantine and block; neither DBOS nor a stable command ID proves exactly-once arbitrary shell effects. The A2 gateway binds task/tool-call identity and request digest; its isolated adapter identity regression now passes.
-3. Decide whether a bounded DBOS-to-candidate-API integration can reuse the existing task/effect ledger and trusted finalizer without introducing a second authority. Compare custom code and runtime state against StepPersistence before adopting.
+2. Keep CP83/84 guarantees bounded: same confirmed effect is replayed, unknown outcomes quarantine and block; neither DBOS nor a stable command ID proves exactly-once arbitrary shell effects. CP84 reuses HADES `gateway_call` and `finalize_turn` but does not run the candidate HTTP Handler or Harness Shell.
+3. Compare the minimum CP84 DBOS integration against A2 StepPersistence for uncertain outcomes, delivery recovery, history privacy, cancellation/retry bounds, and operations burden before adoption.
 4. Advance offline compound-operation and protected-action contracts with independent postconditions, then refresh Cinder's v2 evidence only from an agreed read-only snapshot.
 5. Keep CP71 `BLOCKED_EXTERNAL_DEPENDENCY`; no Hypnos, privileged firewall, HADES v2, frozen-document, or production work. CP75/CP80 remain untouched.
 

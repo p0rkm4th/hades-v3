@@ -1,0 +1,24 @@
+services:
+  cp84-dbos-finalization-runner:
+    build:
+      context: .
+      dockerfile: spikes/cp84_dbos_candidate_finalization/Dockerfile
+    command: ["python", "/app/test_dbos_candidate_finalization.py"]
+    environment:
+      GATEWAY_URL: http://tool-gateway:8080
+      HADES_USER_TOKEN: fixture-token-amber
+      ORCHESTRATOR_SECRET: ${ORCHESTRATOR_SECRET:?set ORCHESTRATOR_SECRET in the ignored local .env file}
+      CP84_STATE_DIR: /tmp/cp84
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    networks: [operator]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=256m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    mem_limit: 1g
+    cpus: 1.0
+    restart: "no"
+    profiles: [cp84-dbos-finalization]
