@@ -27,7 +27,7 @@
 - Current A uses pinned `pydantic-ai-slim[openai]==2.55.0`; a current upstream Harness option is being assessed under a distinct revision and will not replace scored A silently.
 - Current B is a reduced Hermes profile pinned to upstream commit `e4d86423856350825a3a0dc4f52aed89759e11bd`; context-compliant deterministic-peer results remain contract evidence, not model-equivalent CPU scoring.
 - C remains the lean comparison baseline. It is not presumed to be the preferred production foundation.
-- HADES-infra's local checkout has owner changes and no confirmed canonical remote/branch policy. Drafts remain untouched and uncommitted. Cinder's v2 runtime status is not established by a public source revision alone.
+- HADES-infra's local checkout has owner changes and no confirmed canonical remote/branch policy. Drafts remain untouched and uncommitted. Read-only v2 check on 2026-10-14 found public `main` at `eccaf8a4eec9802341cc31261496b98fe50856be` with two passing associated regression CI jobs; v2 runtime and owner-acceptance status remain unverified. Cinder's protected handoff has not yet supplied a current runtime snapshot.
 - No Hypnos generation, firewall privilege, production service, or HADES v2 change is authorized by this campaign.
 
 ## Evidence categories
