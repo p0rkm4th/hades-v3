@@ -19,6 +19,7 @@ from task_lifecycle import (
     provider_diagnostic,
     validate_finalization,
     validate_trusted_effect_contract,
+    validate_trusted_memory_contract,
 )
 from memory_schema import ensure_memory_revision
 
@@ -546,6 +547,37 @@ class Handler(BaseHTTPRequestHandler):
                                     canonical_states[str(effect["effect_id"])] = canonical
                             reason = validate_trusted_effect_contract(
                                 stored_contract, current, effects, approvals, canonical_states,
+                            )
+                            if reason:
+                                raise ClientError(409, reason)
+                            checkpoint["final_response"] = response_text
+                            checkpoint["response_delivery"] = "PERSISTED_PENDING_DELIVERY"
+                            checkpoint["task_finalization"] = {
+                                "reason": "trusted_success_criteria_satisfied",
+                                "contract_kind": stored_contract["kind"],
+                            }
+                        elif stored_contract.get("kind") == "memory_correction":
+                            if (not isinstance(response_text, str) or not response_text.strip()
+                                    or finalization.get("provider_error")
+                                    or provider_diagnostic(response_text)):
+                                raise ClientError(409, "a successful final response is required")
+                            if checkpoint.get("pending"):
+                                raise ClientError(409, "pending task steps prevent completion")
+                            canonical_memory = {}
+                            for effect in effects:
+                                memory_key = (effect.get("request") or {}).get("memory_key")
+                                if effect.get("effect_kind") != "MEMORY_MUTATION" or not isinstance(memory_key, str):
+                                    continue
+                                cur.execute(
+                                    "SELECT memory_key,value,revision FROM scoped_memory "
+                                    "WHERE user_id=%s AND domain_id=%s AND memory_key=%s",
+                                    (current["user_id"], current["domain_id"], memory_key),
+                                )
+                                canonical = cur.fetchone()
+                                if canonical is not None:
+                                    canonical_memory[str(effect["effect_id"])] = canonical
+                            reason = validate_trusted_memory_contract(
+                                stored_contract, current, effects, canonical_memory,
                             )
                             if reason:
                                 raise ClientError(409, reason)

@@ -9,10 +9,49 @@ from contracts.task_lifecycle import (
     normalize_completion_contract,
     validate_finalization,
     validate_trusted_effect_contract,
+    validate_trusted_memory_contract,
 )
 
 
 class TaskLifecycleContract(unittest.TestCase):
+    def test_trusted_memory_correction_contract_requires_exact_cas_identity_and_canonical_state(self):
+        contract = normalize_completion_contract({
+            "version": 1, "kind": "memory_correction", "required": [{
+                "effect_kind": "MEMORY_MUTATION", "memory_key": "answer_style",
+                "expected_revision": 3, "value": {"style": "short bullets"},
+            }],
+        })
+        task = {"task_id": "task-a", "user_id": "user-a", "domain_id": "domain-a"}
+        effect = {
+            "effect_id": "memory-effect-1", "task_id": "task-a", "user_id": "user-a",
+            "domain_id": "domain-a", "effect_kind": "MEMORY_MUTATION",
+            "resource_key": "memory:answer_style", "state": "CONFIRMED",
+            "request": {"operation": "memory_correct", "memory_key": "answer_style",
+                        "expected_revision": 3, "value": {"style": "short bullets"}},
+            "result": {"memory_key": "answer_style", "value": {"style": "short bullets"}, "revision": 4},
+        }
+        canonical = {"memory-effect-1": {"memory_key": "answer_style",
+                                           "value": {"style": "short bullets"}, "revision": 4}}
+        self.assertIsNone(validate_trusted_memory_contract(contract, task, [effect], canonical))
+        self.assertIsNotNone(validate_trusted_memory_contract(contract, task, [], canonical))
+        self.assertIsNotNone(validate_trusted_memory_contract(contract, task, [effect, effect], canonical))
+        self.assertIsNotNone(validate_trusted_memory_contract(
+            contract, task, [{**effect, "user_id": "user-b"}], canonical))
+        self.assertIsNotNone(validate_trusted_memory_contract(
+            contract, task, [effect], {"memory-effect-1": {**canonical["memory-effect-1"], "revision": 5}}))
+        self.assertIsNotNone(validate_trusted_memory_contract(
+            contract, task, [{**effect, "request": {**effect["request"], "expected_revision": 2}}], canonical))
+
+    def test_memory_completion_contract_rejects_multiple_or_untyped_requirements(self):
+        item = {"effect_kind": "MEMORY_MUTATION", "memory_key": "x",
+                "expected_revision": 1, "value": "new"}
+        with self.assertRaises(ValueError):
+            normalize_completion_contract({"version": 1, "kind": "memory_correction",
+                                           "required": [item, item]})
+        with self.assertRaises(ValueError):
+            normalize_completion_contract({"version": 1, "kind": "memory_correction",
+                                           "required": [{**item, "expected_revision": 0}]})
+
     def test_read_only_response_completes_from_verified_read_without_model_claim(self):
         evidence = [{"tool": "infrastructure_read", "status": "ok"}]
         self.assertEqual(decide_turn_finalization("RUNNING", "Health is unknown.", evidence, None),

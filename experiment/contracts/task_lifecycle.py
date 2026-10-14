@@ -37,15 +37,33 @@ def commitment_digest(target_id, details):
 
 
 def normalize_completion_contract(contract):
-    """Accept only the small, typed external-commitment criterion in CP73."""
+    """Normalize the bounded, orchestrator-authored completion criteria."""
     if not isinstance(contract, dict) or set(contract) != {"version", "kind", "required"}:
         raise ValueError("completion contract must contain version, kind, and required")
-    if contract["version"] != 1 or contract["kind"] != "external_commitment_set":
+    if contract["version"] != 1 or contract["kind"] not in {
+        "external_commitment_set", "memory_correction",
+    }:
         raise ValueError("unsupported trusted completion contract")
     required = contract["required"]
     if not isinstance(required, list) or not 1 <= len(required) <= 16:
         raise ValueError("completion contract requires 1 to 16 exact effects")
     normalized = []
+    if contract["kind"] == "memory_correction":
+        if len(required) != 1:
+            raise ValueError("memory correction contract requires exactly one correction")
+        item = required[0]
+        if (not isinstance(item, dict)
+                or set(item) != {"effect_kind", "memory_key", "expected_revision", "value"}
+                or item["effect_kind"] != "MEMORY_MUTATION"
+                or not isinstance(item["memory_key"], str)
+                or not 1 <= len(item["memory_key"]) <= 200
+                or type(item["expected_revision"]) is not int
+                or item["expected_revision"] < 1):
+            raise ValueError("memory correction must identify one key, revision, and replacement value")
+        return {"version": 1, "kind": "memory_correction", "required": [{
+            "effect_kind": "MEMORY_MUTATION", "memory_key": item["memory_key"],
+            "expected_revision": item["expected_revision"], "value": item["value"],
+        }]}
     targets = set()
     for item in required:
         if not isinstance(item, dict) or set(item) != {"effect_kind", "target_id", "details"}:
@@ -63,6 +81,52 @@ def normalize_completion_contract(contract):
             "details": details, "effect_digest": commitment_digest(target_id, details),
         })
     return {"version": 1, "kind": "external_commitment_set", "required": normalized}
+
+
+def validate_trusted_memory_contract(contract, task_identity, effects, canonical_memory):
+    """Verify one explicitly specified CAS correction from durable gateway state."""
+    try:
+        normalized = normalize_completion_contract({
+            "version": contract.get("version"), "kind": contract.get("kind"),
+            "required": contract.get("required", []),
+        })
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return "trusted memory completion contract is malformed"
+    if normalized != contract:
+        return "trusted memory completion criteria changed"
+    if not isinstance(task_identity, dict) or not task_identity.get("task_id"):
+        return "task identity is unavailable"
+    required = normalized["required"][0]
+    if not isinstance(effects, list) or len(effects) != 1:
+        return "persisted effects do not exactly match the required correction"
+    effect = effects[0]
+    request = effect.get("request") or {}
+    result = effect.get("result") or {}
+    effect_id = str(effect.get("effect_id", ""))
+    canonical = (canonical_memory or {}).get(effect_id)
+    if (not effect_id
+            or str(effect.get("task_id")) != str(task_identity.get("task_id"))
+            or effect.get("user_id") != task_identity.get("user_id")
+            or effect.get("domain_id") != task_identity.get("domain_id")
+            or effect.get("effect_kind") != "MEMORY_MUTATION"
+            or effect.get("resource_key") != f"memory:{required['memory_key']}"
+            or effect.get("state") != "CONFIRMED"
+            or request.get("operation") != "memory_correct"
+            or request.get("memory_key") != required["memory_key"]
+            or type(request.get("expected_revision")) is not int
+            or request.get("expected_revision") != required["expected_revision"]
+            or request.get("value") != required["value"]
+            or result.get("memory_key") != required["memory_key"]
+            or result.get("value") != required["value"]
+            or type(result.get("revision")) is not int
+            or result["revision"] != required["expected_revision"] + 1
+            or not isinstance(canonical, dict)
+            or canonical.get("memory_key") != required["memory_key"]
+            or canonical.get("value") != required["value"]
+            or type(canonical.get("revision")) is not int
+            or canonical["revision"] != result["revision"]):
+        return "persisted memory effect lacks matching task-linked canonical verification"
+    return None
 
 
 def validate_trusted_effect_contract(contract, task_identity, effects, approvals, canonical_states):
@@ -187,20 +251,20 @@ def decide_turn_finalization(current_state, response, evidence, claim, effect_st
     effects = [item for item in effect_states]
     if effect_records:
         effects = [item.get("state") for item in effect_records]
-    if not writes and not effects and _verified_reads(evidence):
+    if (trusted_completion_contract is None and not writes and not effects
+            and _verified_reads(evidence)):
         return "COMPLETED", "successful_read_response"
-    if not writes and not effects:
+    if not writes and not effects and trusted_completion_contract is None:
         return "FAILED", "completion_without_verified_outcome"
     if trusted_completion_contract is not None:
         try:
-            contract = normalize_completion_contract({
-                "version": trusted_completion_contract.get("version"),
-                "kind": trusted_completion_contract.get("kind"),
-                "required": [
+            to_normalize = dict(trusted_completion_contract)
+            if to_normalize.get("kind") == "external_commitment_set":
+                to_normalize["required"] = [
                     {key: item[key] for key in ("effect_kind", "target_id", "details")}
-                    for item in trusted_completion_contract.get("required", [])
-                ],
-            })
+                    for item in to_normalize.get("required", [])
+                ]
+            contract = normalize_completion_contract(to_normalize)
         except (AttributeError, KeyError, TypeError, ValueError):
             return "WAITING", "completion_review_required"
         if (contract != trusted_completion_contract or len(contract["required"]) != len(effects)

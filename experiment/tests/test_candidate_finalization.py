@@ -179,6 +179,72 @@ class CandidateFinalization(unittest.TestCase):
         self.assertEqual(proof["response"], result["text"])
         self.assertEqual(proof["reason"], "trusted_success_criteria_satisfied")
 
+    def test_trusted_memory_correction_completes_from_durable_effect_without_model_checkpoint(self):
+        contract = {
+            "version": 1, "kind": "memory_correction", "required": [{
+                "effect_kind": "MEMORY_MUTATION", "memory_key": "weekly_format",
+                "expected_revision": 2, "value": {"format": "short bullets"},
+            }],
+        }
+        effect = {"effect_id": "memory-fx", "effect_kind": "MEMORY_MUTATION", "state": "CONFIRMED"}
+        result = {"text": "Your weekly summary preference is now short bullets.",
+                  "tool_calls": ["memory_search", "memory_correct"], "tool_evidence": []}
+        final, writes = self.run_finalizer({
+            "task_id": "task-1", "state": "RUNNING",
+            "checkpoint": {"trusted_completion_contract": contract}, "effects": [effect],
+        }, result)
+        self.assertEqual(final["state"], "COMPLETED")
+        proof = writes[0]["_orchestrator_finalization"]
+        self.assertFalse(proof["completion_claim"])
+        self.assertEqual(proof["response"], result["text"])
+        self.assertEqual(proof["reason"], "trusted_success_criteria_satisfied")
+
+    def test_trusted_memory_contract_cannot_complete_without_persisted_mutation(self):
+        contract = {"version": 1, "kind": "memory_correction", "required": [{
+            "effect_kind": "MEMORY_MUTATION", "memory_key": "weekly_format",
+            "expected_revision": 2, "value": {"format": "short bullets"},
+        }]}
+        final, writes = self.run_finalizer({
+            "task_id": "task-1", "state": "RUNNING",
+            "checkpoint": {"trusted_completion_contract": contract}, "effects": [],
+        }, {"text": "I changed the preference.", "tool_calls": [], "tool_evidence": [
+            {"kind": "completion_claim", "checkpoint": {
+                "summary": "Preference updated", "completed": ["correction"], "pending": [],
+            }},
+        ]})
+        self.assertEqual(final["state"], "WAITING")
+        self.assertEqual(writes[0]["_orchestrator_finalization"]["reason"], "completion_review_required")
+
+    def test_trusted_memory_contract_does_not_fall_back_to_read_only_completion(self):
+        contract = {"version": 1, "kind": "memory_correction", "required": [{
+            "effect_kind": "MEMORY_MUTATION", "memory_key": "weekly_format",
+            "expected_revision": 2, "value": {"format": "short bullets"},
+        }]}
+        final, writes = self.run_finalizer({
+            "task_id": "task-1", "state": "RUNNING",
+            "checkpoint": {"trusted_completion_contract": contract}, "effects": [],
+        }, {"text": "I found the saved preference; it is updated.",
+            "tool_calls": ["memory_search"], "tool_evidence": [
+                {"kind": "tool_evidence", "tool": "memory_search", "status": "ok"},
+            ]})
+        self.assertEqual(final["state"], "WAITING")
+        self.assertEqual(writes[0]["_orchestrator_finalization"]["reason"], "completion_review_required")
+
+    def test_trusted_memory_contract_does_not_hide_failed_final_generation(self):
+        contract = {"version": 1, "kind": "memory_correction", "required": [{
+            "effect_kind": "MEMORY_MUTATION", "memory_key": "weekly_format",
+            "expected_revision": 2, "value": {"format": "short bullets"},
+        }]}
+        final, writes = self.run_finalizer({
+            "task_id": "task-1", "state": "RUNNING",
+            "checkpoint": {"trusted_completion_contract": contract},
+            "effects": [{"effect_id": "memory-fx", "effect_kind": "MEMORY_MUTATION",
+                         "state": "CONFIRMED"}],
+        }, {"text": "", "provider_error": "upstream_timeout",
+            "tool_calls": ["memory_correct"], "tool_evidence": []})
+        self.assertEqual(final["state"], "WAITING")
+        self.assertTrue(writes[0]["checkpoint"]["final_response_pending"])
+
     def test_provider_failure_after_confirmed_effect_waits_for_response_recovery(self):
         result = {"text": "", "provider_error": "upstream_http_400",
                   "tool_calls": ["commitment_submit"], "tool_evidence": []}
