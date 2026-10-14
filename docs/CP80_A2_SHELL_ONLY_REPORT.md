@@ -33,3 +33,5 @@ This does **not** establish live-model behavior, general repository-agent qualit
 ## Reproducibility and cleanup
 
 The exact A2 package lock and gateway adapter are under `experiment/spikes/a2_gateway_workspace/`. CI repeats three matched pairs with disposable workspace reset between runs and removes only its unique Compose project. Local CP80 used a uniquely named isolated Compose project; the fixture stack is left available for the designated cleanup lead to review. Tern performed no artifact deletion. No shared project, HADES v2 service, production infrastructure, GPU route, or firewall was changed.
+
+Exact-SHA CI run [38514751305](https://github.com/p0rkm4th/hades-v3/actions/runs/38514751305) passed for `347839d0facfdabd7477397df4db98d70b6c1d1f`. It ran all six matched A2 profiles with workspace reset, then repeated CP79 and strict CP69 offline checks and cleaned its own disposable projects.
