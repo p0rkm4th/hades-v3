@@ -5,6 +5,8 @@ import unittest
 import urllib.error
 import urllib.request
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 import psycopg
 from memory_diagnostics import correction_diagnostic_class, json_shape
 from memory_schema import ensure_memory_revision
@@ -46,6 +48,65 @@ def seed_memory_fixture(token, key, value):
 
 
 class GatewayIntegration(unittest.TestCase):
+    def test_concurrent_exact_workspace_retry_dispatches_once(self):
+        status, task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Run one synthetic workspace marker operation once",
+        })
+        self.assertEqual(status, 201, task)
+        task_id = task["task_id"]
+        operation_id = hashlib.sha256(f"{task_id}:concurrent-call".encode()).hexdigest()
+        marker = f".concurrent-operation-{task_id}.txt"
+        command = (
+            "python -c \"import time; from pathlib import Path; time.sleep(0.5); "
+            f"p=Path('{marker}'); p.write_text((p.read_text() if p.exists() else '') + 'x')\""
+        )
+        body = {"task_id": task_id, "command": command, "operation_id": operation_id}
+        barrier = Barrier(2)
+
+        def invoke():
+            barrier.wait(timeout=3)
+            return call("POST", "/v1/workspace/exec", AMBER, body)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first, second = list(pool.map(lambda _: invoke(), range(2)))
+
+        # One request dispatches; the duplicate either sees the in-flight
+        # effect and quarantines it or observes its confirmed replay.
+        self.assertIn(first[0], {200, 202}, first)
+        self.assertIn(second[0], {200, 202}, second)
+        originals = [
+            payload for status, payload in (first, second)
+            if status == 200 and not payload.get("already_recorded", False)
+        ]
+        self.assertEqual(len(originals), 1, (first, second))
+        successful = originals[0]
+        self.assertEqual(successful["state"], "CONFIRMED", successful)
+        other = second[1] if first[1] is successful else first[1]
+        self.assertEqual(other["effect_id"], successful["effect_id"])
+        if other.get("already_recorded"):
+            self.assertEqual(other["state"], "CONFIRMED", other)
+        else:
+            self.assertEqual(other["state"], "QUARANTINED", other)
+
+        status, observed = call("POST", "/v1/workspace/exec", AMBER, {
+            "task_id": task_id,
+            "command": f"cat '{marker}'",
+            "operation_id": hashlib.sha256(f"{task_id}:verify-marker".encode()).hexdigest(),
+        })
+        self.assertEqual(status, 200, observed)
+        self.assertEqual(observed["stdout"].strip(), "x")
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT effect_id,state,request->>'operation_id' FROM effects "
+                "WHERE task_id=%s AND effect_kind='WORKSPACE_COMMAND' "
+                "AND request->>'operation_id'=%s",
+                (task_id, operation_id),
+            )
+            rows = cur.fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((str(rows[0][0]), rows[0][1], rows[0][2]),
+                         (successful["effect_id"], "CONFIRMED", operation_id))
+
     def test_workspace_gateway_blocks_new_operations_for_waiting_tasks(self):
         status, task = call("POST", "/v1/tasks", AMBER, {
             "goal": "Park workspace execution for operator review",
