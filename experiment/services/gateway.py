@@ -516,8 +516,9 @@ class Handler(BaseHTTPRequestHandler):
                             (checkpoint_match.group(1),),
                         )
                         effects = cur.fetchall()
-                        if stored_contract is not None:
-                            response_text = finalization.get("response")
+                        response_text = finalization.get("response")
+                        if (stored_contract is not None
+                                and stored_contract.get("kind") == "external_commitment_set"):
                             if (not isinstance(response_text, str) or not response_text.strip()
                                     or finalization.get("provider_error")
                                     or provider_diagnostic(response_text)):
@@ -556,7 +557,8 @@ class Handler(BaseHTTPRequestHandler):
                                 "reason": "trusted_success_criteria_satisfied",
                                 "contract_kind": stored_contract["kind"],
                             }
-                        elif stored_contract.get("kind") == "memory_correction":
+                        elif (stored_contract is not None
+                                and stored_contract.get("kind") == "memory_correction"):
                             if (not isinstance(response_text, str) or not response_text.strip()
                                     or finalization.get("provider_error")
                                     or provider_diagnostic(response_text)):
