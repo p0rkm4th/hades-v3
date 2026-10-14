@@ -54,6 +54,71 @@ def json_default(value):
     raise TypeError(f"unsupported JSON value: {type(value).__name__}")
 
 
+def require_active_memory_task(cur, user_id: str, domain_id: str, body: dict):
+    """Lock the caller's task so concurrent memory retries serialize on its ledger row."""
+    task_id = body.get("task_id")
+    if task_id is None:
+        return None
+    try:
+        task_uuid = uuid.UUID(str(task_id))
+    except (ValueError, TypeError, AttributeError):
+        raise ClientError(400, "task_id must be a UUID") from None
+    cur.execute(
+        "SELECT task_id,state FROM tasks WHERE task_id=%s AND user_id=%s AND domain_id=%s FOR UPDATE",
+        (task_uuid, user_id, domain_id),
+    )
+    task = cur.fetchone()
+    if task is None:
+        raise ClientError(404, "task not found")
+    if task["state"] != "RUNNING":
+        raise ClientError(409, "memory operations require an active task")
+    return task_uuid
+
+
+def existing_memory_effect(cur, task_id, user_id: str, domain_id: str,
+                           resource_key: str, request: dict):
+    if task_id is None:
+        return None
+    cur.execute(
+        "SELECT effect_id,state,request,result FROM effects "
+        "WHERE task_id=%s AND user_id=%s AND domain_id=%s "
+        "AND effect_kind='MEMORY_MUTATION' AND resource_key=%s "
+        "ORDER BY created_at DESC LIMIT 1",
+        (task_id, user_id, domain_id, resource_key),
+    )
+    prior = cur.fetchone()
+    if prior is None:
+        return None
+    if prior["request"] != request:
+        raise ClientError(409, "this task already recorded a different memory mutation for that key")
+    if prior["state"] != "CONFIRMED":
+        raise ClientError(409, "the task's prior memory mutation is not confirmed")
+    result = dict(prior["result"] or {})
+    result.update({"task_id": str(task_id), "effect_id": str(prior["effect_id"]),
+                   "state": "CONFIRMED", "already_recorded": True})
+    return result
+
+
+def prior_memory_correction(cur, task_id, user_id: str, domain_id: str,
+                            query: str, expected_value):
+    if task_id is None:
+        return None
+    cur.execute(
+        "SELECT effect_id,state,request,result FROM effects "
+        "WHERE task_id=%s AND user_id=%s AND domain_id=%s "
+        "AND effect_kind='MEMORY_MUTATION' AND request->>'operation'='memory_correct' "
+        "AND request->>'query'=%s AND request->'expected_value'=%s "
+        "ORDER BY created_at DESC LIMIT 1",
+        (task_id, user_id, domain_id, query, Jsonb(expected_value)),
+    )
+    prior = cur.fetchone()
+    if prior is None:
+        return None
+    if prior["state"] != "CONFIRMED":
+        raise ClientError(409, "the task's prior memory correction is not confirmed")
+    return prior
+
+
 def grocy_request(method: str, path: str, body: dict | None = None):
     key = open(GROCY_API_KEY_FILE, encoding="utf-8").read().strip()
     data = None if body is None else json.dumps(body).encode()
@@ -284,6 +349,17 @@ class Handler(BaseHTTPRequestHandler):
                 tsquery = " | ".join(terms)
                 document = "to_tsvector('simple', memory_key || ' ' || value::text)"
                 with database() as conn, conn.cursor() as cur:
+                    task_id = require_active_memory_task(cur, user_id, domain_id, body)
+                    prior = prior_memory_correction(
+                        cur, task_id, user_id, domain_id, query.strip(), body["expected_value"],
+                    )
+                    if prior is not None:
+                        if prior["request"].get("value") != body["value"]:
+                            raise ClientError(409, "this task already recorded a different memory correction")
+                        result = dict(prior["result"] or {})
+                        result.update({"task_id": str(task_id), "effect_id": str(prior["effect_id"]),
+                                       "state": "CONFIRMED", "already_recorded": True})
+                        return self.send_json(200, result)
                     cur.execute(
                         f"SELECT memory_key FROM scoped_memory "
                         f"WHERE user_id = %s AND domain_id = %s "
@@ -296,19 +372,47 @@ class Handler(BaseHTTPRequestHandler):
                         raise ClientError(404, "no existing memory matches this query and expected value")
                     if len(matches) != 1:
                         raise ClientError(409, "memory correction is ambiguous; no value changed")
+                    memory_key = matches[0]["memory_key"]
+                    request_value = {
+                        "operation": "memory_correct", "memory_key": memory_key,
+                        "query": query.strip(), "expected_value": body["expected_value"],
+                        "value": body["value"],
+                    }
+                    prior = existing_memory_effect(
+                        cur, task_id, user_id, domain_id, f"memory:{memory_key}", request_value,
+                    )
+                    if prior is not None:
+                        return self.send_json(200, prior)
+                    effect_id = None
+                    if task_id is not None:
+                        cur.execute(
+                            "INSERT INTO effects "
+                            "(task_id,user_id,domain_id,effect_kind,resource_key,state,request) "
+                            "VALUES (%s,%s,%s,'MEMORY_MUTATION',%s,'INTENDED',%s) RETURNING effect_id",
+                            (task_id, user_id, domain_id, f"memory:{memory_key}", Jsonb(request_value)),
+                        )
+                        effect_id = cur.fetchone()["effect_id"]
                     cur.execute(
                         "UPDATE scoped_memory SET value = %s, updated_at = now() "
                         "WHERE user_id = %s AND domain_id = %s AND memory_key = %s AND value = %s "
                         "RETURNING memory_key, value, updated_at",
                         (
                             Jsonb(body["value"]), user_id, domain_id,
-                            matches[0]["memory_key"], Jsonb(body["expected_value"]),
+                            memory_key, Jsonb(body["expected_value"]),
                         ),
                     )
                     row = cur.fetchone()
-                if row is None:
-                    raise ClientError(409, "memory changed before correction; no value changed")
-                return self.send_json(200, row)
+                    if row is None:
+                        raise ClientError(409, "memory changed before correction; no value changed")
+                    result = {**row, "updated_at": row["updated_at"].isoformat(), "state": "CONFIRMED"}
+                    if effect_id is not None:
+                        cur.execute(
+                            "UPDATE effects SET state='CONFIRMED',result=%s,updated_at=now() "
+                            "WHERE effect_id=%s",
+                            (Jsonb(result), effect_id),
+                        )
+                        result.update({"task_id": str(task_id), "effect_id": str(effect_id)})
+                return self.send_json(200, result)
 
             memory_match = re.fullmatch(r"/v1/memory/([^/]+)", route.path)
             if self.command == "GET" and memory_match:
@@ -330,6 +434,23 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(key, str) or not 1 <= len(key) <= 80 or "value" not in body:
                     raise ClientError(400, "key and value are required")
                 with database() as conn, conn.cursor() as cur:
+                    task_id = require_active_memory_task(cur, user_id, domain_id, body)
+                    request_value = {"operation": "memory_write", "memory_key": key,
+                                     "value": body["value"]}
+                    prior = existing_memory_effect(
+                        cur, task_id, user_id, domain_id, f"memory:{key}", request_value,
+                    )
+                    if prior is not None:
+                        return self.send_json(200, prior)
+                    effect_id = None
+                    if task_id is not None:
+                        cur.execute(
+                            "INSERT INTO effects "
+                            "(task_id,user_id,domain_id,effect_kind,resource_key,state,request) "
+                            "VALUES (%s,%s,%s,'MEMORY_MUTATION',%s,'INTENDED',%s) RETURNING effect_id",
+                            (task_id, user_id, domain_id, f"memory:{key}", Jsonb(request_value)),
+                        )
+                        effect_id = cur.fetchone()["effect_id"]
                     cur.execute(
                         "INSERT INTO scoped_memory (user_id, domain_id, memory_key, value) "
                         "VALUES (%s, %s, %s, %s) ON CONFLICT (user_id, domain_id, memory_key) "
@@ -338,7 +459,15 @@ class Handler(BaseHTTPRequestHandler):
                         (user_id, domain_id, key, Jsonb(body["value"])),
                     )
                     row = cur.fetchone()
-                return self.send_json(200, row)
+                    result = {**row, "updated_at": row["updated_at"].isoformat(), "state": "CONFIRMED"}
+                    if effect_id is not None:
+                        cur.execute(
+                            "UPDATE effects SET state='CONFIRMED',result=%s,updated_at=now() "
+                            "WHERE effect_id=%s",
+                            (Jsonb(result), effect_id),
+                        )
+                        result.update({"task_id": str(task_id), "effect_id": str(effect_id)})
+                return self.send_json(200, result)
 
             if self.command == "POST" and route.path == "/v1/tasks":
                 body = self.read_json()
@@ -465,7 +594,25 @@ class Handler(BaseHTTPRequestHandler):
                                 "contract_kind": stored_contract["kind"],
                             }
                         else:
-                            reason = validate_finalization(finalization, checkpoint, effects)
+                            canonical_memory = {}
+                            for effect in effects:
+                                if effect.get("effect_kind") != "MEMORY_MUTATION":
+                                    continue
+                                memory_key = (effect.get("request") or {}).get("memory_key")
+                                if not isinstance(memory_key, str):
+                                    continue
+                                cur.execute(
+                                    "SELECT memory_key,value FROM scoped_memory "
+                                    "WHERE user_id=%s AND domain_id=%s AND memory_key=%s",
+                                    (current["user_id"], current["domain_id"], memory_key),
+                                )
+                                canonical = cur.fetchone()
+                                if canonical is not None:
+                                    canonical_memory[str(effect["effect_id"])] = canonical
+                            reason = validate_finalization(
+                                finalization, checkpoint, effects,
+                                task_identity=current, canonical_memory=canonical_memory,
+                            )
                             if reason:
                                 raise ClientError(409, reason)
                     cur.execute(

@@ -3,6 +3,8 @@ import os
 import unittest
 import urllib.error
 import urllib.request
+import uuid
+import psycopg
 
 
 BASE = os.environ.get("GATEWAY_URL", "http://tool-gateway:8080")
@@ -26,6 +28,90 @@ def call(method, path, token=None, body=None, orchestrator=False):
 
 
 class GatewayIntegration(unittest.TestCase):
+    def test_task_linked_memory_correction_is_atomic_idempotent_and_recoverable(self):
+        key = "cp74-memory-" + uuid.uuid4().hex[:12]
+        task_ids = []
+
+        def cleanup():
+            with psycopg.connect(os.environ["DATABASE_URL"]) as conn, conn.cursor() as cur:
+                for task_id in task_ids:
+                    cur.execute("DELETE FROM effects WHERE task_id=%s", (task_id,))
+                    cur.execute("DELETE FROM tasks WHERE task_id=%s", (task_id,))
+                cur.execute(
+                    "DELETE FROM scoped_memory WHERE user_id='user-amber' AND memory_key=%s",
+                    (key,),
+                )
+
+        self.addCleanup(cleanup)
+        original = {"format": "weekly summary in paragraphs"}
+        corrected = {"format": "short weekly summary bullets"}
+        status, seeded = call("POST", "/v1/memory", AMBER, {"key": key, "value": original})
+        self.assertEqual(status, 200, seeded)
+
+        status, task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Correct the stored weekly summary preference and verify it in a fresh context"
+        })
+        self.assertEqual(status, 201, task)
+        task_id = task["task_id"]
+        task_ids.append(task_id)
+        mutation = {
+            "task_id": task_id, "query": key.replace("-", " ") + " weekly summary",
+            "expected_value": original, "value": corrected,
+        }
+        status, changed = call("POST", "/v1/memory/correct", AMBER, mutation)
+        self.assertEqual(status, 200, changed)
+        self.assertEqual(changed["state"], "CONFIRMED")
+        self.assertEqual(changed["task_id"], task_id)
+        self.assertTrue(changed.get("effect_id"))
+
+        status, repeated = call("POST", "/v1/memory/correct", AMBER, mutation)
+        self.assertEqual(status, 200, repeated)
+        self.assertEqual(repeated["effect_id"], changed["effect_id"])
+        self.assertTrue(repeated["already_recorded"])
+        status, task_row = call("GET", f"/v1/tasks/{task_id}", AMBER)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(task_row["effects"]), 1)
+
+        status, mismatch = call("POST", "/v1/memory/correct", AMBER, {
+            **mutation, "value": {"format": "changed retry must not apply"},
+        })
+        self.assertEqual(status, 409)
+        status, saved = call("GET", f"/v1/memory/{key}", AMBER)
+        self.assertEqual(status, 200)
+        self.assertEqual(saved["value"], corrected)
+
+        proof = {
+            "task_type": "EFFECTFUL", "response_nonempty": True, "completion_claim": True,
+            "tool_evidence": [{
+                "tool": "memory_correct", "status": "ok", "state": "CONFIRMED",
+                "effect_id": changed["effect_id"], "memory_key": key,
+            }],
+        }
+        status, complete = call("POST", f"/v1/tasks/{task_id}/checkpoint", AMBER, {
+            "state": "COMPLETED", "checkpoint": {
+                "summary": "The memory correction was verified", "completed": ["preference corrected"],
+                "pending": [],
+            }, "_orchestrator_finalization": proof,
+        }, orchestrator=True)
+        self.assertEqual(status, 200, complete)
+        self.assertEqual(complete["state"], "COMPLETED")
+
+        # A separate task simulates a fresh conversational context after restart.
+        status, fresh_task = call("POST", "/v1/tasks", AMBER, {
+            "goal": "Recall the corrected weekly summary preference"
+        })
+        self.assertEqual(status, 201)
+        task_ids.append(fresh_task["task_id"])
+        status, recalled = call("GET", f"/v1/memory/{key}", AMBER)
+        self.assertEqual(status, 200)
+        self.assertEqual(recalled["value"], corrected)
+        status, invalid_owner = call("POST", "/v1/memory", COBALT, {
+            "task_id": fresh_task["task_id"], "key": key, "value": {"format": "cross-domain"},
+        })
+        self.assertEqual(status, 404)
+        status, still_correct = call("GET", f"/v1/memory/{key}", AMBER)
+        self.assertEqual(still_correct["value"], corrected)
+
     def test_scoped_reads_memory_tasks_and_verified_compound_edit(self):
         status, _ = call("GET", "/health")
         self.assertEqual(status, 200)

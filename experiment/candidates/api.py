@@ -172,7 +172,8 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
             effect_id = urllib.parse.quote(str(arguments.get("effect_id", "")), safe="")
             path = path.replace("{effect_id}", effect_id)
     payload = dict(arguments)
-    if name in {"workspace_exec", "commitment_submit", "shopping_list_change"}:
+    if name in {"workspace_exec", "commitment_submit", "shopping_list_change",
+                "memory_write", "memory_correct"}:
         payload["task_id"] = task_id
     if name in {"task_checkpoint", "commitment_reconcile"}:
         payload = {} if name == "commitment_reconcile" else payload
@@ -230,7 +231,7 @@ def gateway_call(name: str, arguments: dict, token: str, task_id: str, evidence:
             item["approval_pending"] = True
         if observation.get("state") in {"QUARANTINED", "UNRESOLVED", "DISPATCHED"} or observation.get("reconcile_required"):
             item["uncertain"] = True
-        if name in {"memory_search", "memory_read", "memory_correct"}:
+        if name in {"memory_search", "memory_read", "memory_correct", "memory_write"}:
             if name == "memory_search":
                 memories = observation.get("memories", [])
                 item["result_count"] = len(memories)
