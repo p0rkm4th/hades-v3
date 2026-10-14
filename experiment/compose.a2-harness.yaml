@@ -1,0 +1,20 @@
+services:
+  a2-harness-runner:
+    build:
+      context: .
+      dockerfile: spikes/a2_gateway_workspace/Dockerfile
+    environment:
+      GATEWAY_URL: http://tool-gateway:8080
+      HADES_USER_TOKEN: fixture-token-amber
+    depends_on:
+      tool-gateway:
+        condition: service_healthy
+    networks: [operator]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 2g
+    restart: "no"
+    profiles: [a2-harness]
