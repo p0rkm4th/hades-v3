@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP85's held-out A/C structured-memory screen timed out before tools under a four-CPU safety cap; preserve that unscored result and do not rerun model inference today. CP84's 3/3 deterministic DBOS/finalizer recovery remains positive contract evidence, not live-model qualification. Local isolated deterministic lifecycle/finalizer/oracle tests passed 44/44. The ADR/v2-source and coordination-handoff checkpoint is published at `d47433a1550d007b29e84879df2dc1a2f5534cac`; full exact-SHA CI passed as run `38596642984`.
+**Current workstream:** CP85's held-out A/C structured-memory screen timed out before tools under a four-CPU safety cap; preserve that unscored result and do not rerun model inference today. CP84's 3/3 deterministic DBOS/finalizer recovery remains positive contract evidence, not live-model qualification. Local isolated deterministic lifecycle/finalizer/oracle tests passed 44/44. Latest published coordination/report checkpoint is `db5adc4f4277310c7c009f63f79d917db8864344`; full exact-SHA CI passed as run `38598208988`. A small source-complexity observation on Candidate C is being recorded separately; it does not change candidate scores.
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order

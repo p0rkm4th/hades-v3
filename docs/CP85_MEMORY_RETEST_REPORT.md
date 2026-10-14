@@ -45,3 +45,5 @@ CP85 was published at `998cdc9fc61fd833b4a551d6f8ee8b638a233650`, and remote `ma
 A subsequent sanitized documentation checkpoint, `5a54d083f715829ccceeb3b4cf03acea24afdc91`, passed the complete Prototype CI run [38595098048](https://github.com/p0rkm4th/hades-v3/actions/runs/38595098048), including all gateway, lifecycle, recovery, DBOS/Harness, adapter, and strict CP69 offline tests. This later green run does not change CP85's resource-limited candidate outcome or the original startup failure.
 
 The next sanitized campaign/control-handoff checkpoint `d47433a1550d007b29e84879df2dc1a2f5534cac` also passed its exact-SHA full CI run [38596642984](https://github.com/p0rkm4th/hades-v3/actions/runs/38596642984). The CP85 candidate result remains an unscored pre-tool timeout; no repeat inference was sent.
+
+The current public `db5adc4f4277310c7c009f63f79d917db8864344` checkpoint passed full CI as well ([38598208988](https://github.com/p0rkm4th/hades-v3/actions/runs/38598208988)); no CP85 retry or other model request occurred.
