@@ -3,9 +3,9 @@ import unittest
 from unittest.mock import patch
 
 from pydantic_ai import Agent
-from pydantic_ai.messages import RetryPromptPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai_harness import Shell
+from pydantic_ai.workspaces import WorkspaceUnavailableError
 import probe
 from gateway_workspace import HadesGatewayWorkspace
 
@@ -35,7 +35,7 @@ class CountingOpener:
 
 
 class UncertainShellRecoveryTests(unittest.TestCase):
-    def test_shell_only_stops_after_one_quarantined_command(self):
+    def test_shell_only_aborts_after_one_quarantined_command_without_retry(self):
         previous_profile = probe.TOOL_PROFILE
         previous_calls = probe.MODEL_CALLS
         probe.TOOL_PROFILE = "shell_only"
@@ -46,25 +46,18 @@ class UncertainShellRecoveryTests(unittest.TestCase):
             FunctionModel(probe.scripted_model, model_name="strict-hades-a2-peer"),
             capabilities=[Shell(tools=["run_command"], default_timeout=20)],
         )
+        model_calls = None
         try:
             with patch("gateway_workspace.urllib.request.build_opener", return_value=opener):
-                result = agent.run_sync(probe.TASK_WORDING, workspace=workspace)
+                with self.assertRaises(WorkspaceUnavailableError):
+                    agent.run_sync(probe.TASK_WORDING, workspace=workspace)
+            model_calls = probe.MODEL_CALLS
         finally:
             probe.TOOL_PROFILE = previous_profile
             probe.MODEL_CALLS = previous_calls
 
         self.assertEqual(opener.calls, 1)
-        self.assertEqual(probe.MODEL_CALLS, 2)
-        self.assertIn("uncertain", result.output.casefold())
-        self.assertIn("without retrying", result.output.casefold())
-        self.assertEqual(
-            sum(isinstance(part, RetryPromptPart) for message in result.all_messages()
-                for part in message.parts), 1,
-        )
-        self.assertEqual(
-            sum(isinstance(part, ToolCallPart) for message in result.all_messages()
-                for part in message.parts), 1,
-        )
+        self.assertEqual(model_calls, 1)
 
 
 if __name__ == "__main__":
