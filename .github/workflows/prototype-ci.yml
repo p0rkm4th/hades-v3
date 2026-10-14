@@ -16,6 +16,7 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: hades-v3-ci-${{ github.run_id }}-${{ github.run_attempt }}
       A2_COMPOSE_PROJECT_NAME: hades-v3-exp-a2-${{ github.run_id }}-${{ github.run_attempt }}
+      CP79_COMPOSE_PROJECT_NAME: hades-v3-exp-cp79-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -102,6 +103,22 @@ jobs:
       - name: Remove isolated A2 workspace fixtures
         if: always()
         run: docker compose -p "$A2_COMPOSE_PROJECT_NAME" --profile a2-harness -f experiment/compose.yaml -f experiment/compose.a2-harness.yaml down --volumes --remove-orphans
+
+      - name: Start isolated CP79 gateway fixtures
+        run: docker compose -p "$CP79_COMPOSE_PROJECT_NAME" --profile cp79-dbos -f experiment/compose.yaml -f experiment/compose.cp79-dbos.yaml up -d --build postgres grocy commitment-simulator workspace-amber workspace-cobalt tool-gateway
+
+      - name: Create CP79 synthetic tasks and exact approvals
+        run: docker compose -p "$CP79_COMPOSE_PROJECT_NAME" --profile cp79-dbos -f experiment/compose.yaml -f experiment/compose.cp79-dbos.yaml run --build --rm --no-deps cp79-dbos-setup
+
+      - name: Resume CP79 DBOS workflows after accepted-effect process death
+        run: docker compose -p "$CP79_COMPOSE_PROJECT_NAME" --profile cp79-dbos -f experiment/compose.yaml -f experiment/compose.cp79-dbos.yaml run --build --rm --no-deps cp79-dbos-worker
+
+      - name: Independently verify CP79 task, grant, effect, and target state
+        run: docker compose -p "$CP79_COMPOSE_PROJECT_NAME" --profile cp79-dbos -f experiment/compose.yaml -f experiment/compose.cp79-dbos.yaml run --build --rm --no-deps cp79-dbos-verify
+
+      - name: Remove isolated CP79 DBOS fixtures and workflow state
+        if: always()
+        run: docker compose -p "$CP79_COMPOSE_PROJECT_NAME" --profile cp79-dbos -f experiment/compose.yaml -f experiment/compose.cp79-dbos.yaml down --volumes --remove-orphans --timeout 5
 
       - name: Validate isolated CP69 offline profile
         run: docker compose -p "${COMPOSE_PROJECT_NAME}-cp69offline" --profile cp68-offline -f experiment/compose.yaml -f experiment/compose.cp68-offline.yaml config --quiet

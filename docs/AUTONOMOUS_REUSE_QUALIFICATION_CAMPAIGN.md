@@ -77,3 +77,11 @@ The CP77 DBOS probe is published and exact-SHA CI passed: run `38508417305` for 
 - The combined Shell/FileSystem route has high command/effect overhead for this small task. Compare a Shell-only route before accepting extra capability. Fixed gateway environment/timeout and uncertain-command recovery remain limitations; upstream `Coder` is not qualified.
 - The previous exact-SHA CI failure at fixture startup remains unexplained. Local equivalent startup and uncached build passed; do not infer the hosted failure's cause. The A2 CI route now uses its own unique project and unconditional cleanup; verify the newly published exact-SHA result.
 - All CP78 resources were removed. No HADES v2, Hypnos, firewall, or persistent service changed. CP71 remains `BLOCKED_EXTERNAL_DEPENDENCY`; ADR-010 remains NOT READY.
+
+## CP79 checkpoint: DBOS replay through the HADES gateway
+
+- DBOS Transact 3.2.0 resumed three disposable workflows after the worker died between gateway response and DBOS step persistence. Each replay preserved the original task/effect IDs; HADES recorded one canonical receive and one confirmed effect per task.
+- An independent verifier checked task, user/domain, exact approval digest/consumption, effect request/identity, and simulator state before trusted HADES finalization. All three tasks and final responses persisted as completed. This is a **CONTRACT TEST**, not model or candidate qualification, and DBOS metadata was disposable rather than an authority.
+- The first Python 3.13/3.14 runner attempts failed before effect dispatch because their bundled SQLite did not support DBOS's `unixepoch('subsec')` schema default. That setup failure is preserved. Python 3.11 runner passed. Full evidence: `docs/CP79_DBOS_GATEWAY_RECOVERY_SPIKE.md`.
+- Local CP79/A2 containers, networks, and volumes are absent. Tagged experiment images remain reproducible and are reported to the storage-cleanup lead for disposition; no image or shared build cache was deleted.
+- Next: compare Shell-only A2 against the current gateway-backed Harness composition, then complete held-out compound/recovery work with independent final-state oracles. CP71 remains `BLOCKED_EXTERNAL_DEPENDENCY`; no new GPU or firewall operation is authorized. ADR-010 remains NOT READY.
