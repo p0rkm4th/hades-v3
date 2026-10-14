@@ -69,6 +69,11 @@ class GatewayIntegration(unittest.TestCase):
         status, replay = call("POST", "/v1/workspace/exec", AMBER, body)
         self.assertEqual((status, replay["effect_id"], replay.get("already_recorded")),
                          (200, first["effect_id"], True))
+        status, canonical_task = call("GET", f"/v1/tasks/{task_id}", AMBER)
+        self.assertEqual(status, 200, canonical_task)
+        identity_rows = [effect for effect in canonical_task["effects"] if effect["effect_id"] == first["effect_id"]]
+        self.assertEqual(len(identity_rows), 1)
+        self.assertEqual(identity_rows[0]["operation_id"], operation_id)
         status, changed = call("POST", "/v1/workspace/exec", AMBER,
                                {**body, "command": command + " "+"# changed"})
         self.assertEqual(status, 409, changed)

@@ -128,6 +128,12 @@ jobs:
             --memory=2g --pids-limit=64 --tmpfs /tmp:rw,noexec,nosuid,size=64m \
             "${A2_COMPOSE_PROJECT_NAME}-a2-harness-runner" python /app/test_step_persistence_interrupted_shell.py
 
+      - name: Verify HADES-aware interrupted-call resume gate
+        run: |
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --memory=2g --pids-limit=64 --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            "${A2_COMPOSE_PROJECT_NAME}-a2-harness-runner" python /app/test_resume_gate.py
+
       - name: Verify A2 Shell retries a confirmed call without redispatch
         run: docker compose -p "$A2_COMPOSE_PROJECT_NAME" --profile a2-harness -f experiment/compose.yaml -f experiment/compose.a2-harness.yaml run --rm --no-deps a2-harness-runner python /app/test_confirmed_command_recovery.py
 

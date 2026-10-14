@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP82 identity-bound A2 workspace recovery; exact replay is verified, task-orchestrator reconciliation remains open
+**Current workstream:** CP82 identity-bound A2 workspace recovery; exact replay and a test-only task/effect resume coordinator are contract-tested, A/C restart persistence remains open
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -11,7 +11,7 @@
 |---|---|---|---|
 | 1 | Baseline, component inventory, reuse-first technology assessment | Research synthesis complete; A2/DBOS integration evidence pending | Frozen requirements mapped to current code and official upstream options; facts separated from hypotheses |
 | 2 | CP75/CP81 correction diagnosis, safe CAS interface, and trusted bounded completion | Contract complete; A/C campaign completed with mixed results | Scalar passed 3/3 per candidate; structured no-tool 0/3; list mutations 3/3 with answer 2/3; fresh list recall 0/3. See report and JSONL. |
-| 3 | Upstream Pydantic AI Harness proof of concept | Shell-only and exact-call recovery pass under strict peer; task-journal reconciliation remains | Reconcile StepPersistence's original `started` record against the sole HADES effect record before model continuation; A/C remain unqualified |
+| 3 | Upstream Pydantic AI Harness proof of concept | Shell-only and exact-call recovery pass under strict peer; test-only task-journal reconciliation passes | Integrate a coordinator only in a future authorized runtime; investigate A/C persistence separately |
 | 4 | Durable-engine integration spike | DBOS replay contract probe positive; production-like HADES integration pending | Measure whether DBOS can persist the same operation identity/replay handling using the existing HADES task/effect ledger, without a second ledger/service |
 | 5 | Compound work, general-purpose agency, recovery, protected actions | Planned | Held-out matched trials and independent final-state/security verification |
 | 6 | Deletion-oriented simplification and ADR-010 evidence review | Planned | Replacement parity, reduced maintenance surface, decision-readiness table |
@@ -54,7 +54,7 @@ The CP77 DBOS probe is published and exact-SHA CI passed: run `38508417305` for 
 
 The pinned A2 wrapper derives each operation identity from the task ID, persisted Harness `tool_call_id`, and a dispatch ordinal so multiple Shell/FileSystem backend commands remain distinct; the gateway binds that identity and command digest to its existing effect record. Exact confirmed replay returns the original result; changed arguments reject; unresolved operations block new dispatch. A deterministic worker-crash test passed after killing the worker between gateway confirmation and Shell acknowledgment, then resuming the original tool call without a duplicate marker. Gateway restart replay and seeded unresolved-state cases also passed. The strict A2 repository probe passed under a deterministic peer. See [`CP82_WORKSPACE_COMMAND_REPLAY_REPORT.md`](CP82_WORKSPACE_COMMAND_REPLAY_REPORT.md).
 
-Limits remain: HADES task stayed `RUNNING`; original `StepPersistence` effect still requires reconciliation against the HADES ledger; unknown shell outcomes have no canonical resolution path; A/C now inject provider call IDs but restart persistence is unqualified; Hermes still fails closed without an MCP call identity. The disposable CP82 project was removed after evidence capture; post-cleanup inventory was empty and CP75/CP80 remained up. No Hypnos, privileged firewall, v2 runtime, or production change occurred.
+Limits remain: HADES task stayed `RUNNING`; the old `StepPersistence` row remains `started`; a test-only coordinator rechecks it against the HADES ledger before each continuation but is not integrated in a general runtime; unknown shell outcomes have no canonical resolution path; A/C now inject provider call IDs but restart persistence is unqualified; Hermes still fails closed without an MCP call identity. Both disposable CP82 projects were removed after evidence capture; post-cleanup inventory found no CP82 resources, while the 14 CP75/80 containers remained up and disk free space was 44 GB. No Hypnos, privileged firewall, v2 runtime, or production change occurred.
 
 ## CP76 checkpoint (2026-10-13): research synthesis complete, spikes next
 

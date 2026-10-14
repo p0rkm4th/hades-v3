@@ -65,6 +65,11 @@
       "cause": "A2 shell_filesystem used one operation identity for multiple internal backend commands; gateway rejected changed digest with HTTP 409.",
       "preserved": true
     },
+    "ordinal_fix_exact_sha_ci": {
+      "commit": "081305a709d088f083548598f885546dbb5fe9fc",
+      "run_id": 38581168547,
+      "conclusion": "success"
+    },
     "post_ordinal_fix_a2_profiles": {
       "classification": "CONTRACT_TEST",
       "shell_only_runs": 3,
@@ -74,6 +79,29 @@
       "shell_filesystem_candidate_effects_each": 18,
       "model_calls_each": 4,
       "independent_test_and_source_check": "passed"
+    },
+    "final_source_local_validation": {
+      "classification": "CONTRACT_TEST",
+      "gateway_tests": "8 passed after documented disposable Grocy initialization",
+      "workspace_flow": "passed",
+      "a2_identity_context": "passed",
+      "a2_resume_gate": "passed including WAITING rejection",
+      "a2_confirmed_command_restart_and_repeated_resume": "passed; one canonical effect and marker",
+      "a2_uncertain_shell": "passed; no blind retry",
+      "initial_gateway_attempt_before_grocy_fixture_initialization": "failed at inventory read with HTTP 502; corrected setup and full rerun passed"
+    },
+    "resume_gate": {
+      "classification": "CONTRACT_TEST",
+      "allows_absent_pre_dispatch_effect": true,
+      "allows_matching_confirmed_effect": true,
+      "blocks_matching_quarantined_effect": true,
+      "blocks_unrelated_unresolved_task_effect": true,
+      "blocks_wrong_task_or_terminal_task": true,
+      "blocks_waiting_owner_action_state": true,
+      "repeated_resume_no_duplicate": true,
+      "task_state": "RUNNING",
+      "step_persistence_original_row": "started; test-only coordinator rechecks canonical HADES state each time",
+      "general_runtime_integration": false
     }
   },
   "limitations": [
@@ -81,7 +109,8 @@
     "A2 only; A and C workspace replay remain unqualified.",
     "A new tool-call identity can represent a new command and is not deduplicated against confirmed history.",
     "Unknown arbitrary shell outcomes lack a general canonical reconciliation path and remain quarantined.",
-    "StepPersistence needs an orchestrator check against HADES effects before selecting a continuation."
+    "The test-only StepPersistence coordinator is not integrated in a general runtime; a future authorized orchestrator must check HADES effects before selecting continuation.",
+    "WAITING is rejected by the test-only coordinator to avoid resuming through approval or owner-action pauses."
   ],
   "test_fixture_note": "Initial workspace-flow run caught a marker left by the gateway test; test now removes its exact synthetic marker through a separately identified gateway effect, and both suites pass on rerun."
 }
