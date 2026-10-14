@@ -2,7 +2,7 @@
 
 **Authority:** frozen HADES v3 PRD and Bounded Operator architecture
 **Starting revision:** CP75, `18a4af6738a5e0f4dce079a8302726a766eae49a`
-**Current workstream:** CP76 reuse-first assessment; select bounded A2 and DBOS spikes
+**Current workstream:** CP77 DBOS integration; A2 Harness proof of concept follows
 **ADR-010:** NOT READY; owner ratification required
 
 ## Objectives and order
@@ -12,7 +12,7 @@
 | 1 | Baseline, component inventory, reuse-first technology assessment | Research synthesis complete; A2/DBOS integration evidence pending | Frozen requirements mapped to current code and official upstream options; facts separated from hypotheses |
 | 2 | CP75 correction diagnosis and safe correction interface | Complete; candidate memory workflow unqualified | CAS contract verified; A/C failures and restart reads preserved in CP75 report/results |
 | 3 | Upstream Pydantic AI Harness proof of concept | Selected, not started; separate A2 revision | Pinned isolated integration; same trusted HADES gateway and independent outcome oracle |
-| 4 | Durable-engine integration spike | DBOS selected first; Temporal deferred | Demonstrate resume/retry while HADES remains sole task/effect authority; no external effect replay |
+| 4 | Durable-engine integration spike | DBOS contract probe positive; HADES integration pending | Demonstrate resume/retry while HADES remains sole task/effect authority; no external effect replay |
 | 5 | Compound work, general-purpose agency, recovery, protected actions | Planned | Held-out matched trials and independent final-state/security verification |
 | 6 | Deletion-oriented simplification and ADR-010 evidence review | Planned | Replacement parity, reduced maintenance surface, decision-readiness table |
 
@@ -38,7 +38,7 @@ Research and bounded disposable integrations continue without live GPU access. S
 
 ## Next actionable step
 
-Start the two selected offline hypotheses as separately pinned, disposable work: (1) A2 Pydantic AI Harness using the existing isolated shell/workspace boundary; (2) DBOS with a disposable system database and a simulator operation mediated by the current HADES gateway. Begin with the DBOS integration design and prove that retries cannot dispatch an effect outside the existing effect ID/reconciliation contract. Do not introduce a persistent service or change A/B/C scores. CP71 stays `BLOCKED_EXTERNAL_DEPENDENCY`; no firewall checks or Hypnos inference.
+Continue CP77 by integrating DBOS with the real HADES gateway and simulator in a uniquely scoped disposable fixture project; the existing SQLite probe only established DBOS step replay plus target-side idempotency. After that contract test passes, evaluate the Pydantic AI Harness A2 separately using the existing isolated shell/workspace boundary. Do not introduce a persistent service or change A/B/C scores. CP71 stays `BLOCKED_EXTERNAL_DEPENDENCY`; no firewall checks or Hypnos inference.
 
 ## CP76 checkpoint (2026-10-13): research synthesis complete, spikes next
 
@@ -51,3 +51,10 @@ Start the two selected offline hypotheses as separately pinned, disposable work:
 - CP76 findings, current versions/licenses, architecture gaps, build-versus-reuse rationale, and official source links are in `docs/REUSE_FIRST_TECHNOLOGY_ASSESSMENT.md`. This is **RESEARCH**, not runtime qualification. No package was installed; no service, Docker resource, v2 environment, firewall, or GPU route changed.
 - CP75 trial outcomes remain unchanged. Candidate memory workflow is still unqualified: completion checkpoint omission and structured-value no-tool behavior remain open.
 - Next: begin DBOS spike using disposable state and the existing effect authority, then separate A2 Harness proof of concept. Do not install a persistent workflow service, modify scored candidates, revisit CP71's unchanged firewall blocker, or run Hypnos inference. ADR-010 remains NOT READY.
+
+## CP77 checkpoint (2026-10-13): DBOS replay contract smoke
+
+- Installed `dbos==3.2.0` only in `/tmp/hades-cp77-dbos-venv`; Python was 3.14.7. The reproducible probe and exact pin are under `experiment/spikes/cp77_durable_execution/` and `experiment/spikes/cp77_durable_execution_probe.py`.
+- A subprocess exited after an idempotent synthetic target accepted the fixed effect ID but before DBOS persisted its step result. On restart DBOS recovered the workflow, called the step a second time, and returned the original task/effect identity. The independent synthetic ledger recorded two step attempts and one canonical effect row.
+- This is **CONTRACT TEST** only. It did not use HADES gateway, grants, simulator, PostgreSQL, a model, or candidate runtime. It proves DBOS does replay an interrupted step and target idempotency is needed; it does not prove HADES integration or candidate benefit. See `docs/CP77_DBOS_PROCESS_RECOVERY_PROBE.md`.
+- A narrowly scoped CI step runs the probe with the exact DBOS pin. Next experiment must use a fresh, unique HADES fixture project and real gateway/simulator before assessing whether DBOS reduces custom recovery plumbing. No active fixture project was modified for this smoke. CP71 remains blocked; no GPU or firewall operation occurred.

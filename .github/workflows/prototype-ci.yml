@@ -21,7 +21,7 @@ jobs:
 
       - name: Validate Python and tool contract
         run: |
-          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/contracts/memory_schema.py experiment/contracts/memory_diagnostics.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py experiment/tests/run_cp74_fresh_memory_recall.py experiment/tests/run_cp75_memory_cas_case.py
+          python -m py_compile experiment/services/gateway.py experiment/services/commitment_simulator.py experiment/candidates/api.py experiment/candidates/mcp_proxy.py experiment/contracts/memory_schema.py experiment/contracts/memory_diagnostics.py experiment/tests/test_commitment_recovery.py experiment/tests/run_family8_restart_recovery.py experiment/tests/run_cp73_completion_recovery.py experiment/tests/run_cp74_fresh_memory_recall.py experiment/tests/run_cp75_memory_cas_case.py experiment/spikes/cp77_durable_execution_probe.py
           python -m py_compile experiment/contracts/task_lifecycle.py
           python -m py_compile experiment/services/inference_adapter.py
           python -m py_compile experiment/services/ollama_protocol.py
@@ -29,6 +29,11 @@ jobs:
           python -m py_compile experiment/scripts/hypnos_gpu_preflight.py experiment/tests/test_hypnos_gpu_preflight.py
           python -m py_compile experiment/tests/scripted_ollama.py experiment/tests/run_cp68_e2e.py experiment/tests/test_ollama_protocol.py experiment/tests/compose_scope.py experiment/tests/test_compose_scope.py experiment/tests/run_family2_eggs_oats_screen.py experiment/tests/run_family3_cp64_unavailable.py experiment/tests/run_family4_cp60_screen.py experiment/tests/run_family5_workspace_screen.py experiment/tests/run_family6_restart.py experiment/tests/run_family7_denial_screen.py experiment/tests/run_family8_ack_loss_pilot.py
           python -m json.tool experiment/contracts/tools.json >/dev/null
+
+      - name: Run isolated DBOS process-recovery contract probe
+        run: |
+          python -m pip install -r experiment/spikes/cp77_durable_execution/requirements.txt
+          python experiment/spikes/cp77_durable_execution_probe.py
 
       - name: Create ephemeral orchestrator credential
         run: |
