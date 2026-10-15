@@ -56,6 +56,26 @@ class GatewayIntegration(unittest.TestCase):
         task_id = task["task_id"]
         operation_id = hashlib.sha256(f"{task_id}:concurrent-call".encode()).hexdigest()
         marker = f".concurrent-operation-{task_id}.txt"
+
+        def remove_test_marker():
+            cleanup_id = hashlib.sha256(f"{task_id}:cleanup-concurrent-marker".encode()).hexdigest()
+            cleanup_command = (
+                "python -c \"from pathlib import Path; "
+                f"p=Path('{marker}'); p.unlink(missing_ok=True); "
+                "assert not p.exists()\""
+            )
+            cleanup_status, cleanup_result = call("POST", "/v1/workspace/exec", AMBER, {
+                "task_id": task_id,
+                "command": cleanup_command,
+                "operation_id": cleanup_id,
+            })
+            self.assertEqual(cleanup_status, 200, cleanup_result)
+            self.assertEqual(cleanup_result.get("state"), "CONFIRMED", cleanup_result)
+            self.assertEqual(cleanup_result.get("exit_code"), 0, cleanup_result)
+
+        # unittest runs registered cleanups even if a later assertion fails.
+        # The command removes only this test's exact, task-scoped marker.
+        self.addCleanup(remove_test_marker)
         command = (
             "python -c \"import time; from pathlib import Path; time.sleep(0.5); "
             f"p=Path('{marker}'); p.write_text((p.read_text() if p.exists() else '') + 'x')\""
